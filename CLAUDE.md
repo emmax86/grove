@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 bun test                          # run all tests
 bun test src/__tests__/foo.test.ts  # run a single test file
 bun run build                     # compile to .bin/grove binary
-bun run format                    # format with prettier
-bun run format:check              # check formatting
+bun run format                    # format and lint with biome
+bun run format:check              # check formatting and lint with biome
 ```
 
 ## Architecture
