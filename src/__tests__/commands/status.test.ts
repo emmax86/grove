@@ -23,9 +23,7 @@ describe("status command", () => {
     await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("shows workspace name", async () => {
     const result = await getStatus("myws", paths);

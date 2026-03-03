@@ -21,9 +21,7 @@ describe("discoverDaemon", () => {
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("returns null when no discovery file exists", async () => {
     await addWorkspace("ws", paths);
@@ -69,7 +67,7 @@ describe("startDaemon", () => {
   afterEach(async () => {
     await stopFn?.();
     stopFn = null;
-    cleanup(tempDir);
+    await cleanup(tempDir);
   });
 
   it("throws when workspace does not exist", async () => {
@@ -181,7 +179,7 @@ describe("MCP over HTTP", () => {
     clients = [];
     await stopFn?.();
     stopFn = null;
-    cleanup(tempDir);
+    await cleanup(tempDir);
   });
 
   it("client connects and calls workspace_status tool", async () => {

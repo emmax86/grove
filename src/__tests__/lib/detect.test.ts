@@ -12,9 +12,7 @@ describe("detectEcosystem", () => {
     tempDir = await createTestDir();
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("returns null when no lockfile is present", async () => {
     const result = await detectEcosystem(tempDir);

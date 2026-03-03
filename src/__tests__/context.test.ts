@@ -25,9 +25,7 @@ describe("context inference", () => {
     await addWorktree("myws", "myrepo", "feature/ctx", { newBranch: true }, paths, GIT_ENV);
   });
 
-  afterAll(() => {
-    cleanup(tempDir);
-  });
+  afterAll(() => cleanup(tempDir));
 
   it("cwd at workspace root → workspace only", async () => {
     const ctx = await inferContext(paths.workspace("myws"), wsRoot);
@@ -142,9 +140,7 @@ describe("resolveRepoFromFile", () => {
     await addWorktree("myws", "myrepo", "feat-resolve", { newBranch: true }, paths, GIT_ENV);
   });
 
-  afterAll(() => {
-    cleanup(tempDir);
-  });
+  afterAll(() => cleanup(tempDir));
 
   it("returns REPO_NOT_RESOLVED for non-existent file", async () => {
     const result = await resolveRepoFromFile("/nonexistent/file.ts", "myws", paths);

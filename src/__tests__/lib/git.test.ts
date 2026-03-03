@@ -21,9 +21,7 @@ describe("git lib", () => {
     repoPath = await createTestGitRepo(tempDir, "testrepo");
   });
 
-  afterAll(() => {
-    cleanup(tempDir);
-  });
+  afterAll(() => cleanup(tempDir));
 
   describe("isGitRepo", () => {
     it("returns true for a git repo", async () => {

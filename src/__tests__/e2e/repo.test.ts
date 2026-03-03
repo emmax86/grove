@@ -16,9 +16,7 @@ describe("E2E: repo commands", () => {
     ]);
   });
 
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
+  afterEach(() => cleanupTempRoot(root));
 
   it("ws repo add registers repo and returns JSON", async () => {
     const r = await runCLI(["ws", "repo", "add", "myws", repoPath], { root });

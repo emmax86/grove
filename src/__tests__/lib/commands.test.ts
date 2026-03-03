@@ -14,9 +14,7 @@ describe("loadCommandConfig", () => {
     tempDir = await createTestDir();
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("returns null when .grove/commands.json does not exist", async () => {
     const result = await loadCommandConfig(tempDir);

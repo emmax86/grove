@@ -21,9 +21,7 @@ describe("execCommand", () => {
     await addRepo("ws", repoPath, undefined, paths, GIT_ENV);
   });
 
-  afterAll(() => {
-    cleanup(tempDir);
-  });
+  afterAll(() => cleanup(tempDir));
 
   it("returns REPO_NOT_RESOLVED when neither repo nor file is specified", async () => {
     const result = await execCommand("ws", "test", {}, paths);

@@ -26,9 +26,7 @@ describe("config", () => {
     configPath = join(wsDir, "workspace.json");
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("write then read roundtrip", async () => {
     const config = { name: "myws", repos: [] };
@@ -158,9 +156,7 @@ describe("pool config", () => {
     poolConfigPath = join(tempDir, "worktrees.json");
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("readPoolConfig returns {} when file doesn't exist", async () => {
     const result = await readPoolConfig(poolConfigPath);

@@ -20,9 +20,7 @@ describe("E2E: context inference via cwd", () => {
     });
   });
 
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
+  afterEach(() => cleanupTempRoot(root));
 
   it("workspace inferred from cwd at workspace root", async () => {
     const r = await runCLI(["ws", "repo", "list"], {

@@ -36,9 +36,7 @@ describe("worktree commands", () => {
     await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("add creates pool entry and workspace symlink", async () => {
     const result = await addWorktree(

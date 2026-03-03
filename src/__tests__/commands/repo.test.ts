@@ -35,9 +35,7 @@ describe("repo commands", () => {
     await addWorkspace("myws", paths);
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("add creates repo dir and default branch symlink", async () => {
     const result = await addRepo("myws", repoPath, undefined, paths, GIT_ENV);

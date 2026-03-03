@@ -17,9 +17,7 @@ describe("E2E: worktree commands", () => {
     await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
   });
 
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
+  afterEach(() => cleanupTempRoot(root));
 
   it("ws worktree add --new creates pool entry and workspace symlink", async () => {
     const r = await runCLI(["ws", "worktree", "add", "myrepo", "feature/x", "--new"], {

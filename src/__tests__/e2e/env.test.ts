@@ -9,9 +9,7 @@ describe("E2E: deprecation warnings", () => {
     root = await createTempRoot();
   });
 
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
+  afterEach(() => cleanupTempRoot(root));
 
   it("warns with value when DOTCLAUDE_ROOT is set and GROVE_ROOT is not", async () => {
     const r = await runCLI(["ws", "list"], { env: { DOTCLAUDE_ROOT: root } });
@@ -78,9 +76,7 @@ describe("E2E: GROVE_WORKSPACE plumbed to all ws subcommands", () => {
     await runCLI(["ws", "add", "myws"], { root });
   });
 
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
+  afterEach(() => cleanupTempRoot(root));
 
   // Subcommands that exit 0 when workspace exists and is empty
   const cleanCases: [string, string[]][] = [

@@ -8,9 +8,7 @@ describe("E2E: CLI output shape", () => {
   beforeEach(async () => {
     root = await createTempRoot();
   });
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
+  afterEach(() => cleanupTempRoot(root));
 
   it("success writes JSON to stdout only, stderr is empty", async () => {
     const r = await runCLI(["ws", "add", "myws"], { root });
