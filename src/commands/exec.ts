@@ -68,7 +68,7 @@ export async function execCommand(
   }
 
   // 3. Detect ecosystem and load config — both from the main repo root (lockfile lives there)
-  const ecosystem = detectEcosystem(mainRepoPath);
+  const ecosystem = await detectEcosystem(mainRepoPath);
   const config = await loadCommandConfig(mainRepoPath);
 
   // 4. Resolve command — resolve file to absolute so it works when cwd ≠ worktreeRoot

@@ -126,7 +126,7 @@ export async function addWorktree(
     return ok({ ...entry, setupSkipped: true });
   }
 
-  const ecosystem = detectEcosystem(repoEntry.path);
+  const ecosystem = await detectEcosystem(repoEntry.path);
   const config = await loadCommandConfig(repoEntry.path);
   const setupCmd = resolveCommand("setup", config, ecosystem, {});
 
