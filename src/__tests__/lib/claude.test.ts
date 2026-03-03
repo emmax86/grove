@@ -69,7 +69,10 @@ describe("generateClaudeFiles", () => {
         return;
       }
 
-      expect(result.value.treesMd).toEqual(["alpha", "bravo"]);
+      expect(result.value.treesMd).toEqual([
+        { repo: "alpha", slug: "main", hash: expect.any(String) },
+        { repo: "bravo", slug: "main", hash: expect.any(String) },
+      ]);
 
       const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
       expect(content).toContain("@../trees/alpha/main/CLAUDE.md");
@@ -90,7 +93,9 @@ describe("generateClaudeFiles", () => {
         return;
       }
 
-      expect(result.value.treesMd).toEqual(["alpha"]);
+      expect(result.value.treesMd).toEqual([
+        { repo: "alpha", slug: "main", hash: expect.any(String) },
+      ]);
 
       const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
       expect(content).toContain("@../trees/alpha/main/CLAUDE.md");
@@ -130,7 +135,11 @@ describe("generateClaudeFiles", () => {
         return;
       }
 
-      expect(result.value.treesMd).toEqual(["apple", "mango", "zebra"]);
+      expect(result.value.treesMd).toEqual([
+        { repo: "apple", slug: "main", hash: expect.any(String) },
+        { repo: "mango", slug: "main", hash: expect.any(String) },
+        { repo: "zebra", slug: "main", hash: expect.any(String) },
+      ]);
 
       const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
       const lines = content.split("\n").filter((l) => l.startsWith("@"));
@@ -149,6 +158,7 @@ describe("generateClaudeFiles", () => {
         return;
       }
 
+      expect(result.value.treesMd[0].slug).toBe("release-1.0");
       const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
       expect(content).toContain("@../trees/alpha/release-1.0/CLAUDE.md");
     });
@@ -297,10 +307,12 @@ describe("generateClaudeFiles", () => {
         return;
       }
 
-      expect(result.value.treesMd).toEqual(["alpha"]);
+      expect(result.value.treesMd).toEqual([
+        { repo: "alpha", slug: "main", hash: expect.any(String) },
+      ]);
     });
 
-    it("skips repos where getDefaultBranch fails", async () => {
+    it("includes no entries when getDefaultBranch fails and trees dir is empty", async () => {
       const pathA = await setupRepo("ws", "alpha");
 
       // Create a repo with detached HEAD using the .git/HEAD write pattern
@@ -341,7 +353,52 @@ describe("generateClaudeFiles", () => {
         return;
       }
 
-      expect(result.value.treesMd).toEqual(["alpha"]);
+      expect(result.value.treesMd).toEqual([
+        { repo: "alpha", slug: "main", hash: expect.any(String) },
+      ]);
+    });
+
+    it("still scans worktrees when getDefaultBranch fails", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+
+      // Create a detached HEAD repo so getDefaultBranch fails
+      const detachedPath = join(tempDir, "bravo");
+      await mkdir(detachedPath, { recursive: true });
+      const gitEnv = { ...process.env, ...GIT_ENV, HOME: tempDir };
+      Bun.spawnSync(["git", "init", "-b", "main", detachedPath], { env: gitEnv });
+      Bun.spawnSync(["git", "-C", detachedPath, "config", "user.email", "test@test.com"], {
+        env: gitEnv,
+      });
+      Bun.spawnSync(["git", "-C", detachedPath, "config", "user.name", "Test"], { env: gitEnv });
+      writeFileSync(join(detachedPath, "README"), "x");
+      Bun.spawnSync(["git", "-C", detachedPath, "add", "."], { env: gitEnv });
+      Bun.spawnSync(["git", "-C", detachedPath, "commit", "-m", "init"], { env: gitEnv });
+      const shaResult = Bun.spawnSync(["git", "-C", detachedPath, "rev-parse", "HEAD"], {
+        env: gitEnv,
+      });
+      const sha = new TextDecoder().decode(shaResult.stdout).trim();
+      writeFileSync(join(detachedPath, ".git", "HEAD"), `${sha}\n`);
+
+      // Set up a worktree slug with a CLAUDE.md so scanning can find it
+      await setupWorktreeEntry("ws", "bravo", "feature-1", { claudeContent: "# bravo feature\n" });
+
+      await setupWorkspace("ws", [
+        { name: "alpha", path: pathA },
+        { name: "bravo", path: detachedPath },
+      ]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd).toEqual(
+        expect.arrayContaining([
+          { repo: "alpha", slug: "main", hash: expect.any(String) },
+          { repo: "bravo", slug: "feature-1", hash: expect.any(String) },
+        ]),
+      );
     });
 
     it("creates .claude directory if missing", async () => {
@@ -352,6 +409,310 @@ describe("generateClaudeFiles", () => {
       const result = await generateClaudeFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       expect(existsSync(paths.claudeTreesMd("ws"))).toBe(true);
+    });
+  });
+
+  /**
+   * Create a plain directory with an optional CLAUDE.md and symlink it
+   * into trees/{repo}/{slug}. Does NOT create a git repo.
+   */
+  async function setupWorktreeEntry(
+    ws: string,
+    repo: string,
+    slug: string,
+    opts: { claudeContent?: string } = {},
+  ): Promise<string> {
+    const wtDir = join(tempDir, `worktree-${repo}-${slug}`);
+    await mkdir(wtDir, { recursive: true });
+    if (opts.claudeContent !== undefined) {
+      writeFileSync(join(wtDir, "CLAUDE.md"), opts.claudeContent);
+    }
+    await mkdir(paths.repoDir(ws, repo), { recursive: true });
+    symlinkSync(wtDir, paths.worktreeDir(ws, repo, slug));
+    return wtDir;
+  }
+
+  // ── trees.md comment lines ───────────────────────────────────────
+
+  describe("trees.md comment lines", () => {
+    it("emits # repo/slug comment line immediately before each @reference", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+
+      const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
+      const fileLines = content.split("\n");
+      const atIdx = fileLines.indexOf("@../trees/alpha/main/CLAUDE.md");
+      expect(atIdx).toBeGreaterThan(0);
+      expect(fileLines[atIdx - 1]).toBe("# alpha/main");
+    });
+
+    it("does not emit hash lines in trees.md", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+
+      const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
+      expect(content).not.toContain("sha256");
+    });
+
+    it("preserves the generated-by header as the first line", async () => {
+      await setupWorkspace("ws");
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+
+      const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
+      expect(content.split("\n")[0]).toBe("# Generated by grove — do not edit manually");
+    });
+  });
+
+  // ── hash correctness ─────────────────────────────────────────────
+
+  describe("hash correctness", () => {
+    it("returns deterministic sha256 hash for known file content", async () => {
+      const knownContent = "# alpha\nProject docs.\n";
+      const expectedHash = "0dd6d04f03204a51ec791f0f7369273268f896eba8e3a45fe64c3f5864f3305b";
+      const pathA = await setupRepo("ws", "alpha");
+      // Overwrite CLAUDE.md with known content
+      writeFileSync(join(pathA, "CLAUDE.md"), knownContent);
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd[0].hash).toBe(expectedHash);
+    });
+
+    it("skips worktree when CLAUDE.md is empty", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      // Overwrite with empty file
+      writeFileSync(join(pathA, "CLAUDE.md"), "");
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd).toEqual([]);
+    });
+  });
+
+  // ── worktree scanning (4a) ────────────────────────────────────────
+
+  describe("worktree scanning", () => {
+    it("includes feature branch when default branch has no CLAUDE.md", async () => {
+      const pathA = await setupRepo("ws", "alpha", { hasClaude: false });
+      await setupWorktreeEntry("ws", "alpha", "feature-x", {
+        claudeContent: "# feature-x\n",
+      });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd).toEqual([
+        { repo: "alpha", slug: "feature-x", hash: expect.any(String) },
+      ]);
+    });
+
+    it("orders non-default slugs alphabetically after default branch", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      await setupWorktreeEntry("ws", "alpha", "z-branch", { claudeContent: "# z\n" });
+      await setupWorktreeEntry("ws", "alpha", "a-branch", { claudeContent: "# a\n" });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd.map((e) => e.slug)).toEqual(["main", "a-branch", "z-branch"]);
+    });
+
+    it("orders all slugs alphabetically when default branch not in trees dir", async () => {
+      const pathA = await setupRepo("ws", "alpha", { hasClaude: false });
+      // Remove the default branch entry so diskSlugs truly excludes defaultSlug
+      rmSync(paths.worktreeDir("ws", "alpha", "main"));
+      await setupWorktreeEntry("ws", "alpha", "z-feat", { claudeContent: "# z\n" });
+      await setupWorktreeEntry("ws", "alpha", "a-feat", { claudeContent: "# a\n" });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd.map((e) => e.slug)).toEqual(["a-feat", "z-feat"]);
+    });
+
+    it("gracefully skips repo when trees directory does not exist", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      const pathB = await setupRepo("ws", "bravo");
+      await setupWorkspace("ws", [
+        { name: "alpha", path: pathA },
+        { name: "bravo", path: pathB },
+      ]);
+
+      // Remove bravo's trees directory entirely
+      rmSync(paths.repoDir("ws", "bravo"), { recursive: true, force: true });
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd.map((e) => e.repo)).toEqual(["alpha"]);
+    });
+  });
+
+  // ── deduplication (4b) ────────────────────────────────────────────
+
+  describe("worktree deduplication", () => {
+    it("includes feature branch when content differs from default", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      await setupWorktreeEntry("ws", "alpha", "feature-x", { claudeContent: "# different\n" });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd.map((e) => e.slug)).toEqual(["main", "feature-x"]);
+    });
+
+    it("deduplicates feature branch when content is identical to default", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      const claudeContent = readFileSync(join(pathA, "CLAUDE.md"), "utf-8");
+      await setupWorktreeEntry("ws", "alpha", "feature-x", { claudeContent });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd.map((e) => e.slug)).toEqual(["main"]);
+    });
+
+    it("default branch wins over alphabetically-earlier slug with same content", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      const claudeContent = readFileSync(join(pathA, "CLAUDE.md"), "utf-8");
+      await setupWorktreeEntry("ws", "alpha", "aaa-first", { claudeContent });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd.map((e) => e.slug)).toEqual(["main"]);
+    });
+
+    it("includes unique branches and deduplicates identical ones", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      const claudeContent = readFileSync(join(pathA, "CLAUDE.md"), "utf-8");
+      await setupWorktreeEntry("ws", "alpha", "feat-a", { claudeContent }); // same
+      await setupWorktreeEntry("ws", "alpha", "feat-b", { claudeContent: "# different\n" }); // different
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd.map((e) => e.slug)).toEqual(["main", "feat-b"]);
+    });
+
+    it("does not deduplicate identical content across different repos", async () => {
+      const sharedContent = "# shared content\n";
+      const pathA = await setupRepo("ws", "alpha");
+      writeFileSync(join(pathA, "CLAUDE.md"), sharedContent);
+      const pathB = await setupRepo("ws", "bravo");
+      writeFileSync(join(pathB, "CLAUDE.md"), sharedContent);
+      await setupWorkspace("ws", [
+        { name: "alpha", path: pathA },
+        { name: "bravo", path: pathB },
+      ]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd.map((e) => e.repo)).toEqual(["alpha", "bravo"]);
+    });
+
+    it("emits dedup annotation in trees.md comment for identical slugs", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      const claudeContent = readFileSync(join(pathA, "CLAUDE.md"), "utf-8");
+      await setupWorktreeEntry("ws", "alpha", "feat-a", { claudeContent });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      await generateClaudeFiles("ws", paths, GIT_ENV);
+
+      const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
+      expect(content).toContain("# alpha/main (also: feat-a)");
+    });
+
+    it("sorts multiple deduped slugs alphabetically in annotation", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      const claudeContent = readFileSync(join(pathA, "CLAUDE.md"), "utf-8");
+      await setupWorktreeEntry("ws", "alpha", "zzz-last", { claudeContent });
+      await setupWorktreeEntry("ws", "alpha", "aaa-first", { claudeContent });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      await generateClaudeFiles("ws", paths, GIT_ENV);
+
+      const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
+      expect(content).toContain("# alpha/main (also: aaa-first, zzz-last)");
+    });
+
+    it("emits no annotation when no slugs are deduplicated", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      await generateClaudeFiles("ws", paths, GIT_ENV);
+
+      const content = readFileSync(paths.claudeTreesMd("ws"), "utf-8");
+      expect(content).toContain("# alpha/main");
+      expect(content).not.toContain("(also:");
+    });
+
+    it("does not expose deduped field in return value", async () => {
+      const pathA = await setupRepo("ws", "alpha");
+      const claudeContent = readFileSync(join(pathA, "CLAUDE.md"), "utf-8");
+      await setupWorktreeEntry("ws", "alpha", "feat-a", { claudeContent });
+      await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
+
+      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.treesMd[0]).not.toHaveProperty("deduped");
     });
   });
 });
