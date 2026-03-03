@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -22,7 +22,7 @@ describe("config", () => {
   beforeEach(async () => {
     tempDir = await createTestDir();
     wsDir = join(tempDir, "myws");
-    mkdirSync(wsDir, { recursive: true });
+    await mkdir(wsDir, { recursive: true });
     configPath = join(wsDir, "workspace.json");
   });
 
@@ -95,7 +95,7 @@ describe("config", () => {
   });
 
   it("invalid JSON returns error", async () => {
-    writeFileSync(configPath, "not json");
+    await writeFile(configPath, "not json");
     const result = await readConfig(configPath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -104,7 +104,7 @@ describe("config", () => {
   });
 
   it("valid JSON but wrong schema returns error", async () => {
-    writeFileSync(configPath, JSON.stringify({ wrong: "schema" }));
+    await writeFile(configPath, JSON.stringify({ wrong: "schema" }));
     const result = await readConfig(configPath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -115,11 +115,11 @@ describe("config", () => {
   it("writeConfig returns error when path is not writable", async () => {
     // Write to a path inside a non-writable directory
     const roDir = join(tempDir, "readonly");
-    mkdirSync(roDir);
-    chmodSync(roDir, 0o444);
+    await mkdir(roDir);
+    await chmod(roDir, 0o444);
     const roConfig = join(roDir, "workspace.json");
     const result = await writeConfig(roConfig, { name: "test", repos: [] });
-    chmodSync(roDir, 0o755); // restore so cleanup works
+    await chmod(roDir, 0o755); // restore so cleanup works
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("CONFIG_WRITE_FAILED");
@@ -129,9 +129,9 @@ describe("config", () => {
   it("addRepoToConfig propagates writeConfig failure", async () => {
     await writeConfig(configPath, { name: "myws", repos: [] });
     // Make the directory read-only so write fails
-    chmodSync(wsDir, 0o444);
+    await chmod(wsDir, 0o444);
     const result = await addRepoToConfig(configPath, { name: "r", path: "/p" });
-    chmodSync(wsDir, 0o755);
+    await chmod(wsDir, 0o755);
     expect(result.ok).toBe(false);
   });
 
@@ -140,9 +140,9 @@ describe("config", () => {
       name: "myws",
       repos: [{ name: "r", path: "/p" }],
     });
-    chmodSync(wsDir, 0o444);
+    await chmod(wsDir, 0o444);
     const result = await removeRepoFromConfig(configPath, "r");
-    chmodSync(wsDir, 0o755);
+    await chmod(wsDir, 0o755);
     expect(result.ok).toBe(false);
   });
 });
@@ -167,7 +167,7 @@ describe("pool config", () => {
   });
 
   it("readPoolConfig returns error on invalid JSON", async () => {
-    writeFileSync(poolConfigPath, "not json");
+    await writeFile(poolConfigPath, "not json");
     const result = await readPoolConfig(poolConfigPath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -236,7 +236,7 @@ describe("pool config", () => {
   });
 
   it("readPoolConfig with valid JSON but array schema returns error", async () => {
-    writeFileSync(poolConfigPath, JSON.stringify([1, 2, 3]));
+    await writeFile(poolConfigPath, JSON.stringify([1, 2, 3]));
     const result = await readPoolConfig(poolConfigPath);
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -246,11 +246,11 @@ describe("pool config", () => {
 
   it("writePoolConfig returns error when path is not writable", async () => {
     const roDir = join(tempDir, "readonly");
-    mkdirSync(roDir);
-    chmodSync(roDir, 0o444);
+    await mkdir(roDir);
+    await chmod(roDir, 0o444);
     const roPool = join(roDir, "worktrees.json");
     const result = await writePoolConfig(roPool, {});
-    chmodSync(roDir, 0o755);
+    await chmod(roDir, 0o755);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("POOL_CONFIG_WRITE_FAILED");
