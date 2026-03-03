@@ -122,6 +122,8 @@ describe("E2E: GROVE_WORKSPACE plumbed to all ws subcommands", () => {
     repoArgCases,
   )("%s resolves workspace from GROVE_WORKSPACE (fails for non-workspace reason)", async (_, args) => {
     const r = await runCLI(args, { root, env: { GROVE_WORKSPACE: "myws" } });
+    // Some commands may exit 0 (e.g. ws worktree list with unknown repo returns empty).
+    // The guard is intentional: we only assert the error code when there is a failure.
     if (r.exitCode !== 0) {
       const errJson = JSON.parse(r.stderr) as { code?: string };
       expect(errJson.code).not.toBe("WORKSPACE_NOT_FOUND");
