@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { exists, lstat, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { exists, mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { addRepo } from "../../commands/repo";
@@ -328,7 +328,7 @@ describe("workspace commands", () => {
 
       const result = await syncWorkspace("myws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
-      expect((await exists(slugPath)) || (await lstat(slugPath)) !== null).toBeTruthy();
+      expect(await exists(slugPath)).toBe(true);
 
       if (result.ok) {
         const repo = result.value.repos.find((r) => r.name === "myrepo");
