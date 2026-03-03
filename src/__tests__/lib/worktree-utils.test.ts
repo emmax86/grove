@@ -141,13 +141,7 @@ describe("removePoolWorktree", () => {
     const result = await removePoolWorktree("myws", "myrepo", "feature-x", {}, paths, GIT_ENV);
     expect(result.ok).toBe(true);
 
-    let symlinkGone = false;
-    try {
-      await lstat(wtPath);
-    } catch {
-      symlinkGone = true;
-    }
-    expect(symlinkGone).toBe(true);
+    expect(await exists(wtPath)).toBe(false);
     expect(await exists(poolEntry)).toBe(false);
     const pool = JSON.parse(await readFile(paths.worktreePoolConfig, "utf-8"));
     expect(pool.myrepo).toBeUndefined();
@@ -189,13 +183,7 @@ describe("removePoolWorktree", () => {
     const result = await removePoolWorktree("myws", "myrepo", "feature-x", {}, paths, GIT_ENV);
     expect(result.ok).toBe(true);
 
-    let symlinkGone = false;
-    try {
-      await lstat(wtPath);
-    } catch {
-      symlinkGone = true;
-    }
-    expect(symlinkGone).toBe(true);
+    expect(await exists(wtPath)).toBe(false);
   });
 
   it("does update worktrees.json even when git worktree remove fails", async () => {
