@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { createPaths } from "../../constants";
@@ -19,7 +19,7 @@ describe("generateVSCodeWorkspace", () => {
   afterEach(() => cleanup(tempDir));
 
   async function setupWorkspace(ws: string, repos: { name: string; path: string }[] = []) {
-    mkdirSync(paths.workspace(ws), { recursive: true });
+    await mkdir(paths.workspace(ws), { recursive: true });
     await writeConfig(paths.workspaceConfig(ws), { name: ws, repos });
   }
 
@@ -29,7 +29,7 @@ describe("generateVSCodeWorkspace", () => {
     expect(result.ok).toBe(true);
 
     const filePath = paths.vscodeWorkspace("alpha");
-    const content = JSON.parse(readFileSync(filePath, "utf-8"));
+    const content = JSON.parse(await readFile(filePath, "utf-8"));
     expect(content.folders).toHaveLength(1);
     expect(content.folders[0].path).toBe(".");
     expect(content.folders[0].name).toBe("alpha (workspace)");
@@ -41,7 +41,7 @@ describe("generateVSCodeWorkspace", () => {
     const result = await generateVSCodeWorkspace("alpha", paths);
     expect(result.ok).toBe(true);
 
-    const content = JSON.parse(readFileSync(paths.vscodeWorkspace("alpha"), "utf-8"));
+    const content = JSON.parse(await readFile(paths.vscodeWorkspace("alpha"), "utf-8"));
     expect(content.folders).toHaveLength(2);
     expect(content.folders[0]).toEqual({
       path: ".",
@@ -59,7 +59,7 @@ describe("generateVSCodeWorkspace", () => {
     const result = await generateVSCodeWorkspace("alpha", paths);
     expect(result.ok).toBe(true);
 
-    const content = JSON.parse(readFileSync(paths.vscodeWorkspace("alpha"), "utf-8"));
+    const content = JSON.parse(await readFile(paths.vscodeWorkspace("alpha"), "utf-8"));
     expect(content.folders[0].path).toBe(".");
     expect(content.folders[1].name).toBe("apple");
     expect(content.folders[2].name).toBe("mango");
@@ -69,7 +69,7 @@ describe("generateVSCodeWorkspace", () => {
   it("overwrites existing .code-workspace on regeneration", async () => {
     await setupWorkspace("alpha");
     // Write a file with extra keys
-    writeFileSync(
+    await writeFile(
       paths.vscodeWorkspace("alpha"),
       `${JSON.stringify({ folders: [], settings: {}, extraKey: "should-be-gone" }, null, 2)}\n`,
     );
@@ -77,7 +77,7 @@ describe("generateVSCodeWorkspace", () => {
     const result = await generateVSCodeWorkspace("alpha", paths);
     expect(result.ok).toBe(true);
 
-    const content = JSON.parse(readFileSync(paths.vscodeWorkspace("alpha"), "utf-8"));
+    const content = JSON.parse(await readFile(paths.vscodeWorkspace("alpha"), "utf-8"));
     expect((content as Record<string, unknown>).extraKey).toBeUndefined();
     expect(content.folders).toHaveLength(1);
   });

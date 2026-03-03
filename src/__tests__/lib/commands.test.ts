@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { loadCommandConfig, resolveCommand, spawnCommand } from "../../lib/commands";
@@ -22,8 +22,8 @@ describe("loadCommandConfig", () => {
   });
 
   it("parses valid commands.json", async () => {
-    mkdirSync(join(tempDir, GROVE_DIR));
-    writeFileSync(
+    await mkdir(join(tempDir, GROVE_DIR));
+    await writeFile(
       join(tempDir, GROVE_DIR, "commands.json"),
       JSON.stringify({ check: ["bun", "run", "typecheck"] }),
     );
@@ -33,15 +33,15 @@ describe("loadCommandConfig", () => {
   });
 
   it("returns null on invalid JSON", async () => {
-    mkdirSync(join(tempDir, GROVE_DIR));
-    writeFileSync(join(tempDir, GROVE_DIR, "commands.json"), "not json");
+    await mkdir(join(tempDir, GROVE_DIR));
+    await writeFile(join(tempDir, GROVE_DIR, "commands.json"), "not json");
     const result = await loadCommandConfig(tempDir);
     expect(result).toBeNull();
   });
 
   it("falls back to .dotclaude/commands.json when .grove/commands.json does not exist", async () => {
-    mkdirSync(join(tempDir, ".dotclaude"));
-    writeFileSync(
+    await mkdir(join(tempDir, ".dotclaude"));
+    await writeFile(
       join(tempDir, ".dotclaude", "commands.json"),
       JSON.stringify({ check: ["bun", "run", "typecheck"] }),
     );
@@ -51,8 +51,8 @@ describe("loadCommandConfig", () => {
   });
 
   it("emits deprecation warning when falling back to .dotclaude/commands.json", async () => {
-    mkdirSync(join(tempDir, ".dotclaude"));
-    writeFileSync(
+    await mkdir(join(tempDir, ".dotclaude"));
+    await writeFile(
       join(tempDir, ".dotclaude", "commands.json"),
       JSON.stringify({ setup: ["bun", "install"] }),
     );
@@ -71,8 +71,8 @@ describe("loadCommandConfig", () => {
   });
 
   it("emits parse warning and returns null when .dotclaude/commands.json exists but is invalid JSON", async () => {
-    mkdirSync(join(tempDir, ".dotclaude"));
-    writeFileSync(join(tempDir, ".dotclaude", "commands.json"), "not json");
+    await mkdir(join(tempDir, ".dotclaude"));
+    await writeFile(join(tempDir, ".dotclaude", "commands.json"), "not json");
     const messages: string[] = [];
     const origWrite = process.stderr.write.bind(process.stderr);
     process.stderr.write = (msg: string | Uint8Array) => {
