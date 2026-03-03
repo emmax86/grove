@@ -16,9 +16,7 @@ describe("generateVSCodeWorkspace", () => {
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   async function setupWorkspace(ws: string, repos: { name: string; path: string }[] = []) {
     mkdirSync(paths.workspace(ws), { recursive: true });

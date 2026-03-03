@@ -19,9 +19,7 @@ describe("MCP server", () => {
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   async function setupWorkspaceWithRepo() {
     await addWorkspace("ws", paths);

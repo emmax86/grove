@@ -34,9 +34,7 @@ describe("classifyWorktreeEntry", () => {
     await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("returns 'pool' for pool symlink", async () => {
     await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
@@ -100,9 +98,7 @@ describe("resolveRepoPath", () => {
     await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("resolves a valid repo symlink to its real path", async () => {
     const result = await resolveRepoPath("myrepo", paths);
@@ -143,9 +139,7 @@ describe("removePoolWorktree", () => {
     await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("does remove tree symlink, pool dir, and worktrees.json when last reference", async () => {
     await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
@@ -334,9 +328,7 @@ describe("removePoolWorktree (dangling repo)", () => {
     await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("does succeed and clean worktrees.json when repo symlink is dangling", async () => {
     await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);

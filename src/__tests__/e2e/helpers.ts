@@ -1,5 +1,4 @@
-import { rmSync } from "node:fs";
-import { mkdir, mkdtemp, realpath } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -67,12 +66,8 @@ export async function createTempRoot(): Promise<string> {
   return await realpath(tmp);
 }
 
-export function cleanupTempRoot(dir: string): void {
-  try {
-    rmSync(dir, { recursive: true, force: true });
-  } catch {
-    /* ignore */
-  }
+export async function cleanupTempRoot(dir: string): Promise<void> {
+  await rm(dir, { recursive: true, force: true });
 }
 
 /** Create a minimal git repo with an initial commit and return its path. */

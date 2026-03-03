@@ -10,9 +10,7 @@ describe("E2E: workspace commands", () => {
   beforeEach(async () => {
     root = await createTempRoot();
   });
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
+  afterEach(() => cleanupTempRoot(root));
 
   it("ws add returns name and path, creates directory", async () => {
     const r = await runCLI(["ws", "add", "myws"], { root });
@@ -120,9 +118,7 @@ describe("E2E: ws status", () => {
     await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
   });
 
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
+  afterEach(() => cleanupTempRoot(root));
 
   it("ws status returns workspace overview with repos and worktrees", async () => {
     await runCLI(["ws", "worktree", "add", "myrepo", "feature/s", "--new"], {

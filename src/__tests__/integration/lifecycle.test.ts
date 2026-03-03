@@ -28,9 +28,7 @@ describe("lifecycle integration", () => {
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
-  afterAll(() => {
-    cleanup(tempDir);
-  });
+  afterAll(() => cleanup(tempDir));
 
   it("creates a workspace", async () => {
     const result = await addWorkspace("myws", paths);

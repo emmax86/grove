@@ -23,9 +23,7 @@ describe("generateClaudeFiles", () => {
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   /** Create workspace dir, .claude dir, and workspace.json */
   async function setupWorkspace(ws: string, repos: { name: string; path: string }[] = []) {

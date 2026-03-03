@@ -1,5 +1,4 @@
-import { rmSync } from "node:fs";
-import { mkdir, mkdtemp, realpath } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -42,13 +41,9 @@ export async function createTestGitRepo(
   return repoPath;
 }
 
-export function cleanup(...dirs: string[]): void {
+export async function cleanup(...dirs: string[]): Promise<void> {
   for (const dir of dirs) {
-    try {
-      rmSync(dir, { recursive: true, force: true });
-    } catch {
-      // ignore
-    }
+    await rm(dir, { recursive: true, force: true });
   }
 }
 

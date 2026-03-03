@@ -31,9 +31,7 @@ describe("workspace commands", () => {
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
-  afterEach(() => {
-    cleanup(tempDir);
-  });
+  afterEach(() => cleanup(tempDir));
 
   it("add then list includes workspace", async () => {
     const result = await addWorkspace("myws", paths);
