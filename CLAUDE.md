@@ -72,7 +72,7 @@ When implementing features, follow strict test-driven development:
 3. **Refactor**: Clean up while keeping tests green.
 4. Repeat for the next behavior unit.
 
-For multi-behavior features, use micro-cycles: one Red-Green-Refactor cycle per distinct behavior (e.g., return type change, then hashing, then scanning). Never implement behavior in a Green phase that has no corresponding failing test in the preceding Red phase.
+   For multi-behavior features, use micro-cycles: one Red-Green-Refactor cycle per distinct behavior (e.g., return type change, then hashing, then scanning). Never implement behavior in a Green phase that has no corresponding failing test in the preceding Red phase.
 
 Rules:
 
