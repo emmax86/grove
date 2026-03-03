@@ -67,11 +67,16 @@ All git operations in tests pass `GIT_CONFIG_NOSYSTEM=1` to avoid triggering GPG
 
 When implementing features, follow strict test-driven development:
 
-1. **Red**: Write all test cases first. Tests must fail. Run `bun test` to confirm failures.
-2. **Green**: Implement the minimum code to make tests pass. Run `bun test` after each change.
+1. **Red**: Write tests for the current behavior unit. Tests must fail. Run `bun test` to confirm the new tests fail.
+2. **Green**: Implement the minimum code to make those tests pass. Run `bun test` after each change.
 3. **Refactor**: Clean up while keeping tests green.
+4. Repeat for the next behavior unit.
 
-Rules:
+### Micro-cycles
+
+For multi-behavior features, use one Red-Green-Refactor cycle per distinct behavior (e.g., return type change, then hashing, then scanning). Never implement behavior in a Green phase that has no corresponding failing test in the preceding Red phase.
+
+### Rules
 
 - Never write implementation before a failing test exists for the behavior.
 - Test the `Result<T>` return value, not side effects alone — check both `result.ok` and the value/error.
