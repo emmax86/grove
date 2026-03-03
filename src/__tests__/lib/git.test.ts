@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -30,7 +30,7 @@ describe("git lib", () => {
 
     it("returns false for a plain directory", async () => {
       const plain = join(tempDir, "plain");
-      mkdirSync(plain);
+      await mkdir(plain);
       expect(await isGitRepo(plain)).toBe(false);
     });
 
@@ -138,7 +138,7 @@ describe("git lib", () => {
       await addWorktree(repoPath, wtPath, "dirty-branch", {}, GIT_ENV);
 
       // Make it dirty
-      writeFileSync(join(wtPath, "dirty.txt"), "dirty file");
+      await writeFile(join(wtPath, "dirty.txt"), "dirty file");
 
       const result = await removeWorktree(repoPath, wtPath, false, GIT_ENV);
       expect(result.ok).toBe(false);
@@ -153,7 +153,7 @@ describe("git lib", () => {
       await addWorktree(repoPath, wtPath, "dirty-force-branch", {}, GIT_ENV);
 
       // Make it dirty
-      writeFileSync(join(wtPath, "dirty.txt"), "dirty file");
+      await writeFile(join(wtPath, "dirty.txt"), "dirty file");
 
       const result = await removeWorktree(repoPath, wtPath, true, GIT_ENV);
       expect(result.ok).toBe(true);
@@ -178,7 +178,7 @@ describe("git lib", () => {
 
     it("returns error when called on a non-git directory", async () => {
       const plain = join(tempDir, "plain-for-list");
-      mkdirSync(plain);
+      await mkdir(plain);
       const result = await listWorktrees(plain, GIT_ENV);
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -190,7 +190,7 @@ describe("git lib", () => {
   describe("getDefaultBranch", () => {
     it("returns error on a non-git directory", async () => {
       const plain = join(tempDir, "plain-for-branch");
-      mkdirSync(plain);
+      await mkdir(plain);
       const result = await getDefaultBranch(plain, GIT_ENV);
       expect(result.ok).toBe(false);
       if (!result.ok) {
@@ -222,7 +222,7 @@ describe("git lib", () => {
 
     it("returns error on non-git directory", async () => {
       const plain = join(tempDir, "plain-for-main");
-      mkdirSync(plain);
+      await mkdir(plain);
       const result = await findMainWorktreePath(plain, GIT_ENV);
       expect(result.ok).toBe(false);
     });

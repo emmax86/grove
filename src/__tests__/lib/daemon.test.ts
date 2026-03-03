@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { exists, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -33,22 +33,28 @@ describe("discoverDaemon", () => {
     await addWorkspace("ws", paths);
     const configPath = paths.daemonConfig("ws");
     // PID 999999999 is extremely unlikely to exist
-    writeFileSync(configPath, JSON.stringify({ url: "http://127.0.0.1:9999/mcp", pid: 999999999 }));
+    await writeFile(
+      configPath,
+      JSON.stringify({ url: "http://127.0.0.1:9999/mcp", pid: 999999999 }),
+    );
 
     const result = await discoverDaemon("ws", paths);
     expect(result).toBeNull();
-    expect(existsSync(configPath)).toBe(false);
+    expect(await exists(configPath)).toBe(false);
   });
 
   it("returns null and deletes stale file when health check fails", async () => {
     await addWorkspace("ws", paths);
     const configPath = paths.daemonConfig("ws");
     // Use our own PID (exists) but a port with nothing listening
-    writeFileSync(configPath, JSON.stringify({ url: "http://127.0.0.1:1/mcp", pid: process.pid }));
+    await writeFile(
+      configPath,
+      JSON.stringify({ url: "http://127.0.0.1:1/mcp", pid: process.pid }),
+    );
 
     const result = await discoverDaemon("ws", paths);
     expect(result).toBeNull();
-    expect(existsSync(configPath)).toBe(false);
+    expect(await exists(configPath)).toBe(false);
   });
 });
 
@@ -85,8 +91,8 @@ describe("startDaemon", () => {
     stopFn = info.stop;
 
     const configPath = paths.daemonConfig("ws");
-    expect(existsSync(configPath)).toBe(true);
-    const data = JSON.parse(readFileSync(configPath, "utf8"));
+    expect(await exists(configPath)).toBe(true);
+    const data = JSON.parse(await readFile(configPath, "utf8"));
     expect(data.url).toBe(info.url);
     expect(data.pid).toBe(process.pid);
   });
@@ -149,10 +155,10 @@ describe("startDaemon", () => {
     });
     const configPath = paths.daemonConfig("ws");
 
-    expect(existsSync(configPath)).toBe(true);
+    expect(await exists(configPath)).toBe(true);
     await info.stop();
     stopFn = null;
-    expect(existsSync(configPath)).toBe(false);
+    expect(await exists(configPath)).toBe(false);
   });
 });
 

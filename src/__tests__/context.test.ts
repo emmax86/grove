@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { existsSync, mkdirSync, symlinkSync } from "node:fs";
+import { exists, mkdir, symlink } from "node:fs/promises";
 import { join } from "node:path";
 
 import { addRepo } from "../commands/repo";
@@ -83,7 +83,7 @@ describe("context inference", () => {
     // Before the fix, relative(workspaceDir, cwd) used the unresolved cwd and
     // produced a wrong relative path, causing repo/worktree to come back undefined.
     const alias = join(tempDir, "alias");
-    symlinkSync(tempDir, alias);
+    await symlink(tempDir, alias);
 
     const cwdViaAlias = join(alias, "workspaces", "myws", "myrepo", "feature-ctx");
     const ctx = await inferContext(cwdViaAlias, wsRoot);
@@ -95,7 +95,7 @@ describe("context inference", () => {
   it("validates repo segment against workspace.json repos list", async () => {
     // Create a directory that looks like a repo but isn't registered
     const fakeRepoDir = join(paths.workspace("myws"), "fakerepo");
-    mkdirSync(fakeRepoDir, { recursive: true });
+    await mkdir(fakeRepoDir, { recursive: true });
 
     const ctx = await inferContext(fakeRepoDir, wsRoot);
     expect(ctx.workspace).toBe("myws");
@@ -117,7 +117,7 @@ describe("context inference", () => {
     // Pool is at {root}/worktrees/, which has no workspace.json
     const poolEntry = paths.worktreePoolEntry("myrepo", "feature-ctx");
     // Only test if pool entry exists (it does because addWorktree in beforeAll created it)
-    if (existsSync(poolEntry)) {
+    if (await exists(poolEntry)) {
       const ctx = await inferContext(poolEntry, wsRoot);
       expect(ctx.workspace).toBeUndefined();
     }
