@@ -1,10 +1,9 @@
 /**
- * Enforces a "zero sync in production" invariant.
+ * Enforces a "zero sync" invariant across all source files, including tests.
  *
- * Parses all TypeScript files under src/ (excluding __tests__ directories)
- * using the TypeScript AST and fails if any CallExpression whose callee name
- * ends with "Sync" is found. This correctly ignores comments, string literals,
- * and multi-line call expressions.
+ * Parses all TypeScript files under src/ using the TypeScript AST and fails
+ * if any CallExpression whose callee name ends with "Sync" is found. This
+ * correctly ignores comments, string literals, and multi-line call expressions.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -15,15 +14,12 @@ import ts from "typescript";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const SRC = join(ROOT, "src");
 
-async function collectProductionFiles(dir: string): Promise<string[]> {
+async function collectFiles(dir: string): Promise<string[]> {
   const files: string[] = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
-    if (entry.name === "__tests__") {
-      continue;
-    }
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      files.push(...(await collectProductionFiles(fullPath)));
+      files.push(...(await collectFiles(fullPath)));
     } else if (entry.name.endsWith(".ts")) {
       files.push(fullPath);
     }
@@ -59,7 +55,7 @@ function findSyncCalls(filePath: string, content: string): { line: number; name:
   return violations;
 }
 
-const files = await collectProductionFiles(SRC);
+const files = await collectFiles(SRC);
 let violations = 0;
 
 for (const file of files) {
@@ -71,7 +67,7 @@ for (const file of files) {
 }
 
 if (violations > 0) {
-  console.error(`\n${violations} sync violation(s) found in production code.`);
+  console.error(`\n${violations} sync violation(s) found.`);
   process.exit(1);
 }
 
