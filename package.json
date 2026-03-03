@@ -10,6 +10,7 @@
     "build": "mkdir -p .bin && rm -f .bin/grove && bun build --compile src/cli.ts --outfile .bin/grove",
     "format": "biome check --write .",
     "format:check": "biome check .",
+    "format:ci": "biome ci .",
     "lint:no-sync": "bun run scripts/check-no-sync.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "bun run build && husky"
