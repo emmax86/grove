@@ -30,7 +30,7 @@ async function spawnGit(
       proc.exited,
     ]);
     return {
-      success: (exitCode ?? 1) === 0,
+      success: exitCode === 0,
       stdout: stdout.trim(),
       stderr: stderr.trim(),
     };
