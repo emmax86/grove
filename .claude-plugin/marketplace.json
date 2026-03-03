@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "grove",
+  "description": "Workspace management for Claude Code — group repos and git worktrees into named workspaces",
+  "owner": {
+    "name": "emmax86",
+    "url": "https://github.com/emmax86/grove"
+  },
+  "plugins": [
+    {
+      "name": "grove",
+      "description": "Manage grove workspaces, repos, and git worktrees from Claude Code. Includes slash commands and agent skills for workspace orientation.",
+      "author": {
+        "name": "emmax86",
+        "url": "https://github.com/emmax86/grove"
+      },
+      "source": "./plugins/grove",
+      "category": "productivity",
+      "homepage": "https://github.com/emmax86/grove"
+    }
+  ]
+}
