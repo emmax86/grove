@@ -82,8 +82,10 @@ describe("E2E: workspace commands", () => {
   });
 
   it("ws list returns array of workspaces", async () => {
-    await runCLI(["ws", "add", "ws1"], { root });
-    await runCLI(["ws", "add", "ws2"], { root });
+    await Promise.all([
+      runCLI(["ws", "add", "ws1"], { root }),
+      runCLI(["ws", "add", "ws2"], { root }),
+    ]);
     const r = await runCLI(["ws", "list"], { root });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Array<{ name: string }>;
@@ -94,8 +96,10 @@ describe("E2E: workspace commands", () => {
   });
 
   it("ws list --porcelain: one name per line, no JSON", async () => {
-    await runCLI(["ws", "add", "ws1"], { root });
-    await runCLI(["ws", "add", "ws2"], { root });
+    await Promise.all([
+      runCLI(["ws", "add", "ws1"], { root }),
+      runCLI(["ws", "add", "ws2"], { root }),
+    ]);
     const r = await runCLI(["ws", "list", "--porcelain"], { root });
     expect(r.exitCode).toBe(0);
     const lines = r.stdout.split("\n").filter(Boolean);
@@ -147,8 +151,10 @@ describe("E2E: repo commands", () => {
 
   beforeEach(async () => {
     root = await createTempRoot();
-    repoPath = await createGitRepo(root, "myrepo");
-    await runCLI(["ws", "add", "myws"], { root });
+    [repoPath] = await Promise.all([
+      createGitRepo(root, "myrepo"),
+      runCLI(["ws", "add", "myws"], { root }),
+    ]);
   });
 
   afterEach(() => {
@@ -233,8 +239,10 @@ describe("E2E: worktree commands", () => {
 
   beforeEach(async () => {
     root = await createTempRoot();
-    repoPath = await createGitRepo(root, "myrepo");
-    await runCLI(["ws", "add", "myws"], { root });
+    [repoPath] = await Promise.all([
+      createGitRepo(root, "myrepo"),
+      runCLI(["ws", "add", "myws"], { root }),
+    ]);
     await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
   });
 
@@ -458,8 +466,10 @@ describe("E2E: context inference via cwd", () => {
 
   beforeEach(async () => {
     root = await createTempRoot();
-    repoPath = await createGitRepo(root, "myrepo");
-    await runCLI(["ws", "add", "myws"], { root });
+    [repoPath] = await Promise.all([
+      createGitRepo(root, "myrepo"),
+      runCLI(["ws", "add", "myws"], { root }),
+    ]);
     await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
     await runCLI(["ws", "worktree", "add", "myrepo", "feature/ctx", "--new"], {
       root,
@@ -528,8 +538,10 @@ describe("E2E: ws status", () => {
 
   beforeEach(async () => {
     root = await createTempRoot();
-    repoPath = await createGitRepo(root, "myrepo");
-    await runCLI(["ws", "add", "myws"], { root });
+    [repoPath] = await Promise.all([
+      createGitRepo(root, "myrepo"),
+      runCLI(["ws", "add", "myws"], { root }),
+    ]);
     await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
   });
 
