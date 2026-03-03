@@ -87,10 +87,7 @@ describe("E2E: worktree commands", () => {
     const lines = r.stdout.split("\n").filter(Boolean);
     const featureLine = lines.find((l) => l.includes("feature-x"));
     expect(featureLine).toBeDefined();
-    if (!featureLine) {
-      return;
-    }
-    const parts = featureLine.split("\t");
+    const parts = (featureLine as string).split("\t");
     expect(parts).toHaveLength(4);
     expect(parts[0]).toBe("myrepo");
     expect(parts[1]).toBe("feature-x");
