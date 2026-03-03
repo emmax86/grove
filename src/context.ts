@@ -1,4 +1,3 @@
-import { realpathSync } from "node:fs";
 import { exists, realpath } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import type { Paths } from "./constants";
@@ -126,7 +125,7 @@ export async function resolveRepoFromFile(
 ): Promise<Result<{ repo: string; worktreeRoot: string }>> {
   let resolvedPath: string;
   try {
-    resolvedPath = realpathSync(filePath);
+    resolvedPath = await realpath(filePath);
   } catch {
     return err(`File not found: ${filePath}`, "REPO_NOT_RESOLVED");
   }
@@ -157,7 +156,7 @@ export async function resolveRepoFromFile(
   for (const repoEntry of configResult.value.repos) {
     let realRepoPath: string;
     try {
-      realRepoPath = realpathSync(repoEntry.path);
+      realRepoPath = await realpath(repoEntry.path);
     } catch {
       continue;
     }

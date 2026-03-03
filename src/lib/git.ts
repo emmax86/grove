@@ -11,33 +11,48 @@ export interface GitEnv {
   [key: string]: string | undefined;
 }
 
-function spawnGit(
+async function spawnGit(
   args: string[],
   cwd: string,
   env?: GitEnv,
-): { success: boolean; stdout: string; stderr: string } {
+): Promise<{ success: boolean; stdout: string; stderr: string }> {
   const mergedEnv = env ? { ...process.env, ...env } : process.env;
-  const result = Bun.spawnSync(["git", ...args], {
-    cwd,
-    env: mergedEnv as Record<string, string>,
-  });
-  return {
-    success: result.success,
-    stdout: new TextDecoder().decode(result.stdout).trim(),
-    stderr: new TextDecoder().decode(result.stderr).trim(),
-  };
+  try {
+    const proc = Bun.spawn(["git", ...args], {
+      cwd,
+      env: mergedEnv as Record<string, string>,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    return {
+      success: (exitCode ?? 1) === 0,
+      stdout: stdout.trim(),
+      stderr: stderr.trim(),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      stdout: "",
+      stderr: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export async function isGitRepo(path: string): Promise<boolean> {
   if (!(await exists(path))) {
     return false;
   }
-  const result = spawnGit(["rev-parse", "--git-dir"], path);
+  const result = await spawnGit(["rev-parse", "--git-dir"], path);
   return result.success;
 }
 
 export async function getDefaultBranch(repoPath: string, env?: GitEnv): Promise<Result<string>> {
-  const result = spawnGit(["symbolic-ref", "--short", "HEAD"], repoPath, env);
+  const result = await spawnGit(["symbolic-ref", "--short", "HEAD"], repoPath, env);
   if (!result.success || !result.stdout) {
     return err("Could not determine default branch", "GIT_DEFAULT_BRANCH_ERROR");
   }
@@ -67,7 +82,7 @@ export async function addWorktree(
     args = ["worktree", "add", worktreePath, branch];
   }
 
-  const result = spawnGit(args, repoPath, env);
+  const result = await spawnGit(args, repoPath, env);
   if (!result.success) {
     return err(result.stderr || "git worktree add failed", "GIT_WORKTREE_ADD_ERROR");
   }
@@ -86,7 +101,7 @@ export async function removeWorktree(
   }
   args.push(worktreePath);
 
-  const result = spawnGit(args, repoPath, env);
+  const result = await spawnGit(args, repoPath, env);
   if (!result.success) {
     // If worktree dir already gone, git still succeeds usually, but handle edge cases
     if (
@@ -110,7 +125,7 @@ export async function listWorktrees(
   repoPath: string,
   env?: GitEnv,
 ): Promise<Result<WorktreeInfo[]>> {
-  const result = spawnGit(["worktree", "list", "--porcelain"], repoPath, env);
+  const result = await spawnGit(["worktree", "list", "--porcelain"], repoPath, env);
   if (!result.success) {
     return err(result.stderr || "git worktree list failed", "GIT_WORKTREE_LIST_ERROR");
   }

@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { exists } from "node:fs/promises";
 import { join } from "node:path";
 
 export interface Ecosystem {
@@ -41,9 +41,9 @@ export const ECOSYSTEMS: Ecosystem[] = [
   },
 ];
 
-export function detectEcosystem(repoRoot: string): Ecosystem | null {
+export async function detectEcosystem(repoRoot: string): Promise<Ecosystem | null> {
   for (const eco of ECOSYSTEMS) {
-    if (existsSync(join(repoRoot, eco.signal))) {
+    if (await exists(join(repoRoot, eco.signal))) {
       return eco;
     }
   }

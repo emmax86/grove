@@ -15,73 +15,73 @@ describe("detectEcosystem", () => {
     cleanup(tempDir);
   });
 
-  it("returns null when no lockfile is present", () => {
-    const result = detectEcosystem(tempDir);
+  it("returns null when no lockfile is present", async () => {
+    const result = await detectEcosystem(tempDir);
     expect(result).toBeNull();
   });
 
-  it("detects bun from bun.lock", () => {
+  it("detects bun from bun.lock", async () => {
     writeFileSync(join(tempDir, "bun.lock"), "");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result).not.toBeNull();
     expect(result?.name).toBe("bun");
   });
 
-  it("detects pnpm from pnpm-lock.yaml", () => {
+  it("detects pnpm from pnpm-lock.yaml", async () => {
     writeFileSync(join(tempDir, "pnpm-lock.yaml"), "");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result).not.toBeNull();
     expect(result?.name).toBe("pnpm");
   });
 
-  it("detects npm from package-lock.json", () => {
+  it("detects npm from package-lock.json", async () => {
     writeFileSync(join(tempDir, "package-lock.json"), "{}");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result).not.toBeNull();
     expect(result?.name).toBe("npm");
   });
 
-  it("detects uv from uv.lock", () => {
+  it("detects uv from uv.lock", async () => {
     writeFileSync(join(tempDir, "uv.lock"), "");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result).not.toBeNull();
     expect(result?.name).toBe("uv");
   });
 
-  it("bun wins over npm when both lockfiles present (priority order)", () => {
+  it("bun wins over npm when both lockfiles present (priority order)", async () => {
     writeFileSync(join(tempDir, "bun.lock"), "");
     writeFileSync(join(tempDir, "package-lock.json"), "{}");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result?.name).toBe("bun");
   });
 
-  it("bun setup command is array form", () => {
+  it("bun setup command is array form", async () => {
     writeFileSync(join(tempDir, "bun.lock"), "");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result?.setup).toEqual(["bun", "install"]);
   });
 
-  it("bun format command includes --write and {file} placeholder", () => {
+  it("bun format command includes --write and {file} placeholder", async () => {
     writeFileSync(join(tempDir, "bun.lock"), "");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result?.format).toEqual(["bunx", "prettier", "--write", "{file}"]);
   });
 
-  it("bun test command is array form", () => {
+  it("bun test command is array form", async () => {
     writeFileSync(join(tempDir, "bun.lock"), "");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result?.test).toEqual(["bun", "test"]);
   });
 
-  it("uv format uses ruff format with {file} placeholder", () => {
+  it("uv format uses ruff format with {file} placeholder", async () => {
     writeFileSync(join(tempDir, "uv.lock"), "");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result?.format).toEqual(["uv", "run", "ruff", "format", "{file}"]);
   });
 
-  it("uv test uses pytest", () => {
+  it("uv test uses pytest", async () => {
     writeFileSync(join(tempDir, "uv.lock"), "");
-    const result = detectEcosystem(tempDir);
+    const result = await detectEcosystem(tempDir);
     expect(result?.test).toEqual(["uv", "run", "pytest"]);
   });
 
