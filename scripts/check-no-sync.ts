@@ -38,13 +38,13 @@ for (const file of files) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     // Skip pure comment lines
-    if (/^\s*(\/\/|\*)/.test(line)) {
+    if (/^\s*(\/\/|\*|\/\*)/.test(line)) {
       continue;
     }
     const matches = line.match(SYNC_CALL);
     if (matches) {
       for (const match of matches) {
-        console.error(`${relative(ROOT, file)}:${i + 1}: ${match.trimEnd()}`);
+        console.error(`${relative(ROOT, file)}:${i + 1}: ${match}`);
         violations++;
       }
     }
