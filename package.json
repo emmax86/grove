@@ -2,6 +2,9 @@
   "name": "grove",
   "version": "0.1.0",
   "type": "module",
+  "bin": {
+    "grove": ".bin/grove"
+  },
   "scripts": {
     "test": "bun test",
     "build": "mkdir -p .bin && rm -f .bin/grove && bun build --compile src/cli.ts --outfile .bin/grove",
