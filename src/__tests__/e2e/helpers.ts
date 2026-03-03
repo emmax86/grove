@@ -2,6 +2,7 @@ import { rmSync } from "node:fs";
 import { mkdir, mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnGit } from "../helpers";
 
 const CLI = join(import.meta.dir, "../../cli.ts");
 
@@ -62,7 +63,7 @@ export async function runCLI(
 
 export async function createTempRoot(): Promise<string> {
   const tmp = await mkdtemp(join(tmpdir(), "grove-e2e-"));
-  return realpath(tmp);
+  return await realpath(tmp);
 }
 
 export function cleanupTempRoot(dir: string): void {
@@ -92,22 +93,7 @@ export async function createGitRepo(
     GIT_COMMITTER_EMAIL: "test@test.com",
   };
 
-  const run = async (args: string[]) => {
-    const proc = Bun.spawn(args, {
-      cwd: repoPath,
-      env,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [, stderr, exitCode] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    if (exitCode !== 0) {
-      throw new Error(`git ${args.join(" ")} failed: ${stderr}`);
-    }
-  };
+  const run = (args: string[]) => spawnGit(args, repoPath, env);
 
   await run(["git", "init", "-b", defaultBranch]);
   await run(["git", "config", "user.email", "test@test.com"]);

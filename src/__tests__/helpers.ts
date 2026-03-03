@@ -6,7 +6,23 @@ import { join } from "node:path";
 export async function createTestDir(): Promise<string> {
   // realpath resolves macOS /var -> /private/var symlink so paths match git output
   const tmp = await mkdtemp(join(tmpdir(), "grove-test-"));
-  return realpath(tmp);
+  return await realpath(tmp);
+}
+
+export async function spawnGit(
+  args: string[],
+  cwd: string,
+  env: Record<string, string>,
+): Promise<void> {
+  const proc = Bun.spawn(args, { cwd, env, stdout: "pipe", stderr: "pipe" });
+  const [, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (exitCode !== 0) {
+    throw new Error(`git ${args.join(" ")} failed: ${stderr}`);
+  }
 }
 
 export async function createTestGitRepo(
@@ -27,22 +43,7 @@ export async function createTestGitRepo(
     GIT_COMMITTER_EMAIL: "test@test.com",
   };
 
-  const run = async (args: string[]) => {
-    const proc = Bun.spawn(args, {
-      cwd: repoPath,
-      env,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [, stderr, exitCode] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    if (exitCode !== 0) {
-      throw new Error(`git ${args.join(" ")} failed: ${stderr}`);
-    }
-  };
+  const run = (args: string[]) => spawnGit(args, repoPath, env);
 
   await run(["git", "init", "-b", defaultBranch]);
   await run(["git", "config", "user.email", "test@test.com"]);
