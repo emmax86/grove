@@ -19,7 +19,7 @@ import {
 } from "../../commands/workspace";
 import { addWorktree } from "../../commands/worktree";
 import { createPaths } from "../../constants";
-import { cleanup, createTestDir, createTestGitRepo, GIT_ENV, spawnGit } from "../helpers";
+import { cleanup, createTestDir, createTestGitRepo, GIT_ENV, spawnProc } from "../helpers";
 
 describe("workspace commands", () => {
   let tempDir: string;
@@ -234,7 +234,7 @@ describe("workspace commands", () => {
     // Lock the worktree — git worktree remove --force on a locked worktree fails (requires -f -f).
     // This reliably produces a gitWarning even when force: true is used.
     const poolEntry = paths.worktreePoolEntry("myrepo", "feature-pool");
-    await spawnGit(["git", "-C", repoPath, "worktree", "lock", poolEntry], undefined, GIT_ENV);
+    await spawnProc(["git", "-C", repoPath, "worktree", "lock", poolEntry], undefined, GIT_ENV);
 
     // removeWorkspace --force: even if git reports a warning, workspace directory must be removed
     await removeWorkspace("myws", { force: true }, paths, GIT_ENV);

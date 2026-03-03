@@ -20,7 +20,7 @@ import {
   removeWorktree,
 } from "../../commands/worktree";
 import { createPaths } from "../../constants";
-import { cleanup, createTestDir, createTestGitRepo, GIT_ENV, spawnGit } from "../helpers";
+import { cleanup, createTestDir, createTestGitRepo, GIT_ENV, spawnProc } from "../helpers";
 
 describe("worktree commands", () => {
   let tempDir: string;
@@ -473,7 +473,7 @@ describe("worktree commands", () => {
       // defaultSlug will be wrong. In the double-fault case where repos/ is also dangling,
       // the old default-branch symlink (main) will be incorrectly pruned.
       // ws sync repairs the symlink afterward using the new HEAD value.
-      await spawnGit(["git", "checkout", "-b", "feature-branch"], repoPath, {
+      await spawnProc(["git", "checkout", "-b", "feature-branch"], repoPath, {
         ...process.env,
         ...GIT_ENV,
       });

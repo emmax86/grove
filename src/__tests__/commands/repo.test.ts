@@ -19,7 +19,7 @@ import {
   createTestDir,
   createTestGitRepo,
   GIT_ENV,
-  spawnGit,
+  spawnProc,
 } from "../helpers";
 
 describe("repo commands", () => {
@@ -385,7 +385,7 @@ describe("repo commands", () => {
     // Lock the worktree — git worktree remove --force on a locked worktree fails (requires -f -f).
     // This reliably produces a gitWarning even when force: true is used.
     const poolEntry = paths.worktreePoolEntry("myrepo", "feature-pool");
-    await spawnGit(["git", "-C", repoPath, "worktree", "lock", poolEntry], undefined, GIT_ENV);
+    await spawnProc(["git", "-C", repoPath, "worktree", "lock", poolEntry], undefined, GIT_ENV);
 
     // removeRepo --force: git warns but repoDir and workspace.json must still be cleaned
     const result = await removeRepo("myws", "myrepo", { force: true }, paths, GIT_ENV);

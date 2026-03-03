@@ -9,7 +9,7 @@ import {
   listWorktrees,
   removeWorktree,
 } from "../../lib/git";
-import { cleanup, createTestDir, createTestGitRepo, GIT_ENV, spawnGit } from "../helpers";
+import { cleanup, createTestDir, createTestGitRepo, GIT_ENV, spawnProc } from "../helpers";
 
 describe("git lib", () => {
   let tempDir: string;
@@ -62,7 +62,7 @@ describe("git lib", () => {
   describe("addWorktree", () => {
     it("adds a worktree for an existing branch", async () => {
       // First create a branch
-      await spawnGit(["git", "branch", "existing-branch"], repoPath, {
+      await spawnProc(["git", "branch", "existing-branch"], repoPath, {
         ...process.env,
         ...GIT_ENV,
       });
@@ -120,7 +120,7 @@ describe("git lib", () => {
   describe("removeWorktree", () => {
     it("removes a clean worktree", async () => {
       const wtPath = join(tempDir, "wt-to-remove");
-      await spawnGit(["git", "branch", "to-remove"], repoPath, {
+      await spawnProc(["git", "branch", "to-remove"], repoPath, {
         ...process.env,
         ...GIT_ENV,
       });
@@ -132,7 +132,7 @@ describe("git lib", () => {
 
     it("fails without force on dirty worktree", async () => {
       const wtPath = join(tempDir, "wt-dirty");
-      await spawnGit(["git", "branch", "dirty-branch"], repoPath, {
+      await spawnProc(["git", "branch", "dirty-branch"], repoPath, {
         ...process.env,
         ...GIT_ENV,
       });
@@ -147,7 +147,7 @@ describe("git lib", () => {
 
     it("removes dirty worktree with force", async () => {
       const wtPath = join(tempDir, "wt-dirty-force");
-      await spawnGit(["git", "branch", "dirty-force-branch"], repoPath, {
+      await spawnProc(["git", "branch", "dirty-force-branch"], repoPath, {
         ...process.env,
         ...GIT_ENV,
       });

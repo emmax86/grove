@@ -2,7 +2,7 @@ import { rmSync } from "node:fs";
 import { mkdir, mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnGit } from "../helpers";
+import { spawnProc } from "../helpers";
 
 const CLI = join(import.meta.dir, "../../cli.ts");
 
@@ -93,7 +93,7 @@ export async function createGitRepo(
     GIT_COMMITTER_EMAIL: "test@test.com",
   };
 
-  const run = (args: string[]) => spawnGit(args, repoPath, env);
+  const run = (args: string[]) => spawnProc(args, repoPath, env);
 
   await run(["git", "init", "-b", defaultBranch]);
   await run(["git", "config", "user.email", "test@test.com"]);
