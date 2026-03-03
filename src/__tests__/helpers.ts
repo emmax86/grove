@@ -1,5 +1,5 @@
-import { mkdirSync, rmSync } from "node:fs";
-import { mkdtemp, realpath } from "node:fs/promises";
+import { rmSync } from "node:fs";
+import { mkdir, mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,7 +15,7 @@ export async function createTestGitRepo(
   defaultBranch = "main",
 ): Promise<string> {
   const repoPath = join(dir, name);
-  mkdirSync(repoPath, { recursive: true });
+  await mkdir(repoPath, { recursive: true });
 
   const env = {
     ...process.env,
@@ -42,7 +42,6 @@ export async function createTestGitRepo(
     if (exitCode !== 0) {
       throw new Error(`git ${args.join(" ")} failed: ${stderr}`);
     }
-    return stdout.trim();
   };
 
   await run(["git", "init", "-b", defaultBranch]);

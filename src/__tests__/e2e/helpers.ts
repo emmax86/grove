@@ -1,5 +1,5 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { mkdtemp, realpath } from "node:fs/promises";
+import { rmSync } from "node:fs";
+import { mkdir, mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -80,7 +80,7 @@ export async function createGitRepo(
   defaultBranch = "main",
 ): Promise<string> {
   const repoPath = join(parentDir, name);
-  mkdirSync(repoPath, { recursive: true });
+  await mkdir(repoPath, { recursive: true });
 
   const env: Record<string, string> = {
     PATH: process.env.PATH ?? "",
@@ -107,13 +107,12 @@ export async function createGitRepo(
     if (exitCode !== 0) {
       throw new Error(`git ${args.join(" ")} failed: ${stderr}`);
     }
-    return stdout.trim();
   };
 
   await run(["git", "init", "-b", defaultBranch]);
   await run(["git", "config", "user.email", "test@test.com"]);
   await run(["git", "config", "user.name", "Test"]);
-  writeFileSync(join(repoPath, "README.md"), `# ${name}\n`);
+  await Bun.write(join(repoPath, "README.md"), `# ${name}\n`);
   await run(["git", "add", "."]);
   await run(["git", "commit", "-m", "Initial commit"]);
 
