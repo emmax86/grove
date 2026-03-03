@@ -68,7 +68,9 @@ export async function generateClaudeFiles(
     // Discover all worktree slugs from disk
     let diskSlugs: string[];
     try {
-      const dirents = await readdir(paths.repoDir(workspace, repo.name), { withFileTypes: true });
+      const dirents = await readdir(paths.repoDir(workspace, repo.name), {
+        withFileTypes: true,
+      });
       diskSlugs = dirents.filter((d) => d.isDirectory() || d.isSymbolicLink()).map((d) => d.name);
     } catch {
       continue; // trees/{repo}/ doesn't exist — skip
@@ -83,12 +85,16 @@ export async function generateClaudeFiles(
           ]
         : diskSlugs.slice().sort((a, b) => a.localeCompare(b));
 
+    // Hash all slugs concurrently; results are in orderedSlugs order so canonical priority is preserved
+    const hashes = await Promise.all(
+      orderedSlugs.map((slug) =>
+        hashFileContent(join(paths.worktreeDir(workspace, repo.name, slug), "CLAUDE.md")),
+      ),
+    );
+
     // Group slugs by content hash: first slug per group is canonical, rest are deduped
     const hashGroups = new Map<string, string[]>();
-    for (const slug of orderedSlugs) {
-      const hash = await hashFileContent(
-        join(paths.worktreeDir(workspace, repo.name, slug), "CLAUDE.md"),
-      );
+    for (const [slug, hash] of orderedSlugs.map((s, i) => [s, hashes[i]] as const)) {
       if (hash === null) {
         continue;
       }
