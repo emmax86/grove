@@ -168,7 +168,7 @@ describe("E2E: worktree commands", () => {
   it("pool sharing: two workspaces, same branch, one pool entry", async () => {
     await Promise.all([
       runCLI(["ws", "add", "otherws"], { root }),
-      // Add from myws first (creates pool entry); independent of otherws setup
+      // Creates pool entry; independent of otherws workspace setup
       runCLI(["ws", "worktree", "add", "myrepo", "feature/shared", "--new"], {
         root,
         cwd: join(root, "myws"),
