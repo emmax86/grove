@@ -1,7 +1,7 @@
 ---
 name: create-grove-worktree
 description: Create a new git worktree in a grove workspace using the grove CLI. Use when asked to start work on a new branch, create a worktree, or work in isolation from other branches.
-allowed-tools: Bash(grove ws worktree add:*) Bash(grove ws worktree list:*)
+allowed-tools: Bash(grove ws worktree add:*), Bash(grove ws worktree list:*)
 ---
 
 Create a worktree using the grove CLI (not `git worktree add` directly):
