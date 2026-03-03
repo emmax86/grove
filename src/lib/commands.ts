@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+
 import { REPO_COMMANDS_CONFIG } from "../constants";
 import type { Ecosystem } from "./detect";
 

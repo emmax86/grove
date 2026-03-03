@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 import { execCommand, type StandardCommand } from "./commands/exec";
 import { addRepo, listRepos, removeRepo } from "./commands/repo";
 import { getStatus } from "./commands/status";

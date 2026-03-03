@@ -1,4 +1,5 @@
 import { writeFile } from "node:fs/promises";
+
 import type { Paths } from "../constants";
 import { err, ok, type Result } from "../types";
 import { readConfig } from "./config";

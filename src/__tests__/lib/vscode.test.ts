@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { createPaths } from "../../constants";
 import { writeConfig } from "../../lib/config";
 import { generateVSCodeWorkspace } from "../../lib/vscode";

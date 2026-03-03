@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { detectEcosystem, ECOSYSTEMS } from "../../lib/detect";
 import { cleanup, createTestDir } from "../helpers";
 

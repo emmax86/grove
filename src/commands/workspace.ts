@@ -10,6 +10,7 @@ import {
   unlink,
 } from "node:fs/promises";
 import { dirname, relative } from "node:path";
+
 import type { Paths } from "../constants";
 import { generateClaudeFiles } from "../lib/claude";
 import { getPoolSlugsForWorkspace, readConfig, writeConfig } from "../lib/config";

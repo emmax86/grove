@@ -13,6 +13,18 @@
       "semicolons": "always"
     }
   },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [[":BUN:", ":NODE:"], ":BLANK_LINE:", ":PACKAGE:", ":BLANK_LINE:", ":PATH:"]
+          }
+        }
+      }
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {

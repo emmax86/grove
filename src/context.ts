@@ -1,5 +1,6 @@
 import { exists, realpath } from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
+
 import type { Paths } from "./constants";
 import { readConfig } from "./lib/config";
 import { type Context, err, ok, type Result } from "./types";

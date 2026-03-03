@@ -1,5 +1,6 @@
 import { exists, lstat, readdir, readlink, realpath, rm } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
+
 import type { Paths } from "../constants";
 import { err, ok, type Result } from "../types";
 import { readPoolConfig, writePoolConfig } from "./config";

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+
 import { createPaths } from "../../constants";
 import { generateClaudeFiles } from "../../lib/claude";
 import { writeConfig } from "../../lib/config";
