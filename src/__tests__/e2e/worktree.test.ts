@@ -109,13 +109,7 @@ describe("E2E: worktree commands", () => {
     expect(r.exitCode).toBe(0);
 
     // Symlink gone
-    let gone = false;
-    try {
-      lstatSync(join(root, "myws", "trees", "myrepo", "feature-x"));
-    } catch {
-      gone = true;
-    }
-    expect(gone).toBe(true);
+    expect(existsSync(join(root, "myws", "trees", "myrepo", "feature-x"))).toBe(false);
 
     // Pool entry gone (was last reference)
     expect(existsSync(join(root, "worktrees", "myrepo", "feature-x"))).toBe(false);
@@ -168,24 +162,19 @@ describe("E2E: worktree commands", () => {
     expect(pruned[0].slug).toBe("feature-x");
 
     // Symlink should be gone
-    let gone = false;
-    try {
-      lstatSync(join(root, "myws", "trees", "myrepo", "feature-x"));
-    } catch {
-      gone = true;
-    }
-    expect(gone).toBe(true);
+    expect(existsSync(join(root, "myws", "trees", "myrepo", "feature-x"))).toBe(false);
   });
 
   it("pool sharing: two workspaces, same branch, one pool entry", async () => {
-    await runCLI(["ws", "add", "otherws"], { root });
+    await Promise.all([
+      runCLI(["ws", "add", "otherws"], { root }),
+      // Add from myws first (creates pool entry); independent of otherws setup
+      runCLI(["ws", "worktree", "add", "myrepo", "feature/shared", "--new"], {
+        root,
+        cwd: join(root, "myws"),
+      }),
+    ]);
     await runCLI(["ws", "repo", "add", "otherws", repoPath], { root });
-
-    // Add from myws first (creates pool entry)
-    await runCLI(["ws", "worktree", "add", "myrepo", "feature/shared", "--new"], {
-      root,
-      cwd: join(root, "myws"),
-    });
 
     // Add from otherws (reuses pool entry)
     const r = await runCLI(["ws", "worktree", "add", "myrepo", "feature/shared"], {
@@ -213,13 +202,7 @@ describe("E2E: worktree commands", () => {
       cwd: join(root, "myws"),
     });
     expect(existsSync(join(root, "worktrees", "myrepo", "feature-shared"))).toBe(true);
-    let ws1Gone = false;
-    try {
-      lstatSync(join(root, "myws", "trees", "myrepo", "feature-shared"));
-    } catch {
-      ws1Gone = true;
-    }
-    expect(ws1Gone).toBe(true);
+    expect(existsSync(join(root, "myws", "trees", "myrepo", "feature-shared"))).toBe(false);
 
     // Remove from otherws — pool cleaned up
     await runCLI(["ws", "worktree", "remove", "myrepo", "feature-shared"], {

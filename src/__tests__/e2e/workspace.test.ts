@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { cleanupTempRoot, createTempRoot, runCLI } from "./helpers";
+import { cleanupTempRoot, createGitRepo, createTempRoot, runCLI } from "./helpers";
 
 describe("E2E: workspace commands", () => {
   let root: string;
@@ -103,5 +103,38 @@ describe("E2E: workspace commands", () => {
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toBe(join(root, "myws"));
     expect(() => JSON.parse(r.stdout)).toThrow();
+  });
+});
+
+describe("E2E: ws status", () => {
+  let root: string;
+  let repoPath: string;
+
+  beforeEach(async () => {
+    root = await createTempRoot();
+    [repoPath] = await Promise.all([
+      createGitRepo(root, "myrepo"),
+      runCLI(["ws", "add", "myws"], { root }),
+    ]);
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+  });
+
+  afterEach(() => {
+    cleanupTempRoot(root);
+  });
+
+  it("ws status returns workspace overview with repos and worktrees", async () => {
+    await runCLI(["ws", "worktree", "add", "myrepo", "feature/s", "--new"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+    const r = await runCLI(["ws", "status", "myws"], { root });
+    expect(r.exitCode).toBe(0);
+    const data = r.json?.data as Record<string, unknown>;
+    expect(data.name).toBe("myws");
+    const repos = data.repos as Array<Record<string, unknown>>;
+    expect(repos.length).toBeGreaterThan(0);
+    const worktrees = repos[0].worktrees as Array<{ slug: string }>;
+    expect(worktrees.map((w) => w.slug)).toContain("feature-s");
   });
 });

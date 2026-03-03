@@ -73,36 +73,3 @@ describe("E2E: context inference via cwd", () => {
     expect(data).toHaveLength(0);
   });
 });
-
-describe("E2E: ws status", () => {
-  let root: string;
-  let repoPath: string;
-
-  beforeEach(async () => {
-    root = await createTempRoot();
-    [repoPath] = await Promise.all([
-      createGitRepo(root, "myrepo"),
-      runCLI(["ws", "add", "myws"], { root }),
-    ]);
-    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
-  });
-
-  afterEach(() => {
-    cleanupTempRoot(root);
-  });
-
-  it("ws status returns workspace overview with repos and worktrees", async () => {
-    await runCLI(["ws", "worktree", "add", "myrepo", "feature/s", "--new"], {
-      root,
-      cwd: join(root, "myws"),
-    });
-    const r = await runCLI(["ws", "status", "myws"], { root });
-    expect(r.exitCode).toBe(0);
-    const data = r.json?.data as Record<string, unknown>;
-    expect(data.name).toBe("myws");
-    const repos = data.repos as Array<Record<string, unknown>>;
-    expect(repos.length).toBeGreaterThan(0);
-    const worktrees = repos[0].worktrees as Array<{ slug: string }>;
-    expect(worktrees.map((w) => w.slug)).toContain("feature-s");
-  });
-});
