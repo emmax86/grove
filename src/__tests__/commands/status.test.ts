@@ -14,7 +14,7 @@ describe("status command", () => {
   let paths: ReturnType<typeof createPaths>;
 
   beforeEach(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     paths = createPaths(join(tempDir, "workspaces"));
     await addWorkspace("myws", paths);

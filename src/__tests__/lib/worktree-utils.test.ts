@@ -26,7 +26,7 @@ describe("classifyWorktreeEntry", () => {
   let repoPath: string;
 
   beforeEach(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     await addWorkspace("myws", paths);
@@ -76,7 +76,10 @@ describe("classifyWorktreeEntry", () => {
     await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
     const wtPath = paths.worktreeDir("myws", "myrepo", "feature-x");
     // Delete the pool entry to make the workspace symlink dangle
-    rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+    rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+      recursive: true,
+      force: true,
+    });
     // classifyWorktreeEntry uses lstat (inspects symlink itself, not target)
     // and readlink (reads raw target string), so it still classifies as "pool"
     expect(await classifyWorktreeEntry(wtPath, paths)).toBe("pool");
@@ -89,7 +92,7 @@ describe("resolveRepoPath", () => {
   let repoPath: string;
 
   beforeEach(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     await addWorkspace("myws", paths);
@@ -132,7 +135,7 @@ describe("removePoolWorktree", () => {
   let paths: ReturnType<typeof createPaths>;
 
   beforeEach(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     paths = createPaths(join(tempDir, "workspaces"));
     await addWorkspace("myws", paths);
@@ -165,7 +168,10 @@ describe("removePoolWorktree", () => {
 
   it("does update worktrees.json when pool directory is already gone", async () => {
     await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
-    rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+    rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+      recursive: true,
+      force: true,
+    });
 
     const result = await removePoolWorktree("myws", "myrepo", "feature-x", {}, paths, GIT_ENV);
     expect(result.ok).toBe(true);
@@ -176,7 +182,10 @@ describe("removePoolWorktree", () => {
 
   it("does skip git call when pool directory does not exist", async () => {
     await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
-    rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+    rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+      recursive: true,
+      force: true,
+    });
 
     const result = await removePoolWorktree("myws", "myrepo", "feature-x", {}, paths, GIT_ENV);
     expect(result.ok).toBe(true);
@@ -317,7 +326,7 @@ describe("removePoolWorktree (dangling repo)", () => {
   let paths: ReturnType<typeof createPaths>;
 
   beforeEach(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     paths = createPaths(join(tempDir, "workspaces"));
     await addWorkspace("myws", paths);

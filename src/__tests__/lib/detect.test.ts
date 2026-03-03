@@ -7,8 +7,8 @@ import { cleanup, createTestDir } from "../helpers";
 describe("detectEcosystem", () => {
   let tempDir: string;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
   });
 
   afterEach(() => {

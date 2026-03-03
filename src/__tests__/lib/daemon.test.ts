@@ -14,8 +14,8 @@ describe("discoverDaemon", () => {
   let tempDir: string;
   let paths: ReturnType<typeof createPaths>;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
@@ -59,8 +59,8 @@ describe("startDaemon", () => {
   let paths: ReturnType<typeof createPaths>;
   let stopFn: (() => Promise<void>) | null = null;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
@@ -77,7 +77,11 @@ describe("startDaemon", () => {
 
   it("writes discovery file with url and pid", async () => {
     await addWorkspace("ws", paths);
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 500,
+    });
     stopFn = info.stop;
 
     const configPath = paths.daemonConfig("ws");
@@ -89,14 +93,22 @@ describe("startDaemon", () => {
 
   it("binds to 127.0.0.1 (not 0.0.0.0)", async () => {
     await addWorkspace("ws", paths);
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 500,
+    });
     stopFn = info.stop;
     expect(info.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/);
   });
 
   it("GET /health returns workspace name and pid", async () => {
     await addWorkspace("ws", paths);
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 500,
+    });
     stopFn = info.stop;
     const healthUrl = info.url.replace("/mcp", "/health");
 
@@ -116,7 +128,11 @@ describe("startDaemon", () => {
 
   it("discoverDaemon finds running daemon", async () => {
     await addWorkspace("ws", paths);
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 500,
+    });
     stopFn = info.stop;
 
     const found = await discoverDaemon("ws", paths);
@@ -126,7 +142,11 @@ describe("startDaemon", () => {
 
   it("stop() removes discovery file", async () => {
     await addWorkspace("ws", paths);
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 500,
+    });
     const configPath = paths.daemonConfig("ws");
 
     expect(existsSync(configPath)).toBe(true);
@@ -144,8 +164,8 @@ describe("MCP over HTTP", () => {
   let stopFn: (() => Promise<void>) | null = null;
   let clients: Client[] = [];
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
     clients = [];
   });
@@ -164,7 +184,11 @@ describe("MCP over HTTP", () => {
 
   it("client connects and calls workspace_status tool", async () => {
     await addWorkspace("ws", paths);
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 500,
+    });
     stopFn = info.stop;
 
     const client = new Client({ name: "test-client", version: "1.0.0" });
@@ -176,7 +200,10 @@ describe("MCP over HTTP", () => {
     expect(names).toContain("workspace_status");
     expect(names).toContain("workspace_path");
 
-    const result = await client.callTool({ name: "workspace_status", arguments: {} });
+    const result = await client.callTool({
+      name: "workspace_status",
+      arguments: {},
+    });
     expect(result.isError).toBeFalsy();
     const text = (result.content as Array<{ text: string }>)[0].text;
     const data = JSON.parse(text);
@@ -185,7 +212,11 @@ describe("MCP over HTTP", () => {
 
   it("two clients connect independently", async () => {
     await addWorkspace("ws", paths);
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 500,
+    });
     stopFn = info.stop;
 
     const clientA = new Client({ name: "client-a", version: "1.0.0" });

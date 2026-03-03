@@ -25,8 +25,8 @@ describe("workspace commands", () => {
   let tempDir: string;
   let paths: ReturnType<typeof createPaths>;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
@@ -234,7 +234,9 @@ describe("workspace commands", () => {
     // Lock the worktree — git worktree remove --force on a locked worktree fails (requires -f -f).
     // This reliably produces a gitWarning even when force: true is used.
     const poolEntry = paths.worktreePoolEntry("myrepo", "feature-pool");
-    Bun.spawnSync(["git", "-C", repoPath, "worktree", "lock", poolEntry], { env: GIT_ENV });
+    Bun.spawnSync(["git", "-C", repoPath, "worktree", "lock", poolEntry], {
+      env: GIT_ENV,
+    });
 
     // removeWorkspace --force: even if git reports a warning, workspace directory must be removed
     await removeWorkspace("myws", { force: true }, paths, GIT_ENV);
@@ -384,7 +386,10 @@ describe("workspace commands", () => {
       await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
 
       // Delete pool entry to make workspace symlink dangle
-      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+        recursive: true,
+        force: true,
+      });
 
       const result = await syncWorkspace("myws", paths, GIT_ENV);
       expect(result.ok).toBe(true);

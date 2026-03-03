@@ -18,8 +18,8 @@ describe("config", () => {
   let wsDir: string;
   let configPath: string;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     wsDir = join(tempDir, "myws");
     mkdirSync(wsDir, { recursive: true });
     configPath = join(wsDir, "workspace.json");
@@ -49,7 +49,10 @@ describe("config", () => {
 
   it("addRepoToConfig appends a repo", async () => {
     await writeConfig(configPath, { name: "myws", repos: [] });
-    const result = await addRepoToConfig(configPath, { name: "mrepo", path: "/some/path" });
+    const result = await addRepoToConfig(configPath, {
+      name: "mrepo",
+      path: "/some/path",
+    });
     expect(result.ok).toBe(true);
     const config = await readConfig(configPath);
     expect(config.ok).toBe(true);
@@ -60,7 +63,10 @@ describe("config", () => {
   });
 
   it("addRepoToConfig deduplicates by name", async () => {
-    await writeConfig(configPath, { name: "myws", repos: [{ name: "mrepo", path: "/old" }] });
+    await writeConfig(configPath, {
+      name: "myws",
+      repos: [{ name: "mrepo", path: "/old" }],
+    });
     await addRepoToConfig(configPath, { name: "mrepo", path: "/new" });
     const config = await readConfig(configPath);
     expect(config.ok).toBe(true);
@@ -131,7 +137,10 @@ describe("config", () => {
   });
 
   it("removeRepoFromConfig propagates writeConfig failure", async () => {
-    await writeConfig(configPath, { name: "myws", repos: [{ name: "r", path: "/p" }] });
+    await writeConfig(configPath, {
+      name: "myws",
+      repos: [{ name: "r", path: "/p" }],
+    });
     chmodSync(wsDir, 0o444);
     const result = await removeRepoFromConfig(configPath, "r");
     chmodSync(wsDir, 0o755);
@@ -143,8 +152,8 @@ describe("pool config", () => {
   let tempDir: string;
   let poolConfigPath: string;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     poolConfigPath = join(tempDir, "worktrees.json");
   });
 

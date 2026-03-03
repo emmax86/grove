@@ -21,7 +21,7 @@ describe("repo commands", () => {
   let paths: ReturnType<typeof createPaths>;
 
   beforeEach(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     paths = createPaths(join(tempDir, "workspaces"));
     await addWorkspace("myws", paths);
@@ -202,7 +202,10 @@ describe("repo commands", () => {
       require("node:fs").readFileSync(paths.vscodeWorkspace("myws"), "utf-8"),
     );
     expect(content.folders).toHaveLength(2);
-    expect(content.folders[1]).toEqual({ path: "trees/myrepo", name: "myrepo" });
+    expect(content.folders[1]).toEqual({
+      path: "trees/myrepo",
+      name: "myrepo",
+    });
   });
 
   it("removeRepo removes repo from .code-workspace", async () => {
@@ -295,7 +298,9 @@ describe("repo commands", () => {
     Bun.spawnSync(["git", "-C", detachedRepoPath, "config", "user.name", "Test"], { env });
     writeFileSync(join(detachedRepoPath, "README"), "x");
     Bun.spawnSync(["git", "-C", detachedRepoPath, "add", "."], { env });
-    Bun.spawnSync(["git", "-C", detachedRepoPath, "commit", "-m", "init"], { env });
+    Bun.spawnSync(["git", "-C", detachedRepoPath, "commit", "-m", "init"], {
+      env,
+    });
     // Detach HEAD — symbolic-ref will now fail
     const shaResult = Bun.spawnSync(["git", "-C", detachedRepoPath, "rev-parse", "HEAD"], { env });
     const sha = new TextDecoder().decode(shaResult.stdout).trim();
@@ -397,7 +402,9 @@ describe("repo commands", () => {
     // Lock the worktree — git worktree remove --force on a locked worktree fails (requires -f -f).
     // This reliably produces a gitWarning even when force: true is used.
     const poolEntry = paths.worktreePoolEntry("myrepo", "feature-pool");
-    Bun.spawnSync(["git", "-C", repoPath, "worktree", "lock", poolEntry], { env: GIT_ENV });
+    Bun.spawnSync(["git", "-C", repoPath, "worktree", "lock", poolEntry], {
+      env: GIT_ENV,
+    });
 
     // removeRepo --force: git warns but repoDir and workspace.json must still be cleaned
     const result = await removeRepo("myws", "myrepo", { force: true }, paths, GIT_ENV);

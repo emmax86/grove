@@ -12,8 +12,8 @@ describe("MCP server", () => {
   let tempDir: string;
   let paths: ReturnType<typeof createPaths>;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
@@ -71,7 +71,9 @@ describe("MCP server", () => {
       await setupWorkspaceWithRepo();
       const { client, server } = await connectClient("ws");
 
-      const result = await client.readResource({ uri: "grove://workspace/status" });
+      const result = await client.readResource({
+        uri: "grove://workspace/status",
+      });
       expect(result.contents).toHaveLength(1);
       const text = (result.contents[0] as { uri: string; text: string }).text;
       const data = JSON.parse(text);
@@ -88,7 +90,9 @@ describe("MCP server", () => {
       await setupWorkspaceWithRepo();
       const { client, server } = await connectClient("ws");
 
-      const result = await client.readResource({ uri: "grove://workspace/repos" });
+      const result = await client.readResource({
+        uri: "grove://workspace/repos",
+      });
       const text = (result.contents[0] as { uri: string; text: string }).text;
       const data = JSON.parse(text);
 
@@ -104,7 +108,9 @@ describe("MCP server", () => {
       await addWorkspace("ws", paths);
       const { client, server } = await connectClient("ws");
 
-      const result = await client.readResource({ uri: "grove://workspace/repos" });
+      const result = await client.readResource({
+        uri: "grove://workspace/repos",
+      });
       const text = (result.contents[0] as { uri: string; text: string }).text;
       const data = JSON.parse(text);
 
@@ -118,7 +124,9 @@ describe("MCP server", () => {
       await setupWorkspaceWithRepo();
       const { client, server } = await connectClient("ws");
 
-      const result = await client.readResource({ uri: "grove://workspace/worktrees" });
+      const result = await client.readResource({
+        uri: "grove://workspace/worktrees",
+      });
       const text = (result.contents[0] as { uri: string; text: string }).text;
       const data = JSON.parse(text);
 
@@ -132,7 +140,9 @@ describe("MCP server", () => {
       await setupWorkspaceWithRepo();
       const { client, server } = await connectClient("ws");
 
-      const result = await client.readResource({ uri: "grove://workspace/context" });
+      const result = await client.readResource({
+        uri: "grove://workspace/context",
+      });
       const text = (result.contents[0] as { uri: string; text: string }).text;
       const data = JSON.parse(text);
 
@@ -180,7 +190,10 @@ describe("MCP server", () => {
       await setupWorkspaceWithRepo();
       const { client, server } = await connectClient("ws");
 
-      const result = await client.callTool({ name: "workspace_status", arguments: {} });
+      const result = await client.callTool({
+        name: "workspace_status",
+        arguments: {},
+      });
       expect(result.isError).toBeFalsy();
       const text = (result.content as Array<{ text: string }>)[0].text;
       const data = JSON.parse(text);
@@ -196,7 +209,10 @@ describe("MCP server", () => {
       await addWorkspace("ws", paths);
       const { client, server } = await connectClient("ws");
 
-      const result = await client.callTool({ name: "workspace_path", arguments: {} });
+      const result = await client.callTool({
+        name: "workspace_path",
+        arguments: {},
+      });
       expect(result.isError).toBeFalsy();
       const text = (result.content as Array<{ text: string }>)[0].text;
       const data = JSON.parse(text);
@@ -211,7 +227,10 @@ describe("MCP server", () => {
       await setupWorkspaceWithRepo();
       const { client, server } = await connectClient("ws");
 
-      const result = await client.callTool({ name: "workspace_sync", arguments: {} });
+      const result = await client.callTool({
+        name: "workspace_sync",
+        arguments: {},
+      });
       expect(result.isError).toBeFalsy();
       const text = (result.content as Array<{ text: string }>)[0].text;
       const data = JSON.parse(text);

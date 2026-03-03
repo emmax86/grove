@@ -11,8 +11,8 @@ describe("generateClaudeFiles", () => {
   let tempDir: string;
   let paths: ReturnType<typeof createPaths>;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
@@ -149,7 +149,9 @@ describe("generateClaudeFiles", () => {
     });
 
     it("uses slugified branch in path", async () => {
-      const pathA = await setupRepo("ws", "alpha", { defaultBranch: "release/1.0" });
+      const pathA = await setupRepo("ws", "alpha", {
+        defaultBranch: "release/1.0",
+      });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
       const result = await generateClaudeFiles("ws", paths, GIT_ENV);
@@ -164,7 +166,9 @@ describe("generateClaudeFiles", () => {
     });
 
     it("handles multi-level branch slugification", async () => {
-      const pathA = await setupRepo("ws", "alpha", { defaultBranch: "feature/team/task-123" });
+      const pathA = await setupRepo("ws", "alpha", {
+        defaultBranch: "feature/team/task-123",
+      });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
       const result = await generateClaudeFiles("ws", paths, GIT_ENV);
@@ -323,14 +327,18 @@ describe("generateClaudeFiles", () => {
         ...GIT_ENV,
         HOME: tempDir,
       };
-      Bun.spawnSync(["git", "init", "-b", "main", detachedPath], { env: gitEnv });
+      Bun.spawnSync(["git", "init", "-b", "main", detachedPath], {
+        env: gitEnv,
+      });
       Bun.spawnSync(["git", "-C", detachedPath, "config", "user.email", "test@test.com"], {
         env: gitEnv,
       });
       Bun.spawnSync(["git", "-C", detachedPath, "config", "user.name", "Test"], { env: gitEnv });
       writeFileSync(join(detachedPath, "README"), "x");
       Bun.spawnSync(["git", "-C", detachedPath, "add", "."], { env: gitEnv });
-      Bun.spawnSync(["git", "-C", detachedPath, "commit", "-m", "init"], { env: gitEnv });
+      Bun.spawnSync(["git", "-C", detachedPath, "commit", "-m", "init"], {
+        env: gitEnv,
+      });
       const shaResult = Bun.spawnSync(["git", "-C", detachedPath, "rev-parse", "HEAD"], {
         env: gitEnv,
       });
@@ -365,14 +373,18 @@ describe("generateClaudeFiles", () => {
       const detachedPath = join(tempDir, "bravo");
       await mkdir(detachedPath, { recursive: true });
       const gitEnv = { ...process.env, ...GIT_ENV, HOME: tempDir };
-      Bun.spawnSync(["git", "init", "-b", "main", detachedPath], { env: gitEnv });
+      Bun.spawnSync(["git", "init", "-b", "main", detachedPath], {
+        env: gitEnv,
+      });
       Bun.spawnSync(["git", "-C", detachedPath, "config", "user.email", "test@test.com"], {
         env: gitEnv,
       });
       Bun.spawnSync(["git", "-C", detachedPath, "config", "user.name", "Test"], { env: gitEnv });
       writeFileSync(join(detachedPath, "README"), "x");
       Bun.spawnSync(["git", "-C", detachedPath, "add", "."], { env: gitEnv });
-      Bun.spawnSync(["git", "-C", detachedPath, "commit", "-m", "init"], { env: gitEnv });
+      Bun.spawnSync(["git", "-C", detachedPath, "commit", "-m", "init"], {
+        env: gitEnv,
+      });
       const shaResult = Bun.spawnSync(["git", "-C", detachedPath, "rev-parse", "HEAD"], {
         env: gitEnv,
       });
@@ -380,7 +392,9 @@ describe("generateClaudeFiles", () => {
       writeFileSync(join(detachedPath, ".git", "HEAD"), `${sha}\n`);
 
       // Set up a worktree slug with a CLAUDE.md so scanning can find it
-      await setupWorktreeEntry("ws", "bravo", "feature-1", { claudeContent: "# bravo feature\n" });
+      await setupWorktreeEntry("ws", "bravo", "feature-1", {
+        claudeContent: "# bravo feature\n",
+      });
 
       await setupWorkspace("ws", [
         { name: "alpha", path: pathA },
@@ -530,8 +544,12 @@ describe("generateClaudeFiles", () => {
 
     it("orders non-default slugs alphabetically after default branch", async () => {
       const pathA = await setupRepo("ws", "alpha");
-      await setupWorktreeEntry("ws", "alpha", "z-branch", { claudeContent: "# z\n" });
-      await setupWorktreeEntry("ws", "alpha", "a-branch", { claudeContent: "# a\n" });
+      await setupWorktreeEntry("ws", "alpha", "z-branch", {
+        claudeContent: "# z\n",
+      });
+      await setupWorktreeEntry("ws", "alpha", "a-branch", {
+        claudeContent: "# a\n",
+      });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
       const result = await generateClaudeFiles("ws", paths, GIT_ENV);
@@ -547,8 +565,12 @@ describe("generateClaudeFiles", () => {
       const pathA = await setupRepo("ws", "alpha", { hasClaude: false });
       // Remove the default branch entry so diskSlugs truly excludes defaultSlug
       rmSync(paths.worktreeDir("ws", "alpha", "main"));
-      await setupWorktreeEntry("ws", "alpha", "z-feat", { claudeContent: "# z\n" });
-      await setupWorktreeEntry("ws", "alpha", "a-feat", { claudeContent: "# a\n" });
+      await setupWorktreeEntry("ws", "alpha", "z-feat", {
+        claudeContent: "# z\n",
+      });
+      await setupWorktreeEntry("ws", "alpha", "a-feat", {
+        claudeContent: "# a\n",
+      });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
       const result = await generateClaudeFiles("ws", paths, GIT_ENV);
@@ -586,7 +608,9 @@ describe("generateClaudeFiles", () => {
   describe("worktree deduplication", () => {
     it("includes feature branch when content differs from default", async () => {
       const pathA = await setupRepo("ws", "alpha");
-      await setupWorktreeEntry("ws", "alpha", "feature-x", { claudeContent: "# different\n" });
+      await setupWorktreeEntry("ws", "alpha", "feature-x", {
+        claudeContent: "# different\n",
+      });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
       const result = await generateClaudeFiles("ws", paths, GIT_ENV);
@@ -632,7 +656,9 @@ describe("generateClaudeFiles", () => {
       const pathA = await setupRepo("ws", "alpha");
       const claudeContent = readFileSync(join(pathA, "CLAUDE.md"), "utf-8");
       await setupWorktreeEntry("ws", "alpha", "feat-a", { claudeContent }); // same
-      await setupWorktreeEntry("ws", "alpha", "feat-b", { claudeContent: "# different\n" }); // different
+      await setupWorktreeEntry("ws", "alpha", "feat-b", {
+        claudeContent: "# different\n",
+      }); // different
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
       const result = await generateClaudeFiles("ws", paths, GIT_ENV);

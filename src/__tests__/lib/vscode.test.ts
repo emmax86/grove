@@ -10,8 +10,8 @@ describe("generateVSCodeWorkspace", () => {
   let tempDir: string;
   let paths: ReturnType<typeof createPaths>;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
   });
 
@@ -44,7 +44,10 @@ describe("generateVSCodeWorkspace", () => {
 
     const content = JSON.parse(readFileSync(paths.vscodeWorkspace("alpha"), "utf-8"));
     expect(content.folders).toHaveLength(2);
-    expect(content.folders[0]).toEqual({ path: ".", name: "alpha (workspace)" });
+    expect(content.folders[0]).toEqual({
+      path: ".",
+      name: "alpha (workspace)",
+    });
     expect(content.folders[1]).toEqual({ path: "trees/myapp", name: "myapp" });
   });
 

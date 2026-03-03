@@ -9,8 +9,8 @@ const GROVE_DIR = ".grove";
 describe("loadCommandConfig", () => {
   let tempDir: string;
 
-  beforeEach(() => {
-    tempDir = createTestDir();
+  beforeEach(async () => {
+    tempDir = await createTestDir();
   });
 
   afterEach(() => {
@@ -144,32 +144,42 @@ describe("resolveCommand", () => {
 
   it("substitutes {file} placeholder in array-form command", () => {
     const config = { "test:file": ["bun", "test", "{file}"] };
-    const result = resolveCommand("test:file", config, null, { file: "/src/foo.test.ts" });
+    const result = resolveCommand("test:file", config, null, {
+      file: "/src/foo.test.ts",
+    });
     expect(result).toEqual(["bun", "test", "/src/foo.test.ts"]);
   });
 
   it("substitutes {match} placeholder in array-form command", () => {
     const config = { "test:match": ["bun", "test", "--grep", "{match}"] };
-    const result = resolveCommand("test:match", config, null, { match: "addWorktree" });
+    const result = resolveCommand("test:match", config, null, {
+      match: "addWorktree",
+    });
     expect(result).toEqual(["bun", "test", "--grep", "addWorktree"]);
   });
 
   it("does NOT perform shell interpolation — {file} with shell metacharacters becomes a literal argument", () => {
     const config = { "test:file": ["bun", "test", "{file}"] };
     // Shell injection attempt — must end up as a single literal argv element
-    const result = resolveCommand("test:file", config, null, { file: "; rm -rf /" });
+    const result = resolveCommand("test:file", config, null, {
+      file: "; rm -rf /",
+    });
     expect(result).toEqual(["bun", "test", "; rm -rf /"]);
   });
 
   it("{file} with backticks is a single literal argument", () => {
     const config = { "test:file": ["bun", "test", "{file}"] };
-    const result = resolveCommand("test:file", config, null, { file: "`curl evil.com`" });
+    const result = resolveCommand("test:file", config, null, {
+      file: "`curl evil.com`",
+    });
     expect(result).toEqual(["bun", "test", "`curl evil.com`"]);
   });
 
   it("{file} with spaces is a single literal argument", () => {
     const config = { "test:file": ["bun", "test", "{file}"] };
-    const result = resolveCommand("test:file", config, null, { file: "path with spaces/foo.ts" });
+    const result = resolveCommand("test:file", config, null, {
+      file: "path with spaces/foo.ts",
+    });
     expect(result).toEqual(["bun", "test", "path with spaces/foo.ts"]);
   });
 

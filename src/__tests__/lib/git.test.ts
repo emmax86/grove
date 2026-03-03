@@ -16,7 +16,7 @@ describe("git lib", () => {
   let repoPath: string;
 
   beforeAll(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "testrepo");
   });
 

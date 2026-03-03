@@ -1,10 +1,28 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
+import { mkdir, mkdtemp, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-export function createTestDir(): string {
-  // realpathSync resolves macOS /var -> /private/var symlink so paths match git output
-  return realpathSync(mkdtempSync(join(tmpdir(), "grove-test-")));
+export async function createTestDir(): Promise<string> {
+  // realpath resolves macOS /var -> /private/var symlink so paths match git output
+  const tmp = await mkdtemp(join(tmpdir(), "grove-test-"));
+  return await realpath(tmp);
+}
+
+export async function spawnGit(
+  args: string[],
+  cwd: string,
+  env: Record<string, string>,
+): Promise<void> {
+  const proc = Bun.spawn(args, { cwd, env, stdout: "pipe", stderr: "pipe" });
+  const [, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  if (exitCode !== 0) {
+    throw new Error(`${args.join(" ")} failed: ${stderr}`);
+  }
 }
 
 export async function createTestGitRepo(
@@ -13,35 +31,29 @@ export async function createTestGitRepo(
   defaultBranch = "main",
 ): Promise<string> {
   const repoPath = join(dir, name);
-  mkdirSync(repoPath, { recursive: true });
+  await mkdir(repoPath, { recursive: true });
 
-  const env = {
-    ...process.env,
-    GIT_CONFIG_NOSYSTEM: "1",
+  const env: Record<string, string> = {
+    PATH: process.env.PATH ?? "",
     HOME: dir,
+    GIT_CONFIG_NOSYSTEM: "1",
     GIT_AUTHOR_NAME: "Test",
     GIT_AUTHOR_EMAIL: "test@test.com",
     GIT_COMMITTER_NAME: "Test",
     GIT_COMMITTER_EMAIL: "test@test.com",
   };
 
-  const run = (args: string[]) => {
-    const result = Bun.spawnSync(args, { cwd: repoPath, env });
-    if (!result.success) {
-      throw new Error(`git ${args.join(" ")} failed: ${new TextDecoder().decode(result.stderr)}`);
-    }
-    return new TextDecoder().decode(result.stdout).trim();
-  };
+  const run = (args: string[]) => spawnGit(args, repoPath, env);
 
-  run(["git", "init", "-b", defaultBranch]);
-  run(["git", "config", "user.email", "test@test.com"]);
-  run(["git", "config", "user.name", "Test"]);
+  await run(["git", "init", "-b", defaultBranch]);
+  await run(["git", "config", "user.email", "test@test.com"]);
+  await run(["git", "config", "user.name", "Test"]);
 
   // Create initial commit so HEAD is valid
   const readmePath = join(repoPath, "README.md");
   await Bun.write(readmePath, `# ${name}\n`);
-  run(["git", "add", "."]);
-  run(["git", "commit", "-m", "Initial commit"]);
+  await run(["git", "add", "."]);
+  await run(["git", "commit", "-m", "Initial commit"]);
 
   return repoPath;
 }

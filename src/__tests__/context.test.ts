@@ -15,7 +15,7 @@ describe("context inference", () => {
   let wsRoot: string;
 
   beforeAll(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     wsRoot = join(tempDir, "workspaces");
     paths = createPaths(wsRoot);
@@ -132,7 +132,7 @@ describe("resolveRepoFromFile", () => {
   let wsRoot: string;
 
   beforeAll(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     wsRoot = join(tempDir, "workspaces");
     paths = createPaths(wsRoot);

@@ -22,7 +22,7 @@ describe("lifecycle integration", () => {
   let paths: ReturnType<typeof createPaths>;
 
   beforeAll(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     paths = createPaths(join(tempDir, "workspaces"));
   });
@@ -149,8 +149,8 @@ describe("generateClaudeFiles — trees.md", () => {
   let tempDir: string;
   let paths: ReturnType<typeof createPaths>;
 
-  beforeAll(() => {
-    tempDir = createTestDir();
+  beforeAll(async () => {
+    tempDir = await createTestDir();
     paths = createPaths(join(tempDir, "workspaces"));
   });
 

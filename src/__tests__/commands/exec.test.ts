@@ -13,7 +13,7 @@ describe("execCommand", () => {
   let paths: ReturnType<typeof createPaths>;
 
   beforeAll(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     paths = createPaths(join(tempDir, "workspaces"));
     await addWorkspace("ws", paths);

@@ -28,7 +28,7 @@ describe("worktree commands", () => {
   let paths: ReturnType<typeof createPaths>;
 
   beforeEach(async () => {
-    tempDir = createTestDir();
+    tempDir = await createTestDir();
     repoPath = await createTestGitRepo(tempDir, "myrepo");
     paths = createPaths(join(tempDir, "workspaces"));
     await addWorkspace("myws", paths);
@@ -404,7 +404,10 @@ describe("worktree commands", () => {
       await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
       const wtPath = paths.worktreeDir("myws", "myrepo", "feature-x");
       // Delete pool entry to make the workspace symlink dangle
-      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+        recursive: true,
+        force: true,
+      });
 
       const result = await pruneWorktrees("myws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
@@ -432,7 +435,10 @@ describe("worktree commands", () => {
       await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
       await addWorktree("myws", "myrepo", "feature/y", { newBranch: true }, paths, GIT_ENV);
       // Delete only feature-x pool entry
-      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+        recursive: true,
+        force: true,
+      });
 
       const result = await pruneWorktrees("myws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
@@ -501,8 +507,14 @@ describe("worktree commands", () => {
       await addWorktree("myws", "myrepo", "feature/a", { newBranch: true }, paths, GIT_ENV);
       await addWorktree("myws", "myrepo2", "feature/a", { newBranch: true }, paths, GIT_ENV);
 
-      rmSync(paths.worktreePoolEntry("myrepo", "feature-a"), { recursive: true, force: true });
-      rmSync(paths.worktreePoolEntry("myrepo2", "feature-a"), { recursive: true, force: true });
+      rmSync(paths.worktreePoolEntry("myrepo", "feature-a"), {
+        recursive: true,
+        force: true,
+      });
+      rmSync(paths.worktreePoolEntry("myrepo2", "feature-a"), {
+        recursive: true,
+        force: true,
+      });
 
       const result = await pruneWorktrees("myws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
@@ -546,7 +558,10 @@ describe("worktree commands", () => {
 
     it("does return empty pruned list when called again after previous prune", async () => {
       await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
-      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+        recursive: true,
+        force: true,
+      });
 
       await pruneWorktrees("myws", paths, GIT_ENV); // first pass removes symlink
 
@@ -570,7 +585,10 @@ describe("worktree commands", () => {
       const wtPath = paths.worktreeDir("myws", "myrepo", "feature-x");
 
       // Delete pool entry AND repos/ symlink
-      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+        recursive: true,
+        force: true,
+      });
       rmSync(paths.repoEntry("myrepo"), { force: true });
 
       const result = await pruneWorktrees("myws", paths, GIT_ENV);
@@ -634,7 +652,10 @@ describe("worktree commands", () => {
 
       // Delete both the workspace symlink and the pool dir — orphaned json entry remains
       rmSync(paths.worktreeDir("myws", "myrepo", "feature-x"), { force: true });
-      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), { recursive: true, force: true });
+      rmSync(paths.worktreePoolEntry("myrepo", "feature-x"), {
+        recursive: true,
+        force: true,
+      });
 
       const before = JSON.parse(readFileSync(paths.worktreePoolConfig, "utf-8"));
       expect(before.myrepo?.["feature-x"]).toContain("myws");
@@ -716,8 +737,14 @@ describe("worktree commands", () => {
       await addWorktree("myws", "myrepo2", "feature/perm", { newBranch: true }, paths, GIT_ENV);
 
       // Delete both pool entries to make both symlinks dangle
-      rmSync(paths.worktreePoolEntry("myrepo", "feature-perm"), { recursive: true, force: true });
-      rmSync(paths.worktreePoolEntry("myrepo2", "feature-perm"), { recursive: true, force: true });
+      rmSync(paths.worktreePoolEntry("myrepo", "feature-perm"), {
+        recursive: true,
+        force: true,
+      });
+      rmSync(paths.worktreePoolEntry("myrepo2", "feature-perm"), {
+        recursive: true,
+        force: true,
+      });
 
       // Make myrepo's trees dir read-only so rm on its symlink fails
       const treesDir = paths.repoDir("myws", "myrepo");
