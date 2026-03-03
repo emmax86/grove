@@ -11,7 +11,7 @@
     "format": "biome check --write .",
     "format:check": "biome check .",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "bun run build && husky"
   },
   "lint-staged": {
     "*": "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
