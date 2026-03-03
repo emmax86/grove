@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { rmSync } from "node:fs";
+import { rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { addRepo } from "../../commands/repo";
@@ -57,7 +57,7 @@ describe("status command", () => {
 
   it("flags dangling symlinks", async () => {
     // Remove repo to make dangling
-    rmSync(repoPath, { recursive: true, force: true });
+    await rm(repoPath, { recursive: true, force: true });
     const result = await getStatus("myws", paths);
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -75,8 +75,7 @@ describe("status command", () => {
   });
 
   it("returns CONFIG_INVALID for corrupted workspace config", async () => {
-    const { writeFileSync } = require("node:fs");
-    writeFileSync(paths.workspaceConfig("myws"), "not-json");
+    await writeFile(paths.workspaceConfig("myws"), "not-json");
     const result = await getStatus("myws", paths);
     expect(result.ok).toBe(false);
     if (!result.ok) {

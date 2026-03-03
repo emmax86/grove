@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 
 import { execCommand } from "../../commands/exec";
@@ -58,7 +58,7 @@ describe("execCommand", () => {
 
   it("dry-run returns resolved command without running it", async () => {
     // Write a bun.lock signal so ecosystem is detected
-    writeFileSync(join(repoPath, "bun.lock"), "");
+    await writeFile(join(repoPath, "bun.lock"), "");
     const result = await execCommand("ws", "test", { repo: "myrepo", dryRun: true }, paths);
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -70,8 +70,8 @@ describe("execCommand", () => {
 
   it("dry-run with file substitution resolves {file} placeholder", async () => {
     // Write a commands.json with test:file command
-    mkdirSync(join(repoPath, ".grove"), { recursive: true });
-    writeFileSync(
+    await mkdir(join(repoPath, ".grove"), { recursive: true });
+    await writeFile(
       join(repoPath, ".grove", "commands.json"),
       JSON.stringify({ "test:file": ["bun", "test", "{file}"] }),
     );
@@ -89,8 +89,8 @@ describe("execCommand", () => {
   });
 
   it("executes a real command and captures stdout", async () => {
-    mkdirSync(join(repoPath, ".grove"), { recursive: true });
-    writeFileSync(
+    await mkdir(join(repoPath, ".grove"), { recursive: true });
+    await writeFile(
       join(repoPath, ".grove", "commands.json"),
       JSON.stringify({ setup: ["echo", "hello-grove"] }),
     );
@@ -104,8 +104,11 @@ describe("execCommand", () => {
   });
 
   it("returns ok with non-zero exitCode when command fails", async () => {
-    mkdirSync(join(repoPath, ".grove"), { recursive: true });
-    writeFileSync(join(repoPath, ".grove", "commands.json"), JSON.stringify({ check: ["false"] }));
+    await mkdir(join(repoPath, ".grove"), { recursive: true });
+    await writeFile(
+      join(repoPath, ".grove", "commands.json"),
+      JSON.stringify({ check: ["false"] }),
+    );
     const result = await execCommand("ws", "check", { repo: "myrepo" }, paths);
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -114,8 +117,8 @@ describe("execCommand", () => {
   });
 
   it("resolves relative file path to absolute before command substitution", async () => {
-    mkdirSync(join(repoPath, ".grove"), { recursive: true });
-    writeFileSync(
+    await mkdir(join(repoPath, ".grove"), { recursive: true });
+    await writeFile(
       join(repoPath, ".grove", "commands.json"),
       JSON.stringify({ "test:file": ["bun", "test", "{file}"] }),
     );
