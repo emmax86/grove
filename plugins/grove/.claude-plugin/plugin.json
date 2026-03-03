@@ -1,0 +1,8 @@
+{
+  "name": "grove",
+  "description": "Workspace management for Claude Code — group repos and git worktrees into named workspaces",
+  "author": {
+    "name": "emmax86",
+    "url": "https://github.com/emmax86/grove"
+  }
+}

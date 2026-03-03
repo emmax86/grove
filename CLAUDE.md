@@ -49,7 +49,7 @@ Subcommands: `add`, `list`, `remove`, `repo`, `worktree`, `status`, `path`, `syn
 
 ### Plugin
 
-`.claude-plugin/` contains a `plugin.json` manifest and `commands/*.md` slash-command definitions for use as a Claude Code plugin.
+`plugins/grove/` contains the Claude Code plugin. `plugins/grove/.claude-plugin/plugin.json` is the manifest and `plugins/grove/commands/*.md` are the slash-command definitions. The grove repo acts as a marketplace source installable via `claude plugin marketplace add emmax86/grove --sparse plugins`.
 
 ## Tests
 
