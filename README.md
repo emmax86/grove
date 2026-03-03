@@ -100,10 +100,10 @@ grove ws status
 
 ### Other
 
-| Command                                 | Description                                    |
-| --------------------------------------- | ---------------------------------------------- |
-| `grove ws exec <cmd> [file] [--repo R]` | Run standard command (setup/test/format/check) |
-| `grove mcp-server [--workspace W]`      | Start MCP server (top-level, not under `ws`)   |
+| Command                                                                    | Description                                    |
+| -------------------------------------------------------------------------- | ---------------------------------------------- |
+| `grove ws exec <cmd> (<file> \| --repo R) [--match <pattern>] [--dry-run]` | Run standard command (setup/test/format/check) |
+| `grove mcp-server [--workspace W]`                                         | Start MCP server (top-level, not under `ws`)   |
 
 Bracketed args are inferred from CWD. Override with `--workspace` flag or `GROVE_WORKSPACE` env var.
 
@@ -113,7 +113,7 @@ List commands output JSON by default. Pass `--porcelain` for tab-separated plain
 
 - **Claude Code plugin** — `.claude-plugin/` registers `/workspace`, `/workspace-status`, `/worktree`, `/repo` slash commands
 - **MCP server** — `grove mcp-server` exposes workspace operations over MCP for AI tool integration
-- **Auto-generated files** — adding/removing repos regenerates `CLAUDE.md`, `.claude/trees.md`, and `.code-workspace` to keep editor and agent configs in sync
+- **Auto-generated files** — adding/removing repos regenerates `CLAUDE.md`, `AGENTS.md`, `.claude/trees.md`, and `.code-workspace` to keep editor and agent configs in sync
 
 ## Development
 
