@@ -33,3 +33,5 @@ Navigate to this path to begin work. Do not use `cd` into the pool path directly
 - Do not use `git worktree add` directly; grove manages the pool and workspace symlinks
 - The `repo` argument is inferred from `$PWD` when running inside a workspace repo directory
 - Run `grove ws worktree list [repo]` to confirm the worktree was created
+
+If any command fails, report the error message and error code.

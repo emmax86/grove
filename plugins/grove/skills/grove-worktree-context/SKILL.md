@@ -29,3 +29,5 @@ Worktrees are accessible via the workspace symlink tree:
 ```
 
 Use this path to navigate to or reference a specific worktree. Run `grove ws worktree list [repo]` to see all worktrees for a specific repo with their slugs and branches.
+
+If any command fails, report the error message and error code.
