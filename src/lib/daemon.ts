@@ -82,6 +82,8 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
     await Promise.allSettled(
       Array.from(sessions.entries()).map(async ([id, { server }]) => {
         try {
+          // McpServer.sendResourceListChanged() returns void; use the inner
+          // Server instance (public readonly .server) for the async version.
           await server.server.sendResourceListChanged();
         } catch (e) {
           process.stderr.write(`[daemon] notification failed for session ${id}: ${e}\n`);

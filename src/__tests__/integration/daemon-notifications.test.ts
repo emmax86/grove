@@ -27,7 +27,7 @@ describe("daemon push notifications", () => {
     const daemon = await startDaemon({
       workspace: "ws",
       paths,
-      gracePeriodMs: 1000,
+      gracePeriodMs: 100,
     });
     mcpUrl = daemon.url;
     daemonStop = daemon.stop;
@@ -46,9 +46,10 @@ describe("daemon push notifications", () => {
   }
 
   /**
-   * Sets a persistent notification handler on the client and returns a function
-   * that resolves on the next resourceListChanged notification. Safe to call
-   * multiple times concurrently — each call enqueues its own resolver.
+   * Sets a persistent notification handler on the client and returns a waiter
+   * function. Call makeNotificationWaiter once per client. The returned waiter
+   * is safe to call multiple times concurrently — each call enqueues its own
+   * resolver and notifications are dispatched in arrival order.
    */
   function makeNotificationWaiter(client: Client): () => Promise<void> {
     const pending: Array<() => void> = [];
