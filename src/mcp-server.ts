@@ -2,10 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { execCommand } from "./commands/exec";
-import { listRepos } from "./commands/repo";
 import { getStatus } from "./commands/status";
 import { syncWorkspace } from "./commands/workspace";
-import { addWorktree, listWorktrees, removeWorktree } from "./commands/worktree";
+import { addWorktree, removeWorktree } from "./commands/worktree";
 import type { Paths } from "./constants";
 import type { AsyncMutex } from "./lib/mutex";
 
@@ -18,7 +17,9 @@ function toErrorContent(error: string) {
 }
 
 function toJsonContent(value: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
+  };
 }
 
 export function createMcpServer(
@@ -32,62 +33,15 @@ export function createMcpServer(
   // ── Resources ────────────────────────────────────────────────────
 
   server.registerResource(
-    "workspace-status",
-    "grove://workspace/status",
-    { description: "Current workspace state (name, repo count, worktree count)" },
-    async () => {
-      const result = await getStatus(workspace, paths);
-      if (!result.ok) {
-        return {
-          contents: [
-            { uri: "grove://workspace/status", text: JSON.stringify({ error: result.error }) },
-          ],
-        };
-      }
-      const { name, repos } = result.value;
-      const worktreeCount = repos.reduce((sum, r) => sum + r.worktrees.length, 0);
-      const data = { name, repoCount: repos.length, worktreeCount };
-      return { contents: [{ uri: "grove://workspace/status", text: JSON.stringify(data) }] };
-    },
-  );
-
-  server.registerResource(
-    "workspace-repos",
-    "grove://workspace/repos",
-    { description: "Registered repos with paths and status" },
-    async () => {
-      const result = await listRepos(workspace, paths);
-      const data = result.ok ? result.value : [];
-      return { contents: [{ uri: "grove://workspace/repos", text: JSON.stringify(data) }] };
-    },
-  );
-
-  server.registerResource(
-    "workspace-worktrees",
-    "grove://workspace/worktrees",
-    { description: "All worktrees across repos" },
-    async () => {
-      const reposResult = await listRepos(workspace, paths);
-      const repos = reposResult.ok ? reposResult.value : [];
-      const all = [];
-      for (const repo of repos) {
-        const wtResult = await listWorktrees(workspace, repo.name, paths);
-        if (wtResult.ok) {
-          all.push(...wtResult.value);
-        }
-      }
-      return { contents: [{ uri: "grove://workspace/worktrees", text: JSON.stringify(all) }] };
-    },
-  );
-
-  server.registerResource(
     "workspace-context",
     "grove://workspace/context",
-    { description: "Full workspace context including repos and worktrees" },
+    { description: "Full workspace context: name, path, repos with worktrees" },
     async () => {
       const result = await getStatus(workspace, paths);
       const data = result.ok ? result.value : { error: result.error };
-      return { contents: [{ uri: "grove://workspace/context", text: JSON.stringify(data) }] };
+      return {
+        contents: [{ uri: "grove://workspace/context", text: JSON.stringify(data) }],
+      };
     },
   );
 
@@ -115,7 +69,9 @@ export function createMcpServer(
 
   server.registerTool(
     "workspace_sync",
-    { description: "Repair workspace: recreate missing symlinks, prune dangling worktrees" },
+    {
+      description: "Repair workspace: recreate missing symlinks, prune dangling worktrees",
+    },
     async () => {
       const run = async () => syncWorkspace(workspace, paths);
       const result = await (writeLock ? writeLock.run(run) : run());
