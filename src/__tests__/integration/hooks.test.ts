@@ -44,7 +44,7 @@ const ALLOW_CASES: [string, unknown][] = [
   ["git status", cmd("git status")],
   ["git --version", cmd("git --version")],
   [
-    'git commit -m "fix worktree sync bug"',
+    'git commit --allow-empty -m "fix worktree sync bug"',
     cmd('git commit --allow-empty -m "fix worktree sync bug"'),
   ],
   ["echo git worktree (git is not the command)", cmd("echo git worktree")],
