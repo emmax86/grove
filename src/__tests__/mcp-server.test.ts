@@ -40,114 +40,71 @@ describe("MCP server", () => {
   // ── resource listing ────────────────────────────────────────────
 
   describe("resources", () => {
-    it("lists 4 resources", async () => {
+    it("lists 1 resource", async () => {
       await addWorkspace("ws", paths);
       const { client, server } = await connectClient("ws");
 
       const { resources } = await client.listResources();
-      expect(resources).toHaveLength(4);
+      expect(resources).toHaveLength(1);
 
       await client.close();
       await server.close();
     });
 
-    it("lists resources with expected URIs", async () => {
+    it("exposes only grove://workspace/context", async () => {
       await addWorkspace("ws", paths);
       const { client, server } = await connectClient("ws");
 
       const { resources } = await client.listResources();
       const uris = resources.map((r) => r.uri);
 
-      expect(uris).toContain("grove://workspace/status");
-      expect(uris).toContain("grove://workspace/repos");
-      expect(uris).toContain("grove://workspace/worktrees");
-      expect(uris).toContain("grove://workspace/context");
+      expect(uris).toEqual(["grove://workspace/context"]);
 
       await client.close();
       await server.close();
     });
 
-    it("status resource returns workspace name and counts", async () => {
-      await setupWorkspaceWithRepo();
-      const { client, server } = await connectClient("ws");
-
-      const result = await client.readResource({
-        uri: "grove://workspace/status",
-      });
-      expect(result.contents).toHaveLength(1);
-      const text = (result.contents[0] as { uri: string; text: string }).text;
-      const data = JSON.parse(text);
-
-      expect(data.name).toBe("ws");
-      expect(typeof data.repoCount).toBe("number");
-      expect(typeof data.worktreeCount).toBe("number");
-
-      await client.close();
-      await server.close();
-    });
-
-    it("repos resource returns registered repos", async () => {
-      await setupWorkspaceWithRepo();
-      const { client, server } = await connectClient("ws");
-
-      const result = await client.readResource({
-        uri: "grove://workspace/repos",
-      });
-      const text = (result.contents[0] as { uri: string; text: string }).text;
-      const data = JSON.parse(text);
-
-      expect(Array.isArray(data)).toBe(true);
-      expect(data).toHaveLength(1);
-      expect(data[0].name).toBe("myrepo");
-
-      await client.close();
-      await server.close();
-    });
-
-    it("repos resource returns empty array for workspace with no repos", async () => {
-      await addWorkspace("ws", paths);
-      const { client, server } = await connectClient("ws");
-
-      const result = await client.readResource({
-        uri: "grove://workspace/repos",
-      });
-      const text = (result.contents[0] as { uri: string; text: string }).text;
-      const data = JSON.parse(text);
-
-      expect(data).toEqual([]);
-
-      await client.close();
-      await server.close();
-    });
-
-    it("worktrees resource returns worktrees list", async () => {
-      await setupWorkspaceWithRepo();
-      const { client, server } = await connectClient("ws");
-
-      const result = await client.readResource({
-        uri: "grove://workspace/worktrees",
-      });
-      const text = (result.contents[0] as { uri: string; text: string }).text;
-      const data = JSON.parse(text);
-
-      expect(Array.isArray(data)).toBe(true);
-
-      await client.close();
-      await server.close();
-    });
-
-    it("context resource returns structured workspace context", async () => {
+    it("context resource returns full workspace context with repos and worktrees", async () => {
       await setupWorkspaceWithRepo();
       const { client, server } = await connectClient("ws");
 
       const result = await client.readResource({
         uri: "grove://workspace/context",
       });
-      const text = (result.contents[0] as { uri: string; text: string }).text;
+      expect(result.contents).toHaveLength(1);
+      const content = result.contents[0] as {
+        uri: string;
+        mimeType?: string;
+        text: string;
+      };
+      expect(content.mimeType).toBe("application/json");
+      const text = content.text;
       const data = JSON.parse(text);
 
       expect(data.name).toBe("ws");
       expect(Array.isArray(data.repos)).toBe(true);
+      expect(data.repos).toHaveLength(1);
+      expect(data.repos[0].name).toBe("myrepo");
+      expect(data.repos[0].worktrees.length).toBeGreaterThan(0);
+      expect(data.repos[0].worktrees[0].type).toBe("linked");
+
+      await client.close();
+      await server.close();
+    });
+
+    it("context resource returns error object when workspace does not exist", async () => {
+      const { client, server } = await connectClient("nonexistent");
+
+      const result = await client.readResource({
+        uri: "grove://workspace/context",
+      });
+      expect(result.contents).toHaveLength(1);
+      const content = result.contents[0] as { mimeType?: string; text: string };
+      expect(content.mimeType).toBe("application/json");
+      const data = JSON.parse(content.text);
+
+      expect(data.error).toBeDefined();
+      expect(data.code).toBeDefined();
 
       await client.close();
       await server.close();
