@@ -1,5 +1,5 @@
 ---
-description: Run a standard command (setup, format, test, check) in a repo
+description: Run a standard command (setup, format, test, test:file, test:match, check) in a repo
 argument-hint: <command> [file] [--match <pattern>] [--repo <name>] [--dry-run]
 allowed-tools: Bash(grove ws exec:*)
 ---
@@ -16,7 +16,7 @@ grove ws exec $ARGUMENTS
 - `format` — format and lint code
 - `test` — run the full test suite
 - `test:file <file>` — run tests for a single file
-- `test:match <pattern>` — run tests matching a pattern (`--match <pattern>`)
+- `test:match [file] --match <pattern>` — run tests matching a pattern
 - `check` — typecheck the project
 
 ## Options
@@ -26,7 +26,8 @@ grove ws exec $ARGUMENTS
 
 ## Notes
 
-- Commands are auto-detected from lockfiles (`bun.lock` → bun, `uv.lock` → uv, etc.)
+- `setup`, `format`, and `test` are auto-detected from lockfiles (`bun.lock` → bun, `uv.lock` → uv, etc.)
+- `test:file`, `test:match`, and `check` require a per-repo `.grove/commands.json` entry (otherwise `COMMAND_NOT_CONFIGURED`)
 - Per-repo `.grove/commands.json` overrides take precedence over auto-detection
 - The `file` argument triggers repo resolution from the file path
 - When `--repo` is omitted and no file is given, the command fails with `REPO_NOT_RESOLVED`
