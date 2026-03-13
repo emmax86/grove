@@ -19,7 +19,7 @@ grove ws worktree $ARGUMENTS
 
 The `repo` argument is inferred from `$PWD` when omitted.
 
-Run the command and report the result. If it fails, show the error message.
+Run the command and report the result. If it fails, show the error message and error code.
 
 ## Notes
 

@@ -32,4 +32,4 @@ grove ws exec $ARGUMENTS
 - The `file` argument triggers repo resolution from the file path
 - When `--repo` is omitted and no file is given, the command fails with `REPO_NOT_RESOLVED`
 
-Run the command and report the result. If it fails, show the error and exit code.
+Run the command and report the result. If it fails, show the error message and error code.

@@ -19,7 +19,7 @@ grove ws $ARGUMENTS
 - `path [workspace] [--porcelain]` — print workspace filesystem path
 - `sync [workspace]` — repair workspace symlinks to match workspace.json
 
-Run the command and report the result. If it fails, show the error message.
+Run the command and report the result. If it fails, show the error message and error code.
 
 ## Notes
 
