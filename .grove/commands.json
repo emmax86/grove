@@ -1,8 +1,0 @@
-{
-  "setup": ["bun", "install"],
-  "format": ["bun", "run", "format"],
-  "test": ["bun", "test"],
-  "test:file": ["bun", "test", "{file}"],
-  "test:match": ["bun", "test", "--test-name-pattern", "{match}"],
-  "check": "bun run format:check && bun run typecheck"
-}
