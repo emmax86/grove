@@ -19,6 +19,7 @@
     "*": "biome check --write --config-path ./biome.json --no-errors-on-unmatched --files-ignore-unknown=true"
   },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.74",
     "@biomejs/biome": "^2.4.5",
     "@commitlint/cli": "^20.4.2",
     "@commitlint/config-conventional": "^20.4.2",
