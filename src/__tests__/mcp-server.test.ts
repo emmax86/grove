@@ -93,20 +93,18 @@ describe("MCP server", () => {
     });
 
     it("context resource returns error object when workspace does not exist", async () => {
-      const server = createMcpServer("nonexistent", paths);
-      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-      const client = new Client({ name: "test-client", version: "1.0.0" });
-      await server.connect(serverTransport);
-      await client.connect(clientTransport);
+      const { client, server } = await connectClient("nonexistent");
 
       const result = await client.readResource({
         uri: "grove://workspace/context",
       });
       expect(result.contents).toHaveLength(1);
-      const content = result.contents[0] as { text: string };
+      const content = result.contents[0] as { mimeType?: string; text: string };
+      expect(content.mimeType).toBe("application/json");
       const data = JSON.parse(content.text);
 
       expect(data.error).toBeDefined();
+      expect(data.code).toBeDefined();
 
       await client.close();
       await server.close();

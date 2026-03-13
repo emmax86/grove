@@ -38,7 +38,7 @@ export function createMcpServer(
     { description: "Full workspace context: name, path, repos with worktrees" },
     async () => {
       const result = await getStatus(workspace, paths);
-      const data = result.ok ? result.value : { error: result.error };
+      const data = result.ok ? result.value : { error: result.error, code: result.code };
       return {
         contents: [
           {
