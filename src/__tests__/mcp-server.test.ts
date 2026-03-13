@@ -28,8 +28,8 @@ describe("MCP server", () => {
     return repoPath;
   }
 
-  async function connectClient(workspace: string) {
-    const server = createMcpServer(workspace, paths);
+  async function connectClient(workspace: string, options?: Parameters<typeof createMcpServer>[2]) {
+    const server = createMcpServer(workspace, paths, options);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test-client", version: "1.0.0" });
     await server.connect(serverTransport);
@@ -232,6 +232,98 @@ describe("MCP server", () => {
         name: "workspace_remove_worktree",
         arguments: { repo: "myrepo", slug: "to-remove" },
       });
+      expect(result.isError).toBeFalsy();
+
+      await client.close();
+      await server.close();
+    });
+
+    it("calls onStateChange after workspace_add_worktree succeeds", async () => {
+      await setupWorkspaceWithRepo();
+      const calls: string[] = [];
+      const { client, server } = await connectClient("ws", {
+        onStateChange: () => void calls.push("changed"),
+      });
+
+      await client.callTool({
+        name: "workspace_add_worktree",
+        arguments: { repo: "myrepo", branch: "notify-test", newBranch: true },
+      });
+
+      expect(calls).toEqual(["changed"]);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("calls onStateChange after workspace_remove_worktree succeeds", async () => {
+      await setupWorkspaceWithRepo();
+      const calls: string[] = [];
+      const { client, server } = await connectClient("ws", {
+        onStateChange: () => void calls.push("changed"),
+      });
+
+      // Add a worktree first (triggers one change)
+      await client.callTool({
+        name: "workspace_add_worktree",
+        arguments: { repo: "myrepo", branch: "to-notify", newBranch: true },
+      });
+
+      calls.splice(0); // reset
+
+      await client.callTool({
+        name: "workspace_remove_worktree",
+        arguments: { repo: "myrepo", slug: "to-notify" },
+      });
+
+      expect(calls).toEqual(["changed"]);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("does not call onStateChange when worktree operation fails", async () => {
+      await addWorkspace("ws", paths);
+      const calls: string[] = [];
+      const { client, server } = await connectClient("ws", {
+        onStateChange: () => void calls.push("changed"),
+      });
+
+      await client.callTool({
+        name: "workspace_add_worktree",
+        arguments: { repo: "ghost", branch: "feature-x", newBranch: true },
+      });
+
+      expect(calls).toEqual([]);
+
+      await client.close();
+      await server.close();
+    });
+
+    it.each([
+      [
+        "sync throw",
+        "notify-sync-throw",
+        () => {
+          throw new Error("notification failed");
+        },
+      ],
+      [
+        "async rejection",
+        "notify-async-rejection",
+        async () => {
+          throw new Error("notification failed");
+        },
+      ],
+    ])("returns success when onStateChange has %s", async (_, branch, onStateChange) => {
+      await setupWorkspaceWithRepo();
+      const { client, server } = await connectClient("ws", { onStateChange });
+
+      const result = await client.callTool({
+        name: "workspace_add_worktree",
+        arguments: { repo: "myrepo", branch, newBranch: true },
+      });
+
       expect(result.isError).toBeFalsy();
 
       await client.close();
