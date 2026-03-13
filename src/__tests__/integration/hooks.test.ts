@@ -38,6 +38,36 @@ const DENY_CASES: [string, unknown][] = [
   ['quoted subcommand: git "worktree" list', cmd('git "worktree" list')],
   ["single-quoted subcommand: git 'worktree' list", cmd("git 'worktree' list")],
   ['quoted env var with spaces: VAR="a b" git worktree list', cmd('VAR="a b" git worktree list')],
+  // VALUE_FLAGS consume next token even when it starts with "-"
+  [
+    "git -C -weird-dir worktree list (-C consumes -weird-dir, worktree is subcommand)",
+    cmd("git -C -weird-dir worktree list"),
+  ],
+  [
+    "git --no-pager worktree list (--no-pager is a no-value flag)",
+    cmd("git --no-pager worktree list"),
+  ],
+  // -c consumes key=value pair, worktree is still the subcommand
+  [
+    "git -c user.name=test worktree list (-c consumes key=val)",
+    cmd("git -c user.name=test worktree list"),
+  ],
+  // stacked VALUE_FLAGS — -C consumes path, -c consumes key=val, worktree is subcommand
+  [
+    "git -C /path -c user.name=test worktree list (multiple VALUE_FLAGS)",
+    cmd("git -C /path -c user.name=test worktree list"),
+  ],
+  // multiple env var assignments before git
+  [
+    "GIT_DIR=.git GIT_WORK_TREE=. git worktree list (multiple env vars)",
+    cmd("GIT_DIR=.git GIT_WORK_TREE=. git worktree list"),
+  ],
+  // pipe creates a new segment containing git worktree
+  ["git log | git worktree list (pipe segment)", cmd("git log | git worktree list")],
+  // && creates a new segment
+  ["git fetch && git worktree list", cmd("git fetch && git worktree list")],
+  // newline-separated commands
+  ["newline-separated: git status\\ngit worktree list", cmd("git status\ngit worktree list")],
 ];
 
 const ALLOW_CASES: [string, unknown][] = [
@@ -55,8 +85,46 @@ const ALLOW_CASES: [string, unknown][] = [
     cmd("git checkout feature/worktree-cleanup"),
   ],
   ["git status && echo worktree (worktree as echo arg)", cmd("git status && echo worktree")],
+  // operator inside quoted string must not create a false segment boundary
+  [
+    'git commit -m "save;git worktree list" (semicolon inside double quotes)',
+    cmd('git commit -m "save;git worktree list"'),
+  ],
+  [
+    "git commit -m 'save;git worktree list' (semicolon inside single quotes)",
+    cmd("git commit -m 'save;git worktree list'"),
+  ],
+  ['git commit -m "a|b" (pipe inside double quotes)', cmd('git commit -m "a|b"')],
+  // VALUE_FLAGS consume next token even when it starts with "-"
+  [
+    "git -C -weird-dir list (dir named -weird-dir, list is subcommand)",
+    cmd("git -C -weird-dir list"),
+  ],
   ["empty command (fail open)", cmd("")],
   ["missing tool_input (fail open)", {}],
+  // "worktree" appears only as a filename argument — not a git subcommand
+  ["cat git-worktree-docs.txt (worktree in filename)", cmd("cat git-worktree-docs.txt")],
+  ["grep worktree .git/config (worktree as grep pattern)", cmd("grep worktree .git/config")],
+  // worktree appears after a pipe but in a non-git command
+  [
+    "git log --all | grep worktree (worktree as grep arg, not git subcommand)",
+    cmd("git log --all | grep worktree"),
+  ],
+  // config key contains worktree but git subcommand is config, not worktree
+  [
+    "git config worktree.guessRemote true (worktree in config key)",
+    cmd("git config worktree.guessRemote true"),
+  ],
+  // -c value contains the word worktree — must not misidentify as subcommand
+  [
+    "git -c alias.wt=worktree status (-c value contains worktree, status is subcommand)",
+    cmd("git -c alias.wt=worktree status"),
+  ],
+  // git dir flag with worktree in the path — not a subcommand
+  [
+    "git --git-dir=.git/worktree log (worktree in --git-dir value)",
+    cmd("git --git-dir=.git/worktree log"),
+  ],
 ];
 
 describe("reject-git-worktree hook script", () => {

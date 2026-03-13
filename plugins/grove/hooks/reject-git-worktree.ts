@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 // PreToolUse hook: deny direct `git worktree` commands in grove workspaces.
 //
-// Strategy: split the command on shell operators (;  &  |  newline) to get
-// individual command segments, then tokenize each segment and walk it
-// structurally — no regex for the core detection.
+// Strategy: tokenize the command in a single quote-aware pass that simultaneously
+// handles shell operators (;  &  |  newline) as segment boundaries and strips
+// single/double quotes with backslash escapes. Each segment is then walked
+// structurally to check for a git worktree invocation.
 //
 // Known limitation: command substitution (`$(git worktree list)`) and
 // heredoc-embedded calls are not detected. Full shell parsing is out of scope.
@@ -26,30 +27,41 @@ const DENY_OUTPUT = {
 // Git global options that consume the next token as a separate value argument.
 const VALUE_FLAGS = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace"]);
 
-// Minimal quote-aware tokenizer: strips single/double quotes and handles
-// backslash escapes so `git "worktree" list` is correctly detected.
-function tokenize(segment: string): string[] {
-  const tokens: string[] = [];
+// Tokenize a shell command into segments split on operators (;  &  |  newline),
+// respecting single/double quoting and backslash escapes so operators inside
+// quoted strings are not treated as segment boundaries.
+function tokenizeIntoSegments(command: string): string[][] {
+  const segments: string[][] = [[]];
   let current = "";
   let i = 0;
-  while (i < segment.length) {
-    const ch = segment[i];
+
+  while (i < command.length) {
+    const ch = command[i];
+
     if (ch === '"' || ch === "'") {
       const quote = ch;
       i++;
-      while (i < segment.length && segment[i] !== quote) {
-        if (quote === '"' && segment[i] === "\\" && i + 1 < segment.length) {
-          i++; // consume backslash escape in double-quoted strings
+      while (i < command.length && command[i] !== quote) {
+        if (quote === '"' && command[i] === "\\" && i + 1 < command.length) {
+          i++; // backslash escape inside double-quoted string
         }
-        current += segment[i++];
+        current += command[i++];
       }
       i++; // skip closing quote
-    } else if (ch === "\\" && i + 1 < segment.length) {
-      current += segment[++i];
+    } else if (ch === "\\" && i + 1 < command.length) {
+      current += command[++i];
+      i++;
+    } else if (/[;&|\n]/.test(ch)) {
+      // operator outside quotes — flush current token and start a new segment
+      if (current.length > 0) {
+        segments[segments.length - 1].push(current);
+        current = "";
+      }
+      segments.push([]);
       i++;
     } else if (/\s/.test(ch)) {
       if (current.length > 0) {
-        tokens.push(current);
+        segments[segments.length - 1].push(current);
         current = "";
       }
       i++;
@@ -58,14 +70,15 @@ function tokenize(segment: string): string[] {
       i++;
     }
   }
+
   if (current.length > 0) {
-    tokens.push(current);
+    segments[segments.length - 1].push(current);
   }
-  return tokens;
+
+  return segments;
 }
 
-function isGitWorktreeSegment(segment: string): boolean {
-  const tokens = tokenize(segment);
+function isGitWorktreeSegment(tokens: string[]): boolean {
   let i = 0;
 
   // Skip leading env var assignments (VAR=value).
@@ -80,10 +93,13 @@ function isGitWorktreeSegment(segment: string): boolean {
   i++;
 
   // Skip git global flags, consuming their value argument where applicable.
+  // Always consume the next token for VALUE_FLAGS regardless of whether it
+  // starts with "-", since flag values can legitimately start with "-"
+  // (e.g. a directory named "-c" passed to -C).
   while (i < tokens.length && tokens[i].startsWith("-")) {
     const flag = tokens[i++];
-    if (VALUE_FLAGS.has(flag) && i < tokens.length && !tokens[i].startsWith("-")) {
-      i++; // consume the flag's value (e.g. -C <path>)
+    if (VALUE_FLAGS.has(flag) && i < tokens.length) {
+      i++; // consume the flag's value
     }
   }
 
@@ -114,8 +130,7 @@ try {
 }
 
 const command = extractCommand(input);
-
-const denied = command.split(/[;&|\n]/).some(isGitWorktreeSegment);
+const denied = tokenizeIntoSegments(command).some(isGitWorktreeSegment);
 
 if (denied) {
   process.stdout.write(`${JSON.stringify(DENY_OUTPUT)}\n`);
