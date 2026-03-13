@@ -98,21 +98,23 @@ describe("daemon push notifications", () => {
     const client = await connectClient();
     const waitForNotification = makeNotificationWaiter(client);
 
-    // Add worktree and wait for its notification before proceeding
+    // Enqueue waits before triggering mutations — notification may arrive
+    // before callTool resolves since onStateChange runs server-side first
+    const addNotif = waitForNotification();
     await client.callTool({
       name: "workspace_add_worktree",
       arguments: { repo: "myrepo", branch: "to-remove", newBranch: true },
     });
-    await waitForNotification();
+    await addNotif;
 
-    // Watch for the remove notification
+    const removeNotif = waitForNotification();
     const result = await client.callTool({
       name: "workspace_remove_worktree",
       arguments: { repo: "myrepo", slug: "to-remove" },
     });
     expect(result.isError).toBeFalsy();
 
-    await waitForNotification();
+    await removeNotif;
 
     await client.close();
   });
