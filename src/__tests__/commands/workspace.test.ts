@@ -244,6 +244,11 @@ describe("workspace commands", () => {
     expect(await exists(paths.claudeMd("myws"))).toBe(true);
   });
 
+  it("add creates AGENTS.md", async () => {
+    await addWorkspace("myws", paths);
+    expect(await exists(paths.agentsMd("myws"))).toBe(true);
+  });
+
   describe("syncWorkspace", () => {
     it("returns WORKSPACE_NOT_FOUND for non-existent workspace", async () => {
       const result = await syncWorkspace("ghost", paths);

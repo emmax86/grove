@@ -3,7 +3,7 @@ import { exists, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promise
 import { join } from "node:path";
 
 import { createPaths } from "../../constants";
-import { generateClaudeFiles } from "../../lib/claude";
+import { generateAgentFiles } from "../../lib/agent-files";
 import { writeConfig } from "../../lib/config";
 import {
   cleanup,
@@ -13,7 +13,7 @@ import {
   GIT_ENV,
 } from "../helpers";
 
-describe("generateClaudeFiles", () => {
+describe("generateAgentFiles", () => {
   let tempDir: string;
   let paths: ReturnType<typeof createPaths>;
 
@@ -67,7 +67,7 @@ describe("generateClaudeFiles", () => {
         { name: "bravo", path: pathB },
       ]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -91,7 +91,7 @@ describe("generateClaudeFiles", () => {
         { name: "bravo", path: pathB },
       ]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -110,7 +110,7 @@ describe("generateClaudeFiles", () => {
       const pathA = await setupRepo("ws", "alpha", { hasClaude: false });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -133,7 +133,7 @@ describe("generateClaudeFiles", () => {
         { name: "mango", path: pathM },
       ]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -158,7 +158,7 @@ describe("generateClaudeFiles", () => {
       });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -175,7 +175,7 @@ describe("generateClaudeFiles", () => {
       });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -188,7 +188,7 @@ describe("generateClaudeFiles", () => {
     it("generates trees.md for empty workspace", async () => {
       await setupWorkspace("ws");
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -207,7 +207,7 @@ describe("generateClaudeFiles", () => {
 
       await writeFile(paths.claudeTreesMd("ws"), "stale content\n");
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
 
       const content = await readFile(paths.claudeTreesMd("ws"), "utf-8");
@@ -223,7 +223,7 @@ describe("generateClaudeFiles", () => {
         { name: "bravo", path: pathB },
       ]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
 
       const content = await readFile(paths.claudeTreesMd("ws"), "utf-8");
@@ -240,7 +240,7 @@ describe("generateClaudeFiles", () => {
     it("creates CLAUDE.md when it does not exist", async () => {
       await setupWorkspace("ws");
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -256,7 +256,7 @@ describe("generateClaudeFiles", () => {
       await setupWorkspace("ws");
       await writeFile(paths.claudeMd("ws"), "# My custom workspace notes\n@.claude/trees.md\n");
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -272,12 +272,12 @@ describe("generateClaudeFiles", () => {
       const pathA = await setupRepo("ws", "alpha");
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result1 = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result1 = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result1.ok).toBe(true);
       const claudeMd1 = await readFile(paths.claudeMd("ws"), "utf-8");
       const treesMd1 = await readFile(paths.claudeTreesMd("ws"), "utf-8");
 
-      const result2 = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result2 = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result2.ok).toBe(true);
       const claudeMd2 = await readFile(paths.claudeMd("ws"), "utf-8");
       const treesMd2 = await readFile(paths.claudeTreesMd("ws"), "utf-8");
@@ -287,11 +287,44 @@ describe("generateClaudeFiles", () => {
     });
   });
 
+  describe("AGENTS.md creation", () => {
+    it("creates AGENTS.md when it does not exist", async () => {
+      await setupWorkspace("ws");
+
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.agentsMd).toBe("created");
+
+      const content = await readFile(paths.agentsMd("ws"), "utf-8");
+      expect(content).toContain("@.claude/trees.md");
+    });
+
+    it("does not overwrite existing AGENTS.md", async () => {
+      await setupWorkspace("ws");
+      await writeFile(paths.agentsMd("ws"), "# My custom Codex notes\n@.claude/trees.md\n");
+
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.agentsMd).toBe("exists");
+
+      const content = await readFile(paths.agentsMd("ws"), "utf-8");
+      expect(content).toBe("# My custom Codex notes\n@.claude/trees.md\n");
+    });
+  });
+
   // ── error handling ──────────────────────────────────────────────
 
   describe("error handling", () => {
     it("returns WORKSPACE_NOT_FOUND for non-existent workspace", async () => {
-      const result = await generateClaudeFiles("ghost", paths, GIT_ENV);
+      const result = await generateAgentFiles("ghost", paths, GIT_ENV);
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.code).toBe("WORKSPACE_NOT_FOUND");
@@ -309,7 +342,7 @@ describe("generateClaudeFiles", () => {
       // Delete bravo's source repo
       await rm(pathB, { recursive: true, force: true });
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -335,7 +368,7 @@ describe("generateClaudeFiles", () => {
         { name: "bravo", path: detachedPath },
       ]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -362,7 +395,7 @@ describe("generateClaudeFiles", () => {
         { name: "bravo", path: detachedPath },
       ]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -384,7 +417,7 @@ describe("generateClaudeFiles", () => {
         force: true,
       });
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       expect(await exists(paths.claudeTreesMd("ws"))).toBe(true);
     });
@@ -417,7 +450,7 @@ describe("generateClaudeFiles", () => {
       const pathA = await setupRepo("ws", "alpha");
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
 
       const content = await readFile(paths.claudeTreesMd("ws"), "utf-8");
@@ -431,7 +464,7 @@ describe("generateClaudeFiles", () => {
       const pathA = await setupRepo("ws", "alpha");
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
 
       const content = await readFile(paths.claudeTreesMd("ws"), "utf-8");
@@ -441,7 +474,7 @@ describe("generateClaudeFiles", () => {
     it("preserves the generated-by header as the first line", async () => {
       await setupWorkspace("ws");
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
 
       const content = await readFile(paths.claudeTreesMd("ws"), "utf-8");
@@ -460,7 +493,7 @@ describe("generateClaudeFiles", () => {
       await writeFile(join(pathA, "CLAUDE.md"), knownContent);
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -475,7 +508,7 @@ describe("generateClaudeFiles", () => {
       await writeFile(join(pathA, "CLAUDE.md"), "");
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -495,7 +528,7 @@ describe("generateClaudeFiles", () => {
       });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -516,7 +549,7 @@ describe("generateClaudeFiles", () => {
       });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -537,7 +570,7 @@ describe("generateClaudeFiles", () => {
       });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -557,7 +590,7 @@ describe("generateClaudeFiles", () => {
       // Remove bravo's trees directory entirely
       await rm(paths.repoDir("ws", "bravo"), { recursive: true, force: true });
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -577,7 +610,7 @@ describe("generateClaudeFiles", () => {
       });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -592,7 +625,7 @@ describe("generateClaudeFiles", () => {
       await setupWorktreeEntry("ws", "alpha", "feature-x", { claudeContent });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -607,7 +640,7 @@ describe("generateClaudeFiles", () => {
       await setupWorktreeEntry("ws", "alpha", "aaa-first", { claudeContent });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -625,7 +658,7 @@ describe("generateClaudeFiles", () => {
       }); // different
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -645,7 +678,7 @@ describe("generateClaudeFiles", () => {
         { name: "bravo", path: pathB },
       ]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;
@@ -660,7 +693,7 @@ describe("generateClaudeFiles", () => {
       await setupWorktreeEntry("ws", "alpha", "feat-a", { claudeContent });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      await generateClaudeFiles("ws", paths, GIT_ENV);
+      await generateAgentFiles("ws", paths, GIT_ENV);
 
       const content = await readFile(paths.claudeTreesMd("ws"), "utf-8");
       expect(content).toContain("# alpha/main (also: feat-a)");
@@ -673,7 +706,7 @@ describe("generateClaudeFiles", () => {
       await setupWorktreeEntry("ws", "alpha", "aaa-first", { claudeContent });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      await generateClaudeFiles("ws", paths, GIT_ENV);
+      await generateAgentFiles("ws", paths, GIT_ENV);
 
       const content = await readFile(paths.claudeTreesMd("ws"), "utf-8");
       expect(content).toContain("# alpha/main (also: aaa-first, zzz-last)");
@@ -683,7 +716,7 @@ describe("generateClaudeFiles", () => {
       const pathA = await setupRepo("ws", "alpha");
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      await generateClaudeFiles("ws", paths, GIT_ENV);
+      await generateAgentFiles("ws", paths, GIT_ENV);
 
       const content = await readFile(paths.claudeTreesMd("ws"), "utf-8");
       expect(content).toContain("# alpha/main");
@@ -696,7 +729,7 @@ describe("generateClaudeFiles", () => {
       await setupWorktreeEntry("ws", "alpha", "feat-a", { claudeContent });
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
-      const result = await generateClaudeFiles("ws", paths, GIT_ENV);
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
       if (!result.ok) {
         return;

@@ -1,0 +1,32 @@
+{
+  "name": "grove",
+  "version": "0.1.0",
+  "description": "Workspace management for Codex using the grove CLI and workspace-aware skills.",
+  "author": {
+    "name": "emmax86",
+    "url": "https://github.com/emmax86/grove"
+  },
+  "homepage": "https://github.com/emmax86/grove",
+  "repository": "https://github.com/emmax86/grove",
+  "license": "MIT",
+  "keywords": ["grove", "codex", "workspace", "git-worktree", "cli"],
+  "skills": "./skills/",
+  "hooks": "./hooks.json",
+  "interface": {
+    "displayName": "Grove",
+    "shortDescription": "Manage Grove workspaces and worktrees from Codex",
+    "longDescription": "CLI-first Grove workflows for Codex. Reuses Grove skills to inspect workspaces, create worktrees, and steer the agent toward `grove ws ...` commands instead of raw `git worktree` calls.",
+    "developerName": "emmax86",
+    "category": "Coding",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/emmax86/grove",
+    "privacyPolicyURL": "https://github.com/emmax86/grove",
+    "termsOfServiceURL": "https://github.com/emmax86/grove",
+    "defaultPrompt": [
+      "Show me the active Grove workspace context",
+      "Create a new Grove worktree for this repo",
+      "List the worktrees available in this Grove workspace"
+    ],
+    "brandColor": "#2F6F4F"
+  }
+}

@@ -7,7 +7,7 @@ import { getStatus } from "../../commands/status";
 import { addWorkspace, listWorkspaces } from "../../commands/workspace";
 import { addWorktree, listWorktrees, removeWorktree } from "../../commands/worktree";
 import { createPaths } from "../../constants";
-import { generateClaudeFiles } from "../../lib/claude";
+import { generateAgentFiles } from "../../lib/agent-files";
 import { cleanup, createTestDir, createTestGitRepo, entryGone, GIT_ENV } from "../helpers";
 
 describe("lifecycle integration", () => {
@@ -131,7 +131,7 @@ describe("lifecycle integration", () => {
   });
 });
 
-describe("generateClaudeFiles — trees.md", () => {
+describe("generateAgentFiles — trees.md", () => {
   let tempDir: string;
   let paths: ReturnType<typeof createPaths>;
 
@@ -182,7 +182,7 @@ describe("generateClaudeFiles — trees.md", () => {
         GIT_ENV,
       );
       await writeFile(join(paths.worktreePoolEntry("dup-same", "feature-x"), "CLAUDE.md"), CONTENT);
-      await generateClaudeFiles("ws-dup-same", paths, GIT_ENV);
+      await generateAgentFiles("ws-dup-same", paths, GIT_ENV);
     });
 
     it("annotates the canonical slug when a duplicate is found", async () => {
@@ -216,7 +216,7 @@ describe("generateClaudeFiles — trees.md", () => {
         join(paths.worktreePoolEntry("dup-diff", "feature-y"), "CLAUDE.md"),
         "# Feature content\n",
       );
-      await generateClaudeFiles("ws-dup-diff", paths, GIT_ENV);
+      await generateAgentFiles("ws-dup-diff", paths, GIT_ENV);
     });
 
     it("includes both entries when content differs", async () => {
@@ -263,7 +263,7 @@ describe("generateClaudeFiles — trees.md", () => {
         join(paths.worktreePoolEntry("multi-dup", "feature-aaa"), "CLAUDE.md"),
         CONTENT,
       );
-      await generateClaudeFiles("ws-multi-dup", paths, GIT_ENV);
+      await generateAgentFiles("ws-multi-dup", paths, GIT_ENV);
     });
 
     it("lists deduped slugs alphabetically within the annotation", async () => {
@@ -309,7 +309,7 @@ describe("generateClaudeFiles — trees.md", () => {
         join(paths.worktreePoolEntry("no-main-claude", "feature-only"), "CLAUDE.md"),
         "# Feature only\n",
       );
-      await generateClaudeFiles("ws-no-main", paths, GIT_ENV);
+      await generateAgentFiles("ws-no-main", paths, GIT_ENV);
     });
 
     it("includes the feature branch when the default branch has no CLAUDE.md", async () => {
@@ -343,7 +343,7 @@ describe("generateClaudeFiles — trees.md", () => {
         join(paths.worktreePoolEntry("default-wins", "aaa-first"), "CLAUDE.md"),
         CONTENT,
       );
-      await generateClaudeFiles("ws-default-wins", paths, GIT_ENV);
+      await generateAgentFiles("ws-default-wins", paths, GIT_ENV);
     });
 
     it("uses main as canonical even when another slug is alphabetically earlier", async () => {

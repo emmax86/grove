@@ -12,7 +12,7 @@ import {
 import { dirname, relative } from "node:path";
 
 import type { Paths } from "../constants";
-import { generateClaudeFiles } from "../lib/claude";
+import { generateAgentFiles } from "../lib/agent-files";
 import { getPoolSlugsForWorkspace, readConfig, writeConfig } from "../lib/config";
 import { type GitEnv, getDefaultBranch, isGitRepo, removeWorktree } from "../lib/git";
 import { toSlug } from "../lib/slug";
@@ -66,9 +66,9 @@ export async function addWorkspace(name: string, paths: Paths): Promise<Result<W
     return vscodeResult;
   }
 
-  const claudeResult = await generateClaudeFiles(name, paths);
-  if (!claudeResult.ok) {
-    return claudeResult;
+  const agentFilesResult = await generateAgentFiles(name, paths);
+  if (!agentFilesResult.ok) {
+    return agentFilesResult;
   }
 
   return ok({ name, path: wsPath });
@@ -314,9 +314,9 @@ export async function syncWorkspace(
     return vscodeResult;
   }
 
-  const claudeResult = await generateClaudeFiles(name, paths, env);
-  if (!claudeResult.ok) {
-    return claudeResult;
+  const agentFilesResult = await generateAgentFiles(name, paths, env);
+  if (!agentFilesResult.ok) {
+    return agentFilesResult;
   }
 
   const pruneResult = await pruneWorktrees(name, paths, env);

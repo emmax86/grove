@@ -2,7 +2,7 @@ import { exists, mkdir, readdir, realpath, rm, symlink } from "node:fs/promises"
 import { basename, dirname, relative, resolve } from "node:path";
 
 import type { Paths } from "../constants";
-import { generateClaudeFiles } from "../lib/claude";
+import { generateAgentFiles } from "../lib/agent-files";
 import {
   addRepoToConfig,
   getPoolSlugsForWorkspace,
@@ -117,9 +117,9 @@ export async function addRepo(
     return vscodeResult;
   }
 
-  const claudeResult = await generateClaudeFiles(workspace, paths, env);
-  if (!claudeResult.ok) {
-    return claudeResult;
+  const agentFilesResult = await generateAgentFiles(workspace, paths, env);
+  if (!agentFilesResult.ok) {
+    return agentFilesResult;
   }
 
   return ok({ name, path: absPath, status: "ok" });
@@ -248,9 +248,9 @@ export async function removeRepo(
     return vscodeResult;
   }
 
-  const claudeResult = await generateClaudeFiles(workspace, paths, env);
-  if (!claudeResult.ok) {
-    return claudeResult;
+  const agentFilesResult = await generateAgentFiles(workspace, paths, env);
+  if (!agentFilesResult.ok) {
+    return agentFilesResult;
   }
 
   if (forceErrors.length > 0) {
