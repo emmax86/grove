@@ -134,7 +134,7 @@ List commands output JSON by default. Pass `--porcelain` for stable, script-frie
 
 ## Integrations
 
-- **Claude Code plugin** — `.claude-plugin/` registers `/workspace`, `/workspace-status`, `/worktree`, `/repo`, `/exec` slash commands
+- **Claude Code plugin** — `.claude-plugin/marketplace.json` is the Claude marketplace file, and `plugins/grove/commands/` contains the `/workspace`, `/workspace-status`, `/worktree`, `/repo`, `/exec` slash command implementations
 - **Codex plugin** — `.agents/plugins/marketplace.json` exposes `plugins/grove/` as a Codex plugin that reuses Grove's CLI-first skills
 - **MCP server** — `grove mcp-server` exposes workspace operations over MCP for AI tool integration
 - **Auto-generated files** — adding/removing repos creates `CLAUDE.md` once (if absent), then regenerates `.claude/trees.md` and `{workspace}.code-workspace` to keep editor and agent configs in sync

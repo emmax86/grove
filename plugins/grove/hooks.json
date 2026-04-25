@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ./hooks/reject-git-worktree.ts"
+            "command": "bun run ${CODEX_PLUGIN_ROOT}/hooks/reject-git-worktree.ts",
+            "timeout": 5
           }
         ]
       }
