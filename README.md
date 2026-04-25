@@ -161,7 +161,7 @@ To use the local plugin in Codex, point Codex at this repo's marketplace file:
 ```bash
 bun install          # install deps
 bun test             # run tests
-bun run build        # compile to .bin/grove
+bun run build        # compile to bin/grove
 bun run format       # format + lint (biome)
 bun run typecheck    # tsc --noEmit
 ```

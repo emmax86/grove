@@ -8,7 +8,7 @@ with code in this repository.
 ```bash
 bun test                          # run all tests
 bun test src/__tests__/foo.test.ts  # run a single test file
-bun run build                     # compile to .bin/grove binary
+bun run build                     # compile to bin/grove binary
 bun run format                    # format and lint with biome
 bun run format:check              # check formatting and lint with biome
 ```
