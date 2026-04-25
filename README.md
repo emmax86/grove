@@ -134,9 +134,28 @@ List commands output JSON by default. Pass `--porcelain` for stable, script-frie
 
 ## Integrations
 
-- **Claude Code plugin** — `.claude-plugin/` registers `/workspace`, `/workspace-status`, `/worktree`, `/repo`, `/exec` slash commands
+- **Claude Code plugin** — `.claude-plugin/marketplace.json` is the Claude marketplace file, and `plugins/grove/commands/` contains the `/workspace`, `/workspace-status`, `/worktree`, `/repo`, `/exec` slash command implementations
+- **Codex plugin** — `.agents/plugins/marketplace.json` exposes `plugins/grove/` as a Codex plugin that reuses Grove's CLI-first skills
 - **MCP server** — `grove mcp-server` exposes workspace operations over MCP for AI tool integration
 - **Auto-generated files** — adding/removing repos creates `CLAUDE.md` once (if absent), then regenerates `.claude/trees.md` and `{workspace}.code-workspace` to keep editor and agent configs in sync
+
+### Codex
+
+The Codex integration is intentionally CLI-first. The plugin in `plugins/grove/`
+packages Grove's existing skills so Codex uses:
+
+- `grove ws status` to discover workspace context
+- `grove ws worktree ...` to create and manage worktrees
+- the `reject-git-worktree.ts` hook to steer the agent away from raw `git worktree`
+
+This keeps the `grove` CLI as the source of truth. MCP support remains available,
+but Codex does not depend on it for the primary workflow.
+
+To use the local plugin in Codex, point Codex at this repo's marketplace file:
+
+```text
+.agents/plugins/marketplace.json
+```
 
 ## Development
 

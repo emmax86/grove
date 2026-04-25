@@ -239,9 +239,14 @@ describe("workspace commands", () => {
     expect(await exists(paths.claudeTreesMd("myws"))).toBe(true);
   });
 
-  it("add creates CLAUDE.md in .claude/", async () => {
+  it("add creates CLAUDE.md in workspace root", async () => {
     await addWorkspace("myws", paths);
     expect(await exists(paths.claudeMd("myws"))).toBe(true);
+  });
+
+  it("add creates AGENTS.md", async () => {
+    await addWorkspace("myws", paths);
+    expect(await exists(paths.agentsMd("myws"))).toBe(true);
   });
 
   describe("syncWorkspace", () => {
