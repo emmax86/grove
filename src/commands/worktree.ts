@@ -335,7 +335,7 @@ export async function removeWorktree(
   options: { force?: boolean },
   paths: Paths,
   env?: GitEnv,
-): Promise<Result<void>> {
+): Promise<Result<{ repo: string; slug: string; workspace: string }>> {
   const wtPath = paths.worktreeDir(workspace, repo, slug);
   const kind = await classifyWorktreeEntry(wtPath, paths);
 
@@ -357,7 +357,7 @@ export async function removeWorktree(
       if (removeResult.value.gitWarning) {
         return err(removeResult.value.gitWarning, "GIT_WORKTREE_REMOVE_ERROR");
       }
-      return ok(undefined);
+      return ok({ repo, slug, workspace });
     }
     return err(`Worktree "${slug}" not found in repo "${repo}"`, "WORKTREE_NOT_FOUND");
   }
@@ -370,7 +370,7 @@ export async function removeWorktree(
     if (removeResult.value.gitWarning) {
       return err(removeResult.value.gitWarning, "GIT_WORKTREE_REMOVE_ERROR");
     }
-    return ok(undefined);
+    return ok({ repo, slug, workspace });
   }
 
   if (kind === "legacy") {
@@ -378,7 +378,11 @@ export async function removeWorktree(
     if (!repoPathResult.ok) {
       return repoPathResult;
     }
-    return gitRemoveWorktree(repoPathResult.value, wtPath, options.force, env);
+    const legacyResult = await gitRemoveWorktree(repoPathResult.value, wtPath, options.force, env);
+    if (!legacyResult.ok) {
+      return legacyResult;
+    }
+    return ok({ repo, slug, workspace });
   }
 
   // linked (default-branch or unreadable symlink)

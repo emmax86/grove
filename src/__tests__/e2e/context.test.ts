@@ -23,7 +23,7 @@ describe("E2E: context inference via cwd", () => {
   afterEach(() => cleanupTempRoot(root));
 
   it("workspace inferred from cwd at workspace root", async () => {
-    const r = await runCLI(["ws", "repo", "list"], {
+    const r = await runCLI(["ws", "repo", "list", "--json"], {
       root,
       cwd: join(root, "myws"),
     });
@@ -33,7 +33,7 @@ describe("E2E: context inference via cwd", () => {
   });
 
   it("workspace and repo inferred from cwd inside repo dir", async () => {
-    const r = await runCLI(["ws", "worktree", "list"], {
+    const r = await runCLI(["ws", "worktree", "list", "--json"], {
       root,
       cwd: join(root, "myws", "trees", "myrepo"),
     });
@@ -46,14 +46,14 @@ describe("E2E: context inference via cwd", () => {
     // The symlink at {ws}/trees/{repo}/{slug} points into the pool.
     // Logical cwd traversal should find workspace.json in myws.
     const wtLink = join(root, "myws", "trees", "myrepo", "feature-ctx");
-    const r = await runCLI(["ws", "repo", "list"], { root, cwd: wtLink });
+    const r = await runCLI(["ws", "repo", "list", "--json"], { root, cwd: wtLink });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Array<{ name: string }>;
     expect(data.map((r) => r.name)).toContain("myrepo");
   });
 
   it("ws status inferred from cwd", async () => {
-    const r = await runCLI(["ws", "status"], { root, cwd: join(root, "myws") });
+    const r = await runCLI(["ws", "status", "--json"], { root, cwd: join(root, "myws") });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Record<string, unknown>;
     expect(data.name).toBe("myws");
@@ -62,7 +62,7 @@ describe("E2E: context inference via cwd", () => {
   it("explicit arg overrides cwd context", async () => {
     await runCLI(["ws", "add", "otherws"], { root });
     // cwd is myws but we explicitly pass otherws
-    const r = await runCLI(["ws", "repo", "list", "otherws"], {
+    const r = await runCLI(["ws", "repo", "list", "otherws", "--json"], {
       root,
       cwd: join(root, "myws"),
     });

@@ -186,6 +186,17 @@ describe("worktree commands", () => {
     }
   });
 
+  it("remove returns {repo, slug, workspace} in Result.value on success", async () => {
+    await addWorktree("myws", "myrepo", "feature/x", { newBranch: true }, paths, GIT_ENV);
+    const result = await removeWorktree("myws", "myrepo", "feature-x", {}, paths, GIT_ENV);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.repo).toBe("myrepo");
+      expect(result.value.slug).toBe("feature-x");
+      expect(result.value.workspace).toBe("myws");
+    }
+  });
+
   it("remove refuses dirty worktree without --force", async () => {
     await addWorktree("myws", "myrepo", "feature/dirty", { newBranch: true }, paths, GIT_ENV);
     const poolEntryPath = paths.worktreePoolEntry("myrepo", "feature-dirty");

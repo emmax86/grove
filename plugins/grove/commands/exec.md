@@ -24,6 +24,8 @@ grove ws exec $ARGUMENTS
 - `--repo <name>` — target a specific repo (otherwise inferred from file path)
 - `--dry-run` — resolve and print the command without executing it
 
+All subcommands accept `--text` (default), `--porcelain` (tab-separated for scripts), or `--json` (`{"ok","data"}` envelope for programmatic consumers). Errors include `error:` and `code:` lines.
+
 ## Notes
 
 - `setup`, `format`, and `test` are auto-detected from lockfiles (`bun.lock` → bun, `uv.lock` → uv, etc.)

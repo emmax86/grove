@@ -20,7 +20,7 @@ describe("E2E: worktree commands", () => {
   afterEach(() => cleanupTempRoot(root));
 
   it("ws worktree add --new creates pool entry and workspace symlink", async () => {
-    const r = await runCLI(["ws", "worktree", "add", "myrepo", "feature/x", "--new"], {
+    const r = await runCLI(["ws", "worktree", "add", "myrepo", "feature/x", "--new", "--json"], {
       root,
       cwd: join(root, "myws"),
     });
@@ -62,7 +62,7 @@ describe("E2E: worktree commands", () => {
       root,
       cwd: join(root, "myws"),
     });
-    const r = await runCLI(["ws", "worktree", "list", "myrepo"], {
+    const r = await runCLI(["ws", "worktree", "list", "myrepo", "--json"], {
       root,
       cwd: join(root, "myws"),
     });
@@ -113,7 +113,7 @@ describe("E2E: worktree commands", () => {
   });
 
   it("ws worktree remove refuses default branch without --force", async () => {
-    const r = await runCLI(["ws", "worktree", "remove", "myrepo", "main"], {
+    const r = await runCLI(["ws", "worktree", "remove", "myrepo", "main", "--json"], {
       root,
       cwd: join(root, "myws"),
     });
@@ -126,7 +126,7 @@ describe("E2E: worktree commands", () => {
       root,
       cwd: join(root, "myws"),
     });
-    const r = await runCLI(["ws", "worktree", "add", "myrepo", "feature/x", "--new"], {
+    const r = await runCLI(["ws", "worktree", "add", "myrepo", "feature/x", "--new", "--json"], {
       root,
       cwd: join(root, "myws"),
     });
@@ -146,7 +146,7 @@ describe("E2E: worktree commands", () => {
       force: true,
     });
 
-    const r = await runCLI(["ws", "worktree", "prune"], {
+    const r = await runCLI(["ws", "worktree", "prune", "--json"], {
       root,
       cwd: join(root, "myws"),
     });

@@ -11,7 +11,7 @@ describe("E2E: CLI output shape", () => {
   afterEach(() => cleanupTempRoot(root));
 
   it("success writes JSON to stdout only, stderr is empty", async () => {
-    const r = await runCLI(["ws", "add", "myws"], { root });
+    const r = await runCLI(["ws", "add", "myws", "--json"], { root });
     expect(r.exitCode).toBe(0);
     expect(r.json?.ok).toBe(true);
     expect(r.stderr).toBe("");
@@ -19,7 +19,7 @@ describe("E2E: CLI output shape", () => {
 
   it("error writes JSON to stderr only, stdout is empty, exits 1", async () => {
     await runCLI(["ws", "add", "myws"], { root });
-    const r = await runCLI(["ws", "add", "myws"], { root }); // duplicate
+    const r = await runCLI(["ws", "add", "myws", "--json"], { root }); // duplicate
     expect(r.exitCode).toBe(1);
     expect(r.stdout).toBe("");
     const err = JSON.parse(r.stderr);

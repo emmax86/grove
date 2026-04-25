@@ -17,6 +17,8 @@ import { err, ok, type RepoEntry, type Result } from "../types";
 
 export interface RepoInfo extends RepoEntry {
   status: "ok" | "dangling";
+  defaultBranch?: string;
+  defaultBranchSlug?: string;
 }
 
 export async function addRepo(
@@ -122,7 +124,13 @@ export async function addRepo(
     return agentFilesResult;
   }
 
-  return ok({ name, path: absPath, status: "ok" });
+  return ok({
+    name,
+    path: absPath,
+    status: "ok",
+    defaultBranch: branchResult.value,
+    defaultBranchSlug: slug,
+  });
 }
 
 export async function listRepos(workspace: string, paths: Paths): Promise<Result<RepoInfo[]>> {
@@ -154,7 +162,7 @@ export async function removeRepo(
   options: { force?: boolean },
   paths: Paths,
   env?: GitEnv,
-): Promise<Result<void>> {
+): Promise<Result<{ name: string; workspace: string }>> {
   const repoDir = paths.repoDir(workspace, name);
   const forceErrors: string[] = [];
 
@@ -260,5 +268,5 @@ export async function removeRepo(
     );
   }
 
-  return ok(undefined);
+  return ok({ name, workspace });
 }

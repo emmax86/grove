@@ -131,6 +131,15 @@ describe("workspace commands", () => {
     }
   });
 
+  it("remove returns {name} in Result.value on success", async () => {
+    await addWorkspace("myws", paths);
+    const result = await removeWorkspace("myws", {}, paths);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toBe("myws");
+    }
+  });
+
   it("remove non-existent workspace returns error", async () => {
     const result = await removeWorkspace("ghost", {}, paths);
     expect(result.ok).toBe(false);

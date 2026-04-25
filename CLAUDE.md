@@ -41,11 +41,28 @@ All filesystem paths are centralised through the `Paths` object created by `crea
 
 ### CLI
 
-`src/cli.ts` handles flat arg parsing (no external parser). The top-level command is `grove ws <subcommand>` (also aliased as `grove workspaces`). `--porcelain` switches output from JSON to tab-separated plaintext.
+`src/cli.ts` handles flat arg parsing (no external parser). The top-level command is `grove ws <subcommand>` (also aliased as `grove workspaces`). All output goes through `render(result, kind, ctx)` in `src/lib/render/`.
 
 Subcommands: `add`, `list`, `remove`, `repo`, `worktree`, `status`, `path`, `sync`.
 
-`ws sync [workspace]` — idempotent repair command. Reads `workspace.json` and recreates any missing or dangling `repos/<name>` symlinks, `trees/<repo>/` directories, and default-branch symlinks. Also prunes dangling pool worktree symlinks. Returns per-repo `status` of `ok`, `repaired`, or `dangling` (source path no longer a git repo).
+`ws sync [workspace]` — idempotent repair command. Reads `workspace.json` and recreates any missing or dangling `repos/<name>` symlinks, `trees/<repo>/` directories, and default-branch symlinks. Also prunes dangling pool worktree symlinks. Returns per-repo `status` of `ok`, `repaired`, or `dangling`.
+
+### Output rendering
+
+All CLI output goes through `render(result, kind, ctx)` in `src/lib/render/`. Three mutually-exclusive modes:
+
+- **default text** — human/agent-readable, with ANSI colors when `process.stdout.isTTY && !NO_COLOR && !--no-color`.
+- **`--porcelain`** — tab-separated, denormalized for nested data, no headers, no colors.
+- **`--json`** — `{"ok", "data"}` envelope unchanged from the original implementation.
+
+Adding a command requires registering text + porcelain formatters in `src/lib/render/formatters/` and adding the new kind to the `CommandKind` union (TypeScript exhaustiveness check enforces both modes are wired). JSON is automatic from the `Result<T>` value.
+
+Output invariants enforced by tests in `src/__tests__/lib/render/invariants.test.ts`:
+- No information conveyed by color, font weight, or Unicode symbols alone.
+- Default palette is red / cyan / yellow / dim / bold (never red / green).
+- `stripAnsi(text(value, color=true)) === text(value, color=false)` for every formatter.
+- ASCII fallback exists for tree chars and arrows under `LANG=C` / `--ascii`.
+- `--porcelain` is tab-separated, denormalized, no headers, no color.
 
 ### Plugin
 

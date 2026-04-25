@@ -23,7 +23,7 @@ describe("E2E: deprecation warnings", () => {
     // Create a workspace using root as the grove root
     await runCLI(["ws", "add", "myws"], { root });
     // Now use DOTCLAUDE_ROOT without GROVE_ROOT — should still find the workspace
-    const r = await runCLI(["ws", "list"], { env: { DOTCLAUDE_ROOT: root } });
+    const r = await runCLI(["ws", "list", "--json"], { env: { DOTCLAUDE_ROOT: root } });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Array<{ name: string }>;
     expect(data.map((w) => w.name)).toContain("myws");
@@ -118,7 +118,7 @@ describe("E2E: GROVE_WORKSPACE plumbed to all ws subcommands", () => {
   it.each(
     repoArgCases,
   )("%s resolves workspace from GROVE_WORKSPACE (fails for non-workspace reason)", async (_, args) => {
-    const r = await runCLI(args, { root, env: { GROVE_WORKSPACE: "myws" } });
+    const r = await runCLI([...args, "--json"], { root, env: { GROVE_WORKSPACE: "myws" } });
     // Some commands may exit 0 (e.g. ws worktree list with unknown repo returns empty).
     // The guard is intentional: we only assert the error code when there is a failure.
     if (r.exitCode !== 0) {

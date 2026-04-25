@@ -19,7 +19,7 @@ describe("E2E: repo commands", () => {
   afterEach(() => cleanupTempRoot(root));
 
   it("ws repo add registers repo and returns JSON", async () => {
-    const r = await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+    const r = await runCLI(["ws", "repo", "add", "myws", repoPath, "--json"], { root });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Record<string, string>;
     expect(data.name).toBe("myrepo");
@@ -35,27 +35,31 @@ describe("E2E: repo commands", () => {
   });
 
   it("ws repo add --name overrides derived name", async () => {
-    const r = await runCLI(["ws", "repo", "add", "myws", repoPath, "--name", "custom"], { root });
+    const r = await runCLI(["ws", "repo", "add", "myws", repoPath, "--name", "custom", "--json"], {
+      root,
+    });
     expect(r.exitCode).toBe(0);
     expect((r.json?.data as Record<string, string>).name).toBe("custom");
     expect(await exists(join(root, "repos", "custom"))).toBe(true);
   });
 
   it("ws repo add rejects reserved name 'trees'", async () => {
-    const r = await runCLI(["ws", "repo", "add", "myws", repoPath, "--name", "trees"], { root });
+    const r = await runCLI(["ws", "repo", "add", "myws", repoPath, "--name", "trees", "--json"], {
+      root,
+    });
     expect(r.exitCode).toBe(1);
     expect(JSON.parse(r.stderr).code).toBe("RESERVED_NAME");
   });
 
   it("ws repo add rejects non-git directory", async () => {
-    const r = await runCLI(["ws", "repo", "add", "myws", root], { root }); // root is not a git repo
+    const r = await runCLI(["ws", "repo", "add", "myws", root, "--json"], { root }); // root is not a git repo
     expect(r.exitCode).toBe(1);
     expect(JSON.parse(r.stderr).code).toBe("NOT_A_GIT_REPO");
   });
 
   it("ws repo list returns repos", async () => {
     await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
-    const r = await runCLI(["ws", "repo", "list", "myws"], { root });
+    const r = await runCLI(["ws", "repo", "list", "myws", "--json"], { root });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Array<{ name: string }>;
     expect(data.map((r) => r.name)).toContain("myrepo");
@@ -84,7 +88,7 @@ describe("E2E: repo commands", () => {
     // Global symlink stays
     expect(await exists(join(root, "repos", "myrepo"))).toBe(true);
     // Not in list anymore
-    const list = await runCLI(["ws", "repo", "list", "myws"], { root });
+    const list = await runCLI(["ws", "repo", "list", "myws", "--json"], { root });
     const data = list.json?.data as Array<{ name: string }>;
     expect(data.map((r) => r.name)).not.toContain("myrepo");
   });

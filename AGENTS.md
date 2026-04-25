@@ -60,12 +60,29 @@ All filesystem paths are centralized through the `Paths` object created by
 ### CLI and integrations
 
 `src/cli.ts` handles flat arg parsing (no external parser). The top-level
-command is `grove ws <subcommand>` (also aliased as `grove workspaces`).
-`--porcelain` switches output from JSON to tab-separated plaintext.
+command is `grove ws <subcommand>` (also aliased as `grove workspaces`). All
+output goes through `render(result, kind, ctx)` in `src/lib/render/`.
 
 The Grove CLI is the source of truth. Agent integrations should prefer calling
 `grove ws ...` directly. The Claude plugin, Codex plugin, and MCP server are
 adapters around the CLI rather than alternative implementations.
+
+### Output rendering
+
+All CLI output goes through `render(result, kind, ctx)` in `src/lib/render/`. Three mutually-exclusive modes:
+
+- **default text** — human/agent-readable, with ANSI colors when `process.stdout.isTTY && !NO_COLOR && !--no-color`.
+- **`--porcelain`** — tab-separated, denormalized for nested data, no headers, no colors.
+- **`--json`** — `{"ok", "data"}` envelope unchanged from the original implementation.
+
+Adding a command requires registering text + porcelain formatters in `src/lib/render/formatters/` and adding the new kind to the `CommandKind` union (TypeScript exhaustiveness check enforces both modes are wired). JSON is automatic from the `Result<T>` value.
+
+Output invariants enforced by tests in `src/__tests__/lib/render/invariants.test.ts`:
+- No information conveyed by color, font weight, or Unicode symbols alone.
+- Default palette is red / cyan / yellow / dim / bold (never red / green).
+- `stripAnsi(text(value, color=true)) === text(value, color=false)` for every formatter.
+- ASCII fallback exists for tree chars and arrows under `LANG=C` / `--ascii`.
+- `--porcelain` is tab-separated, denormalized, no headers, no color.
 
 ## Tests
 
