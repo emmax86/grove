@@ -13,11 +13,13 @@ grove ws $ARGUMENTS
 ## Subcommands
 
 - `add <name>` — create a new workspace
-- `list [--porcelain]` — list all workspaces
+- `list` — list all workspaces
 - `remove <name> [--force]` — remove a workspace
 - `status [workspace]` — show repos and worktrees overview
-- `path [workspace] [--porcelain]` — print workspace filesystem path
+- `path [workspace]` — print workspace filesystem path
 - `sync [workspace]` — repair workspace symlinks to match workspace.json
+
+All subcommands accept `--text` (default), `--porcelain` (tab-separated for scripts), or `--json` (`{"ok","data"}` envelope for programmatic consumers). Errors include `error:` and `code:` lines.
 
 Run the command and report the result. If it fails, show the error message and error code.
 

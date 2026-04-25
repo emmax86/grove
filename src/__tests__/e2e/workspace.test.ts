@@ -13,7 +13,7 @@ describe("E2E: workspace commands", () => {
   afterEach(() => cleanupTempRoot(root));
 
   it("ws add returns name and path, creates directory", async () => {
-    const r = await runCLI(["ws", "add", "myws"], { root });
+    const r = await runCLI(["ws", "add", "myws", "--json"], { root });
     expect(r.exitCode).toBe(0);
     expect(r.json?.ok).toBe(true);
     const data = r.json?.data as Record<string, string>;
@@ -23,20 +23,20 @@ describe("E2E: workspace commands", () => {
   });
 
   it("ws add rejects reserved name 'repos'", async () => {
-    const r = await runCLI(["ws", "add", "repos"], { root });
+    const r = await runCLI(["ws", "add", "repos", "--json"], { root });
     expect(r.exitCode).toBe(1);
     expect(JSON.parse(r.stderr).code).toBe("RESERVED_NAME");
   });
 
   it("ws add rejects reserved name 'worktrees'", async () => {
-    const r = await runCLI(["ws", "add", "worktrees"], { root });
+    const r = await runCLI(["ws", "add", "worktrees", "--json"], { root });
     expect(r.exitCode).toBe(1);
     expect(JSON.parse(r.stderr).code).toBe("RESERVED_NAME");
   });
 
   it("ws add rejects duplicate workspace", async () => {
     await runCLI(["ws", "add", "myws"], { root });
-    const r = await runCLI(["ws", "add", "myws"], { root });
+    const r = await runCLI(["ws", "add", "myws", "--json"], { root });
     expect(r.exitCode).toBe(1);
     expect(JSON.parse(r.stderr).code).toBe("WORKSPACE_EXISTS");
   });
@@ -46,7 +46,7 @@ describe("E2E: workspace commands", () => {
       runCLI(["ws", "add", "ws1"], { root }),
       runCLI(["ws", "add", "ws2"], { root }),
     ]);
-    const r = await runCLI(["ws", "list"], { root });
+    const r = await runCLI(["ws", "list", "--json"], { root });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Array<{ name: string }>;
     expect(data.map((w) => w.name)).toContain("ws1");
@@ -55,7 +55,7 @@ describe("E2E: workspace commands", () => {
     expect(data.map((w) => w.name)).not.toContain("worktrees");
   });
 
-  it("ws list --porcelain: one name per line, no JSON", async () => {
+  it("ws list --porcelain: name<TAB>path per line, no JSON", async () => {
     await Promise.all([
       runCLI(["ws", "add", "ws1"], { root }),
       runCLI(["ws", "add", "ws2"], { root }),
@@ -63,8 +63,13 @@ describe("E2E: workspace commands", () => {
     const r = await runCLI(["ws", "list", "--porcelain"], { root });
     expect(r.exitCode).toBe(0);
     const lines = r.stdout.split("\n").filter(Boolean);
-    expect(lines).toContain("ws1");
-    expect(lines).toContain("ws2");
+    const names = lines.map((l) => l.split("\t")[0]);
+    expect(names).toContain("ws1");
+    expect(names).toContain("ws2");
+    // each line has a TAB
+    for (const line of lines) {
+      expect(line).toMatch(/\t/);
+    }
     // Not JSON
     expect(() => JSON.parse(r.stdout)).toThrow();
   });
@@ -83,14 +88,14 @@ describe("E2E: workspace commands", () => {
   });
 
   it("ws remove non-existent workspace exits 1", async () => {
-    const r = await runCLI(["ws", "remove", "ghost"], { root });
+    const r = await runCLI(["ws", "remove", "ghost", "--json"], { root });
     expect(r.exitCode).toBe(1);
     expect(JSON.parse(r.stderr).code).toBe("WORKSPACE_NOT_FOUND");
   });
 
   it("ws path returns workspace directory path", async () => {
     await runCLI(["ws", "add", "myws"], { root });
-    const r = await runCLI(["ws", "path", "myws"], { root });
+    const r = await runCLI(["ws", "path", "myws", "--json"], { root });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Record<string, string>;
     expect(data.path).toBe(join(root, "myws"));
@@ -125,7 +130,7 @@ describe("E2E: ws status", () => {
       root,
       cwd: join(root, "myws"),
     });
-    const r = await runCLI(["ws", "status", "myws"], { root });
+    const r = await runCLI(["ws", "status", "myws", "--json"], { root });
     expect(r.exitCode).toBe(0);
     const data = r.json?.data as Record<string, unknown>;
     expect(data.name).toBe("myws");

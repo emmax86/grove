@@ -78,6 +78,15 @@ describe("repo commands", () => {
     expect((await lstat(paths.repoDir("myws", "customname"))).isDirectory()).toBe(true);
   });
 
+  it("add returns defaultBranch and defaultBranchSlug in Result.value", async () => {
+    const result = await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.defaultBranch).toBe("main");
+      expect(result.value.defaultBranchSlug).toBe("main");
+    }
+  });
+
   it("add fails if path is not a git repo", async () => {
     const plainDir = join(tempDir, "notarepo");
     await mkdir(plainDir);
@@ -162,6 +171,16 @@ describe("repo commands", () => {
 
     // Repo dir under trees/ is removed
     expect(await exists(paths.repoDir("myws", "myrepo"))).toBe(false);
+  });
+
+  it("remove returns {name, workspace} in Result.value on success", async () => {
+    await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
+    const result = await removeRepo("myws", "myrepo", {}, paths, GIT_ENV);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toBe("myrepo");
+      expect(result.value.workspace).toBe("myws");
+    }
   });
 
   it("remove refuses if real worktrees exist without --force", async () => {

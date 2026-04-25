@@ -13,11 +13,13 @@ grove ws worktree $ARGUMENTS
 ## Subcommands
 
 - `add [repo] <branch> [--new] [--from <base>]` — create a worktree; `--new` creates the branch
-- `list [repo] [--porcelain]` — list worktrees for a repo
+- `list [repo]` — list worktrees for a repo
 - `remove [repo] <slug> [--force]` — remove a worktree
 - `prune` — remove dangling pool symlinks for all repos in the workspace
 
 The `repo` argument is inferred from `$PWD` when omitted.
+
+All subcommands accept `--text` (default), `--porcelain` (tab-separated for scripts), or `--json` (`{"ok","data"}` envelope for programmatic consumers). Errors include `error:` and `code:` lines.
 
 Run the command and report the result. If it fails, show the error message and error code.
 

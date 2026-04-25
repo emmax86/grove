@@ -48,31 +48,20 @@ grove ws status
 > **Note**: `worktree add` infers the workspace from CWD — run it from inside the
 > workspace directory, or pass `--workspace myproject` explicitly.
 
-`grove ws status` outputs a JSON snapshot:
+`grove ws status` shows a tree by default:
 
-```json
-{
-  "ok": true,
-  "data": {
-    "name": "myproject",
-    "path": "<GROVE_ROOT>/myproject",
-    "repos": [
-      {
-        "name": "my-api",
-        "path": "/path/to/my-api",
-        "status": "ok",
-        "worktrees": [
-          {
-            "repo": "my-api",
-            "slug": "feat-auth",
-            "branch": "feat-auth",
-            "type": "worktree"
-          }
-        ]
-      }
-    ]
-  }
-}
+```
+myproject (~/grove-workspaces/myproject)
+├── my-api (/path/to/my-api) [ok]
+│   ├── main (linked)
+│   └── feat-auth (worktree, branch: feat-auth)
+└── web-client (/path/to/web-client) [ok]
+```
+
+Pipe to `--json` for programmatic use:
+
+```bash
+grove ws status --json | jq '.data.repos[] | select(.status=="dangling") | .name'
 ```
 
 ## Commands
@@ -130,7 +119,17 @@ Options: `--repo <name>` (required when no file is given, otherwise inferred fro
 
 Bracketed args are inferred from CWD. Override with `--workspace` flag or `GROVE_WORKSPACE` env var.
 
-List commands output JSON by default. Pass `--porcelain` for stable, script-friendly plaintext (format varies per command).
+## Output modes
+
+Every command supports three output modes:
+
+- **default** — human/agent-readable text. Tree for `status`, aligned columns for lists, single-line confirmations for mutations, multi-line `error:` / `code:` for failures. Honors `NO_COLOR=1`, `--no-color`, and disables ANSI codes when stdout is not a TTY.
+- **`--porcelain`** — stable tab-separated form for shell scripts (`awk`, `cut`). One row per result; nested data flattens with parent fields repeated.
+- **`--json`** — `{"ok": true, "data": <T>}` envelope (`{"ok": false, ...}` on error). Pretty-printed in a TTY, single-line otherwise. Suitable for `jq` pipelines.
+
+`--porcelain` and `--json` together is an error.
+
+Output captured to a file or piped to another command is byte-identical to terminal output minus ANSI escape codes.
 
 ## Integrations
 

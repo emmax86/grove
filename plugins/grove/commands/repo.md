@@ -13,10 +13,12 @@ grove ws repo $ARGUMENTS
 ## Subcommands
 
 - `add [workspace] <path> [--name <name>]` — register a git repo in a workspace
-- `list [workspace] [--porcelain]` — list repos in a workspace
+- `list [workspace]` — list repos in a workspace
 - `remove [workspace] <name> [--force]` — unregister a repo
 
 The `workspace` argument is inferred from `$PWD` when omitted.
+
+All subcommands accept `--text` (default), `--porcelain` (tab-separated for scripts), or `--json` (`{"ok","data"}` envelope for programmatic consumers). Errors include `error:` and `code:` lines.
 
 Run the command and report the result. If it fails, show the error message and error code.
 

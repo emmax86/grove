@@ -110,7 +110,7 @@ export async function removeWorkspace(
   options: { force?: boolean },
   paths: Paths,
   env?: GitEnv,
-): Promise<Result<void>> {
+): Promise<Result<{ name: string }>> {
   const wsPath = paths.workspace(name);
   if (!(await exists(wsPath))) {
     return err(`Workspace "${name}" not found`, "WORKSPACE_NOT_FOUND");
@@ -209,7 +209,7 @@ export async function removeWorkspace(
     return err(`Failed to remove some worktrees:\n${errors.join("\n")}`, "WORKTREE_REMOVE_FAILED");
   }
 
-  return ok(undefined);
+  return ok({ name });
 }
 
 export interface SyncRepoResult {
