@@ -12,7 +12,7 @@ grove ws status
 
 This returns the workspace name, path, all registered repos (each with `name`, `path`, `status`), and their worktrees (`repo`, `slug`, `branch`, `type`). The path to each worktree is derived as `{workspace}/trees/{repo}/{slug}/`.
 
-If `grove` is not in PATH, the binary is at `.bin/grove` within the grove repo worktree, or at `{workspace}/trees/{grove-repo}/{default-branch}/.bin/grove` from the workspace root (derive `{grove-repo}` and `{default-branch}` from the `grove ws status` output).
+If `grove` is not in PATH, the binary is at `bin/grove` within the grove repo worktree, or at `{workspace}/trees/{grove-repo}/{default-branch}/bin/grove` from the workspace root (derive `{grove-repo}` and `{default-branch}` from the `grove ws status` output).
 
 ## Interpreting the output
 
