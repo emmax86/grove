@@ -268,21 +268,24 @@ describe("generateAgentFiles", () => {
       expect(content).toBe("# My custom workspace notes\n@.claude/trees.md\n");
     });
 
-    it("is idempotent across both files", async () => {
+    it("is idempotent across all three files", async () => {
       const pathA = await setupRepo("ws", "alpha");
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
       const result1 = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result1.ok).toBe(true);
       const claudeMd1 = await readFile(paths.claudeMd("ws"), "utf-8");
+      const agentsMd1 = await readFile(paths.agentsMd("ws"), "utf-8");
       const treesMd1 = await readFile(paths.claudeTreesMd("ws"), "utf-8");
 
       const result2 = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result2.ok).toBe(true);
       const claudeMd2 = await readFile(paths.claudeMd("ws"), "utf-8");
+      const agentsMd2 = await readFile(paths.agentsMd("ws"), "utf-8");
       const treesMd2 = await readFile(paths.claudeTreesMd("ws"), "utf-8");
 
       expect(claudeMd1).toBe(claudeMd2);
+      expect(agentsMd1).toBe(agentsMd2);
       expect(treesMd1).toBe(treesMd2);
     });
   });
