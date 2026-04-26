@@ -134,6 +134,10 @@ export const ERROR_CATALOG = {
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;
 
+export function entries(): [ErrorCode, ErrorEntry][] {
+  return Object.entries(ERROR_CATALOG) as [ErrorCode, ErrorEntry][];
+}
+
 export function err(message: string, code: ErrorCode): Result<never> {
   return { ok: false, error: message, code };
 }

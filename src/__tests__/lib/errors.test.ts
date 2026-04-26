@@ -2,13 +2,12 @@ import { describe, expect, it } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import type { ErrorEntry } from "../../lib/errors";
-import { ERROR_CATALOG, mapFsError } from "../../lib/errors";
+import { entries, mapFsError } from "../../lib/errors";
 import { renderErrorsMarkdown } from "../../lib/errors-renderer";
 
 describe("ERROR_CATALOG", () => {
   it("has a non-empty description for every entry", () => {
-    for (const [code, entry] of Object.entries(ERROR_CATALOG)) {
+    for (const [code, entry] of entries()) {
       expect(entry.description, `${code} description`).toBeTruthy();
       expect(entry.description.length, `${code} description length`).toBeGreaterThan(0);
     }
@@ -18,7 +17,9 @@ describe("ERROR_CATALOG", () => {
 describe("renderErrorsMarkdown", () => {
   it("includes a heading for every error code in alphabetical order", () => {
     const md = renderErrorsMarkdown();
-    const codes = Object.keys(ERROR_CATALOG).sort();
+    const codes = entries()
+      .map(([code]) => code)
+      .sort();
     for (const code of codes) {
       expect(md).toContain(`## ${code}`);
     }
@@ -33,14 +34,14 @@ describe("renderErrorsMarkdown", () => {
 
   it("includes the description for each code", () => {
     const md = renderErrorsMarkdown();
-    for (const [code, entry] of Object.entries(ERROR_CATALOG)) {
+    for (const [code, entry] of entries()) {
       expect(md, `description for ${code}`).toContain(entry.description);
     }
   });
 
   it("includes the hint when present", () => {
     const md = renderErrorsMarkdown();
-    for (const [code, entry] of Object.entries(ERROR_CATALOG) as [string, ErrorEntry][]) {
+    for (const [code, entry] of entries()) {
       if (entry.hint) {
         expect(md, `hint for ${code}`).toContain(`**Hint:** ${entry.hint}`);
       }
@@ -49,7 +50,7 @@ describe("renderErrorsMarkdown", () => {
 
   it("does not include a Hint line for codes without a hint", () => {
     const md = renderErrorsMarkdown();
-    const codesWithoutHint = (Object.entries(ERROR_CATALOG) as [string, ErrorEntry][])
+    const codesWithoutHint = entries()
       .filter(([, entry]) => !entry.hint)
       .map(([code]) => code);
     // Every ## SECTION for codes without a hint should not be followed by a Hint line
