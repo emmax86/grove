@@ -51,10 +51,18 @@ export const ERROR_CATALOG = {
   WORKTREE_REMOVE_FAILED: {
     description: "Removing a worktree failed.",
   },
+  SLUG_COLLISION: {
+    description:
+      "A branch slug derived from the given name collides with an existing worktree entry in this workspace.",
+  },
+  CANNOT_REMOVE_DEFAULT_BRANCH: {
+    description:
+      "The default-branch worktree is a managed symlink and cannot be removed directly; remove the repo instead.",
+  },
 
   // Git invocation
   GIT_DEFAULT_BRANCH_ERROR: {
-    description: "Failed to determine the repo's default branch.",
+    description: "Failed to read the current branch name via `git symbolic-ref --short HEAD`.",
   },
   GIT_WORKTREE_ADD_ERROR: {
     description: "`git worktree add` failed.",
@@ -83,7 +91,7 @@ export const ERROR_CATALOG = {
   },
   RESERVED_NAME: {
     description:
-      "The supplied name conflicts with a reserved directory name (e.g. `repos`, `trees`, `worktrees`).",
+      "The supplied name conflicts with a directory name reserved by grove's internal layout.",
   },
 
   // CLI
