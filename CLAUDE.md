@@ -29,7 +29,7 @@ The `classifyWorktreeEntry()` function in `src/lib/worktree-utils.ts` distinguis
 
 ### Result pattern
 
-All functions return `Result<T>` (`{ ok: true; value: T } | { ok: false; error: string; code: string }`). Error codes are SCREAMING_SNAKE_CASE strings. The CLI's `output()` helper writes JSON to stdout/stderr and exits 1 on error.
+All functions return `Result<T>` (`{ ok: true; value: T } | { ok: false; error: string; code: ErrorCode }`) where `ErrorCode = keyof typeof ERROR_CATALOG` from `src/lib/errors.ts`. Error codes are SCREAMING_SNAKE_CASE strings. The CLI's `output()` helper writes JSON to stdout/stderr and exits 1 on error.
 
 ### Context inference
 
@@ -98,7 +98,7 @@ For multi-behavior features, use one Red-Green-Refactor cycle per distinct behav
 - Never write implementation before a failing test exists for the behavior.
 - Test the `Result<T>` return value, not side effects alone — check both `result.ok` and the value/error.
 - Use `createTestGitRepo()` and real filesystem state, not mocks.
-- Error codes are SCREAMING_SNAKE_CASE. Add new codes to the error catalog in this file.
+- Error codes are SCREAMING_SNAKE_CASE. Add new codes to `ERROR_CATALOG` in `src/lib/errors.ts`. The corresponding entry in `docs/errors.md` is regenerated via `bun run gen:errors`; the drift test in `src/__tests__/lib/errors.test.ts` enforces sync.
 - One test = one behavior. Name tests as "does X when Y" or "returns ERROR_CODE when Y".
 
 ## Commits

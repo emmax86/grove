@@ -1,0 +1,157 @@
+import type { Result } from "../types";
+
+export type ErrorEntry = {
+  description: string;
+  hint?: string;
+};
+
+export const ERROR_CATALOG = {
+  // Workspace config
+  CONFIG_NOT_FOUND: {
+    description: "The workspace config file is missing.",
+    hint: "Check that the workspace exists with `grove ws list`.",
+  },
+  CONFIG_INVALID: {
+    description: "The workspace config file is malformed JSON or fails schema validation.",
+  },
+  CONFIG_WRITE_FAILED: {
+    description: "Writing the workspace config file failed.",
+  },
+
+  // Pool config
+  POOL_CONFIG_INVALID: {
+    description: "The pool config file is malformed JSON or fails schema validation.",
+  },
+  POOL_CONFIG_WRITE_FAILED: {
+    description: "Writing the pool config file failed.",
+  },
+
+  // Workspace lifecycle
+  WORKSPACE_NOT_FOUND: {
+    description: "The named workspace does not exist.",
+  },
+  WORKSPACE_EXISTS: {
+    description: "A workspace with the given name already exists.",
+  },
+
+  // Repo lifecycle
+  REPO_NOT_FOUND: {
+    description: "The named repo is not registered in the workspace.",
+  },
+  REPO_NOT_RESOLVED: {
+    description: "Could not determine which repo a command should target.",
+    hint: "Pass --repo or invoke the command from inside a worktree.",
+  },
+  NOT_A_GIT_REPO: {
+    description: "The path is not a git repository.",
+  },
+
+  // Worktree lifecycle
+  WORKTREE_NOT_FOUND: {
+    description: "The named worktree does not exist.",
+  },
+  WORKTREE_REMOVE_FAILED: {
+    description:
+      "One or more worktrees failed to be removed during a higher-level grove operation (repo or workspace removal).",
+  },
+  SLUG_COLLISION: {
+    description:
+      "A branch slug derived from the given name collides with an existing worktree entry in this workspace.",
+  },
+  CANNOT_REMOVE_DEFAULT_BRANCH: {
+    description:
+      "The default-branch worktree is a managed symlink and cannot be removed directly; remove the repo instead.",
+  },
+
+  // Git invocation
+  GIT_DEFAULT_BRANCH_ERROR: {
+    description: "Failed to read the current branch name via `git symbolic-ref --short HEAD`.",
+  },
+  GIT_WORKTREE_ADD_ERROR: {
+    description: "`git worktree add` failed.",
+  },
+  GIT_WORKTREE_LIST_ERROR: {
+    description: "`git worktree list` failed or returned malformed output.",
+  },
+  GIT_WORKTREE_REMOVE_ERROR: {
+    description: "The underlying `git worktree remove` command failed for a single worktree.",
+  },
+
+  // Filesystem and symlinks
+  DANGLING_SYMLINK: {
+    description: "A symlink points at a path that does not exist.",
+  },
+  FILE_NOT_FOUND: {
+    description: "An expected file does not exist on disk.",
+  },
+  SYMLINK_CREATE_FAILED: {
+    description: "Creating a symlink failed.",
+  },
+  VSCODE_WORKSPACE_WRITE_FAILED: {
+    description: "Writing the generated VS Code workspace file failed.",
+  },
+
+  // Naming and validation
+  INVALID_NAME: {
+    description: "A workspace, repo, or branch name failed validation.",
+  },
+  RESERVED_NAME: {
+    description:
+      "The supplied name conflicts with a directory name reserved by grove's internal layout.",
+  },
+
+  // CLI
+  UNKNOWN_COMMAND: {
+    description: "The top-level command is not recognised.",
+  },
+  UNKNOWN_SUBCOMMAND: {
+    description: "The subcommand is not recognised.",
+  },
+  INVALID_FLAGS: {
+    description: "Mutually exclusive flags were supplied together.",
+  },
+
+  // Exec
+  COMMAND_NOT_CONFIGURED: {
+    description: "The requested command is not configured for the repo.",
+    hint: "Add the command to .grove/commands.json in the repo root, or ensure the repo's ecosystem config (e.g. package.json) defines the command.",
+  },
+
+  // Repo removal
+  TREE_NAME_CONFLICT: {
+    description: "The repos/ symlink for this name already points to a different path.",
+    hint: "Use --name to pick a different name.",
+  },
+  REPO_HAS_WORKTREES: {
+    description: "The repo has active worktrees and cannot be removed without --force.",
+  },
+
+  // Workspace removal
+  WORKSPACE_HAS_REPOS: {
+    description: "The workspace has registered repos and cannot be removed without --force.",
+  },
+} as const satisfies Record<string, ErrorEntry>;
+
+export type ErrorCode = keyof typeof ERROR_CATALOG;
+
+export function entries(): [ErrorCode, ErrorEntry][] {
+  return Object.entries(ERROR_CATALOG) as [ErrorCode, ErrorEntry][];
+}
+
+export function err(message: string, code: ErrorCode): Result<never> {
+  return { ok: false, error: message, code };
+}
+
+export function ok<T>(value: T): Result<T> {
+  return { ok: true, value };
+}
+
+type NodeFsError = { code?: string; message?: string };
+
+export function mapFsError(e: unknown, fallback: ErrorCode): Result<never> {
+  const fsErr = e as NodeFsError;
+  if (fsErr?.code === "ENOENT") {
+    return err(fsErr.message ?? "File not found", "FILE_NOT_FOUND");
+  }
+  return err(String(e), fallback);
+}
