@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { ERROR_CATALOG, type ErrorEntry } from "../../lib/errors";
+import { ERROR_CATALOG } from "../../lib/errors";
 
 describe("ERROR_CATALOG", () => {
   it("has unique codes (object keys are inherently unique, but verify the type matches)", () => {
@@ -9,7 +9,7 @@ describe("ERROR_CATALOG", () => {
   });
 
   it("has a non-empty description for every entry", () => {
-    for (const [code, entry] of Object.entries(ERROR_CATALOG) as [string, ErrorEntry][]) {
+    for (const [code, entry] of Object.entries(ERROR_CATALOG)) {
       expect(entry.description, `${code} description`).toBeTruthy();
       expect(entry.description.length, `${code} description length`).toBeGreaterThan(0);
     }
