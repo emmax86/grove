@@ -338,6 +338,7 @@ describe("readRepoFromWorkspace", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("WORKSPACE_NOT_FOUND");
+      expect(result.error).toContain("missing-ws");
     }
   });
 
