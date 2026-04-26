@@ -1,12 +1,6 @@
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string; code: string };
 
-export function ok<T>(value: T): Result<T> {
-  return { ok: true, value };
-}
-
-export function err<T>(error: string, code: string): Result<T> {
-  return { ok: false, error, code };
-}
+export { ERROR_CATALOG, type ErrorCode, type ErrorEntry, err, ok } from "./lib/errors";
 
 export interface RepoEntry {
   name: string;

@@ -27,9 +27,13 @@ describe("render — JSON envelope", () => {
   });
 
   it("emits error JSON to stderr with exit 1", () => {
-    const out = render(err("nope", "OOPS"), "workspace-add", ctx);
+    const out = render(err("nope", "WORKSPACE_NOT_FOUND"), "workspace-add", ctx);
     expect(out.stdout).toBe("");
-    expect(JSON.parse(out.stderr)).toEqual({ ok: false, error: "nope", code: "OOPS" });
+    expect(JSON.parse(out.stderr)).toEqual({
+      ok: false,
+      error: "nope",
+      code: "WORKSPACE_NOT_FOUND",
+    });
     expect(out.exitCode).toBe(1);
   });
 });
@@ -44,8 +48,8 @@ describe("render — error in text/porcelain modes", () => {
       isStderrTTY: false,
       warnings: [],
     };
-    const out = render(err("nope", "OOPS"), "workspace-add", ctx);
-    expect(out.stderr).toBe("error: nope\n  code: OOPS");
+    const out = render(err("nope", "WORKSPACE_NOT_FOUND"), "workspace-add", ctx);
+    expect(out.stderr).toBe("error: nope\n  code: WORKSPACE_NOT_FOUND");
     expect(out.stdout).toBe("");
     expect(out.exitCode).toBe(1);
   });
@@ -59,15 +63,15 @@ describe("render — error in text/porcelain modes", () => {
       isStderrTTY: false,
       warnings: [],
     };
-    const out = render(err("nope", "OOPS"), "workspace-add", ctx);
-    expect(out.stderr).toBe("error: nope\n  code: OOPS");
+    const out = render(err("nope", "WORKSPACE_NOT_FOUND"), "workspace-add", ctx);
+    expect(out.stderr).toBe("error: nope\n  code: WORKSPACE_NOT_FOUND");
     expect(out.exitCode).toBe(1);
   });
 });
 
 describe("render — JSON error envelope TTY pretty-print", () => {
   it("error JSON pretty-prints when stderr is TTY", () => {
-    const out = render(err("nope", "OOPS"), "workspace-add", {
+    const out = render(err("nope", "WORKSPACE_NOT_FOUND"), "workspace-add", {
       mode: "json",
       colorEnabled: false,
       unicodeEnabled: true,
@@ -76,11 +80,15 @@ describe("render — JSON error envelope TTY pretty-print", () => {
       warnings: [],
     });
     expect(out.stderr).toContain("\n");
-    expect(JSON.parse(out.stderr)).toEqual({ ok: false, error: "nope", code: "OOPS" });
+    expect(JSON.parse(out.stderr)).toEqual({
+      ok: false,
+      error: "nope",
+      code: "WORKSPACE_NOT_FOUND",
+    });
   });
 
   it("error JSON is compact when stderr is not TTY", () => {
-    const out = render(err("nope", "OOPS"), "workspace-add", {
+    const out = render(err("nope", "WORKSPACE_NOT_FOUND"), "workspace-add", {
       mode: "json",
       colorEnabled: false,
       unicodeEnabled: true,
@@ -89,7 +97,11 @@ describe("render — JSON error envelope TTY pretty-print", () => {
       warnings: [],
     });
     expect(out.stderr).not.toContain("\n");
-    expect(JSON.parse(out.stderr)).toEqual({ ok: false, error: "nope", code: "OOPS" });
+    expect(JSON.parse(out.stderr)).toEqual({
+      ok: false,
+      error: "nope",
+      code: "WORKSPACE_NOT_FOUND",
+    });
   });
 
   it("success JSON pretty-prints when stdout is TTY", () => {

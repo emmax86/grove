@@ -1,3 +1,5 @@
+import type { Result } from "../types";
+
 export type ErrorEntry = {
   description: string;
   hint?: string;
@@ -101,6 +103,37 @@ export const ERROR_CATALOG = {
   UNKNOWN_SUBCOMMAND: {
     description: "The subcommand is not recognised.",
   },
+  INVALID_FLAGS: {
+    description: "Mutually exclusive flags were supplied together.",
+  },
+
+  // Exec
+  COMMAND_NOT_CONFIGURED: {
+    description: "The requested command is not configured for the repo.",
+    hint: "Add the command to .grove/commands.json in the repo root.",
+  },
+
+  // Repo removal
+  TREE_NAME_CONFLICT: {
+    description: "The repos/ symlink for this name already points to a different path.",
+    hint: "Use --name to pick a different name.",
+  },
+  REPO_HAS_WORKTREES: {
+    description: "The repo has active worktrees and cannot be removed without --force.",
+  },
+
+  // Workspace removal
+  WORKSPACE_HAS_REPOS: {
+    description: "The workspace has registered repos and cannot be removed without --force.",
+  },
 } as const satisfies Record<string, ErrorEntry>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;
+
+export function err(message: string, code: ErrorCode): Result<never> {
+  return { ok: false, error: message, code };
+}
+
+export function ok<T>(value: T): Result<T> {
+  return { ok: true, value };
+}
