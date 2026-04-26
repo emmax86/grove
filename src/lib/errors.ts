@@ -80,6 +80,9 @@ export const ERROR_CATALOG = {
   DANGLING_SYMLINK: {
     description: "A symlink points at a path that does not exist.",
   },
+  FILE_NOT_FOUND: {
+    description: "An expected file does not exist on disk.",
+  },
   SYMLINK_CREATE_FAILED: {
     description: "Creating a symlink failed.",
   },
@@ -136,4 +139,14 @@ export function err(message: string, code: ErrorCode): Result<never> {
 
 export function ok<T>(value: T): Result<T> {
   return { ok: true, value };
+}
+
+type NodeFsError = { code?: string; message?: string };
+
+export function mapFsError(e: unknown, fallback: ErrorCode): Result<never> {
+  const fsErr = e as NodeFsError;
+  if (fsErr?.code === "ENOENT") {
+    return err(fsErr.message ?? "File not found", "FILE_NOT_FOUND");
+  }
+  return err(String(e), fallback);
 }
