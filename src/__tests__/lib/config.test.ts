@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { createPaths } from "../../constants";
 import {
   addPoolReference,
   addRepoToConfig,
   getPoolSlugsForWorkspace,
   readConfig,
   readPoolConfig,
+  readWorkspaceConfig,
   removeRepoFromConfig,
   writeConfig,
   writePoolConfig,
@@ -254,6 +256,51 @@ describe("pool config", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("POOL_CONFIG_WRITE_FAILED");
+    }
+  });
+});
+
+describe("readWorkspaceConfig", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await createTestDir();
+  });
+
+  afterEach(() => cleanup(tempDir));
+
+  it("returns WORKSPACE_NOT_FOUND when workspace dir is missing", async () => {
+    const paths = createPaths(tempDir);
+    const result = await readWorkspaceConfig("missing-ws", paths);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("WORKSPACE_NOT_FOUND");
+      expect(result.error).toContain("missing-ws");
+    }
+  });
+
+  it("returns workspace config on happy path", async () => {
+    const paths = createPaths(tempDir);
+    await mkdir(paths.workspace("ws"), { recursive: true });
+    await writeFile(paths.workspaceConfig("ws"), JSON.stringify({ name: "ws", repos: [] }));
+
+    const result = await readWorkspaceConfig("ws", paths);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toBe("ws");
+      expect(result.value.repos).toEqual([]);
+    }
+  });
+
+  it("passes CONFIG_INVALID through unchanged", async () => {
+    const paths = createPaths(tempDir);
+    await mkdir(paths.workspace("ws"), { recursive: true });
+    await writeFile(paths.workspaceConfig("ws"), "{not valid json");
+
+    const result = await readWorkspaceConfig("ws", paths);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("CONFIG_INVALID");
     }
   });
 });
