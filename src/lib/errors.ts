@@ -110,7 +110,7 @@ export const ERROR_CATALOG = {
   // Exec
   COMMAND_NOT_CONFIGURED: {
     description: "The requested command is not configured for the repo.",
-    hint: "Add the command to .grove/commands.json in the repo root.",
+    hint: "Add the command to .grove/commands.json in the repo root, or ensure the repo's ecosystem config (e.g. package.json) defines the command.",
   },
 
   // Repo removal

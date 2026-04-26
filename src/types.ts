@@ -1,4 +1,6 @@
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string; code: string };
+import type { ErrorCode } from "./lib/errors";
+
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string; code: ErrorCode };
 
 export { ERROR_CATALOG, type ErrorCode, type ErrorEntry, err, ok } from "./lib/errors";
 
