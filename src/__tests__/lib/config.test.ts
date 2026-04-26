@@ -9,6 +9,7 @@ import {
   getPoolSlugsForWorkspace,
   readConfig,
   readPoolConfig,
+  readRepoFromWorkspace,
   readWorkspaceConfig,
   removeRepoFromConfig,
   writeConfig,
@@ -301,6 +302,62 @@ describe("readWorkspaceConfig", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("CONFIG_INVALID");
+    }
+  });
+});
+
+describe("readRepoFromWorkspace", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await createTestDir();
+  });
+
+  afterEach(() => cleanup(tempDir));
+
+  it("returns REPO_NOT_FOUND when workspace exists but repo is not registered", async () => {
+    const paths = createPaths(tempDir);
+    await mkdir(paths.workspace("ws"), { recursive: true });
+    await writeFile(
+      paths.workspaceConfig("ws"),
+      JSON.stringify({ name: "ws", repos: [{ name: "other", path: "/tmp/other" }] }),
+    );
+
+    const result = await readRepoFromWorkspace("ws", "missing-repo", paths);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("REPO_NOT_FOUND");
+      expect(result.error).toContain("missing-repo");
+      expect(result.error).toContain("ws");
+    }
+  });
+
+  it("returns WORKSPACE_NOT_FOUND when workspace is missing", async () => {
+    const paths = createPaths(tempDir);
+    const result = await readRepoFromWorkspace("missing-ws", "any-repo", paths);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("WORKSPACE_NOT_FOUND");
+    }
+  });
+
+  it("returns config and repo on happy path", async () => {
+    const paths = createPaths(tempDir);
+    await mkdir(paths.workspace("ws"), { recursive: true });
+    await writeFile(
+      paths.workspaceConfig("ws"),
+      JSON.stringify({
+        name: "ws",
+        repos: [{ name: "myrepo", path: "/tmp/myrepo" }],
+      }),
+    );
+
+    const result = await readRepoFromWorkspace("ws", "myrepo", paths);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.config.name).toBe("ws");
+      expect(result.value.repo.name).toBe("myrepo");
+      expect(result.value.repo.path).toBe("/tmp/myrepo");
     }
   });
 });
