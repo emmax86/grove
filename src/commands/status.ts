@@ -16,9 +16,9 @@ export interface WorkspaceStatus {
 
 export async function getStatus(workspace: string, paths: Paths): Promise<Result<WorkspaceStatus>> {
   const wsPath = paths.workspace(workspace);
-  const wsExistsResult = await readWorkspaceConfig(workspace, paths);
-  if (!wsExistsResult.ok) {
-    return wsExistsResult;
+  const configResult = await readWorkspaceConfig(workspace, paths);
+  if (!configResult.ok) {
+    return configResult;
   }
 
   const reposResult = await listRepos(workspace, paths);

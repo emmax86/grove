@@ -117,6 +117,7 @@ export async function removeWorkspace(
   }
 
   const configPath = paths.workspaceConfig(name);
+  // Use readConfig directly: the exists() guard above makes CONFIG_NOT_FOUND unreachable here.
   const configResult = await readConfig(configPath);
   if (!configResult.ok) {
     return configResult;
@@ -233,6 +234,7 @@ export async function syncWorkspace(
     return err(`Workspace "${name}" not found`, "WORKSPACE_NOT_FOUND");
   }
 
+  // Use readConfig directly: the exists() guard above makes CONFIG_NOT_FOUND unreachable here.
   const configResult = await readConfig(paths.workspaceConfig(name));
   if (!configResult.ok) {
     return configResult;
