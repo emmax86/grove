@@ -6,7 +6,7 @@ import { loadCommandConfig, resolveCommand, spawnCommand } from "../lib/commands
 import {
   addPoolReference,
   getPoolSlugsForWorkspace,
-  readConfig,
+  readRepoFromWorkspace,
   readWorkspaceConfig,
 } from "../lib/config";
 import { detectEcosystem } from "../lib/detect";
@@ -37,18 +37,11 @@ export async function addWorktree(
   env?: GitEnv,
 ): Promise<Result<AddWorktreeResult>> {
   // Validate repo is registered
-  const configResult = await readConfig(paths.workspaceConfig(workspace));
-  if (!configResult.ok) {
-    if (configResult.code === "CONFIG_NOT_FOUND") {
-      return err(`Workspace "${workspace}" not found`, "WORKSPACE_NOT_FOUND");
-    }
-    return configResult;
+  const result = await readRepoFromWorkspace(workspace, repo, paths);
+  if (!result.ok) {
+    return result;
   }
-
-  const repoEntry = configResult.value.repos.find((r) => r.name === repo);
-  if (!repoEntry) {
-    return err(`Repo "${repo}" is not registered in workspace "${workspace}"`, "REPO_NOT_FOUND");
-  }
+  const { repo: repoEntry } = result.value;
 
   // Resolve real repo path through repos/
   const repoPathResult = await resolveRepoPath(repo, paths);

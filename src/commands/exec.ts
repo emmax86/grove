@@ -8,7 +8,7 @@ import {
   type StandardCommand,
   spawnCommand,
 } from "../lib/commands";
-import { readConfig } from "../lib/config";
+import { readRepoFromWorkspace, readWorkspaceConfig } from "../lib/config";
 import { detectEcosystem } from "../lib/detect";
 import { type ExecResult, err, ok, type Result } from "../types";
 
@@ -27,32 +27,25 @@ export async function execCommand(
   opts: ExecOptions,
   paths: Paths,
 ): Promise<Result<ExecResult>> {
-  // 1. Resolve workspace config
-  const configResult = await readConfig(paths.workspaceConfig(workspace));
-  if (!configResult.ok) {
-    if (configResult.code === "CONFIG_NOT_FOUND") {
-      return err(`Workspace "${workspace}" not found`, "WORKSPACE_NOT_FOUND");
-    }
-    return configResult;
-  }
-
-  // 2. Resolve repo, worktree root, and main repo path for ecosystem detection
+  // 1. Resolve repo, worktree root, and main repo path for ecosystem detection
   let repo: string;
   let worktreeRoot: string;
   let mainRepoPath: string;
 
   if (opts.repo) {
-    const repoEntry = configResult.value.repos.find((r) => r.name === opts.repo);
-    if (!repoEntry) {
-      return err(
-        `Repo "${opts.repo}" not registered in workspace "${workspace}"`,
-        "REPO_NOT_FOUND",
-      );
+    const result = await readRepoFromWorkspace(workspace, opts.repo, paths);
+    if (!result.ok) {
+      return result;
     }
+    const { repo: repoEntry } = result.value;
     repo = repoEntry.name;
     worktreeRoot = repoEntry.path;
     mainRepoPath = repoEntry.path;
   } else if (opts.file) {
+    const configResult = await readWorkspaceConfig(workspace, paths);
+    if (!configResult.ok) {
+      return configResult;
+    }
     const resolved = await resolveRepoFromFile(opts.file, workspace, paths);
     if (!resolved.ok) {
       return resolved;
@@ -65,14 +58,19 @@ export async function execCommand(
     }
     mainRepoPath = repoEntry.path;
   } else {
+    // Validate workspace exists before reporting the missing-repo error
+    const configResult = await readWorkspaceConfig(workspace, paths);
+    if (!configResult.ok) {
+      return configResult;
+    }
     return err("No repo or file specified — pass --repo or a file path", "REPO_NOT_RESOLVED");
   }
 
-  // 3. Detect ecosystem and load config — both from the main repo root (lockfile lives there)
+  // 2. Detect ecosystem and load config — both from the main repo root (lockfile lives there)
   const ecosystem = await detectEcosystem(mainRepoPath);
   const config = await loadCommandConfig(mainRepoPath);
 
-  // 4. Resolve command — resolve file to absolute so it works when cwd ≠ worktreeRoot
+  // 3. Resolve command — resolve file to absolute so it works when cwd ≠ worktreeRoot
   const file = opts.file ? resolve(opts.file) : undefined;
   const cmd = resolveCommand(command, config, ecosystem, {
     file,
@@ -88,7 +86,7 @@ export async function execCommand(
     );
   }
 
-  // 5. Dry-run short-circuit
+  // 4. Dry-run short-circuit
   if (opts.dryRun) {
     return ok({
       repo,
@@ -100,7 +98,7 @@ export async function execCommand(
     });
   }
 
-  // 6. Spawn
+  // 5. Spawn
   const spawnResult = await spawnCommand(cmd, worktreeRoot);
   return ok({ repo, cwd: worktreeRoot, command: cmd, ...spawnResult });
 }
