@@ -6,7 +6,7 @@ import { generateAgentFiles } from "../lib/agent-files";
 import {
   addRepoToConfig,
   getPoolSlugsForWorkspace,
-  readConfig,
+  readWorkspaceConfig,
   removeRepoFromConfig,
 } from "../lib/config";
 import { type GitEnv, getDefaultBranch, isGitRepo, removeWorktree } from "../lib/git";
@@ -111,7 +111,7 @@ export async function addRepo(
   });
   if (!configResult.ok) {
     await cleanup();
-    return configResult; // preserves CONFIG_NOT_FOUND etc.
+    return configResult;
   }
 
   const vscodeResult = await generateVSCodeWorkspace(workspace, paths);
@@ -134,11 +134,8 @@ export async function addRepo(
 }
 
 export async function listRepos(workspace: string, paths: Paths): Promise<Result<RepoInfo[]>> {
-  const configResult = await readConfig(paths.workspaceConfig(workspace));
+  const configResult = await readWorkspaceConfig(workspace, paths);
   if (!configResult.ok) {
-    if (configResult.code === "CONFIG_NOT_FOUND") {
-      return err(`Workspace "${workspace}" not found`, "WORKSPACE_NOT_FOUND");
-    }
     return configResult;
   }
 
