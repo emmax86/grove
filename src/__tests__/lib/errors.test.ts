@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { ERROR_CATALOG, type ErrorCode, type ErrorEntry } from "../../lib/errors";
+import { ERROR_CATALOG, type ErrorEntry } from "../../lib/errors";
 
 describe("ERROR_CATALOG", () => {
   it("has unique codes (object keys are inherently unique, but verify the type matches)", () => {
