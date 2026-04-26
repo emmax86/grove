@@ -11,6 +11,7 @@
     "format": "biome check --write --config-path ./biome.json .",
     "format:check": "biome check --config-path ./biome.json .",
     "format:ci": "biome ci --config-path ./biome.json .",
+    "gen:errors": "bun run scripts/gen-errors.ts",
     "lint:no-sync": "bun run scripts/check-no-sync.ts",
     "typecheck": "tsc --noEmit",
     "prepare": "bun run build && husky"
