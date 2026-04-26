@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 import type { ErrorEntry } from "../../lib/errors";
 import { ERROR_CATALOG, mapFsError, renderErrorsMarkdown } from "../../lib/errors";
@@ -88,5 +90,14 @@ describe("mapFsError", () => {
       expect(result.code).toBe("CONFIG_WRITE_FAILED");
       expect(result.error).toContain("disk full");
     }
+  });
+});
+
+describe("docs/errors.md", () => {
+  it("matches the catalog (run `bun run gen:errors` if this fails)", async () => {
+    const path = resolve(import.meta.dir, "..", "..", "..", "docs", "errors.md");
+    const onDisk = await readFile(path, "utf-8");
+    const expected = renderErrorsMarkdown();
+    expect(onDisk).toBe(expected);
   });
 });
