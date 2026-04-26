@@ -7,11 +7,6 @@ import { ERROR_CATALOG, mapFsError } from "../../lib/errors";
 import { renderErrorsMarkdown } from "../../lib/errors-renderer";
 
 describe("ERROR_CATALOG", () => {
-  it("has no duplicate codes", () => {
-    const codes = Object.keys(ERROR_CATALOG);
-    expect(new Set(codes).size).toBe(codes.length);
-  });
-
   it("has a non-empty description for every entry", () => {
     for (const [code, entry] of Object.entries(ERROR_CATALOG)) {
       expect(entry.description, `${code} description`).toBeTruthy();

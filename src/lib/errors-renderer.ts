@@ -10,6 +10,7 @@ Every error returned by grove carries a SCREAMING_SNAKE_CASE code. The codes bel
 export function renderErrorsMarkdown(): string {
   const codes = Object.keys(ERROR_CATALOG).sort();
   const sections = codes.map((code) => {
+    // `as const satisfies` preserves per-entry literal types; cast to ErrorEntry widens safely (satisfies validates shape)
     const entry = ERROR_CATALOG[code as ErrorCode] as ErrorEntry;
     const hint = entry.hint ? `\n\n**Hint:** ${entry.hint}` : "";
     return `## ${code}\n\n${entry.description}${hint}`;
