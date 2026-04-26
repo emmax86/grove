@@ -1,5 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 
+import type { Paths } from "../constants";
 import {
   err,
   ok,
@@ -34,6 +35,34 @@ export async function readConfig(configPath: string): Promise<Result<WorkspaceCo
   }
 
   return ok(parsed as WorkspaceConfig);
+}
+
+export async function readWorkspaceConfig(
+  workspace: string,
+  paths: Paths,
+): Promise<Result<WorkspaceConfig>> {
+  const result = await readConfig(paths.workspaceConfig(workspace));
+  if (!result.ok && result.code === "CONFIG_NOT_FOUND") {
+    return err(`Workspace "${workspace}" not found`, "WORKSPACE_NOT_FOUND");
+  }
+  return result;
+}
+
+export async function readRepoFromWorkspace(
+  workspace: string,
+  repo: string,
+  paths: Paths,
+): Promise<Result<{ config: WorkspaceConfig; repo: RepoEntry }>> {
+  const cfgResult = await readWorkspaceConfig(workspace, paths);
+  if (!cfgResult.ok) {
+    return cfgResult;
+  }
+
+  const repoEntry = cfgResult.value.repos.find((r) => r.name === repo);
+  if (!repoEntry) {
+    return err(`Repo "${repo}" is not registered in workspace "${workspace}"`, "REPO_NOT_FOUND");
+  }
+  return ok({ config: cfgResult.value, repo: repoEntry });
 }
 
 export async function writeConfig(

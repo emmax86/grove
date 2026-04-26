@@ -3,8 +3,8 @@ import { exists, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { Paths } from "../constants";
-import { err, ok, type Result } from "../types";
-import { readConfig } from "./config";
+import { ok, type Result } from "../types";
+import { readWorkspaceConfig } from "./config";
 import { type GitEnv, getDefaultBranch } from "./git";
 import { toSlug } from "./slug";
 
@@ -49,11 +49,8 @@ export async function generateAgentFiles(
   paths: Paths,
   env?: GitEnv,
 ): Promise<Result<GenerateAgentFilesResult>> {
-  const configResult = await readConfig(paths.workspaceConfig(workspace));
+  const configResult = await readWorkspaceConfig(workspace, paths);
   if (!configResult.ok) {
-    if (configResult.code === "CONFIG_NOT_FOUND") {
-      return err(`Workspace "${workspace}" not found`, "WORKSPACE_NOT_FOUND");
-    }
     return configResult;
   }
 

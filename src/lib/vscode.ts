@@ -2,17 +2,14 @@ import { writeFile } from "node:fs/promises";
 
 import type { Paths } from "../constants";
 import { err, ok, type Result } from "../types";
-import { readConfig } from "./config";
+import { readWorkspaceConfig } from "./config";
 
 export async function generateVSCodeWorkspace(
   workspace: string,
   paths: Paths,
 ): Promise<Result<void>> {
-  const configResult = await readConfig(paths.workspaceConfig(workspace));
+  const configResult = await readWorkspaceConfig(workspace, paths);
   if (!configResult.ok) {
-    if (configResult.code === "CONFIG_NOT_FOUND") {
-      return err(`Workspace "${workspace}" not found`, "WORKSPACE_NOT_FOUND");
-    }
     return configResult;
   }
 

@@ -2,12 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { createPaths } from "../../constants";
 import {
   addPoolReference,
   addRepoToConfig,
   getPoolSlugsForWorkspace,
   readConfig,
   readPoolConfig,
+  readRepoFromWorkspace,
+  readWorkspaceConfig,
   removeRepoFromConfig,
   writeConfig,
   writePoolConfig,
@@ -254,6 +257,108 @@ describe("pool config", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.code).toBe("POOL_CONFIG_WRITE_FAILED");
+    }
+  });
+});
+
+describe("readWorkspaceConfig", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await createTestDir();
+  });
+
+  afterEach(() => cleanup(tempDir));
+
+  it("returns WORKSPACE_NOT_FOUND when workspace dir is missing", async () => {
+    const paths = createPaths(tempDir);
+    const result = await readWorkspaceConfig("missing-ws", paths);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("WORKSPACE_NOT_FOUND");
+      expect(result.error).toContain("missing-ws");
+    }
+  });
+
+  it("returns workspace config on happy path", async () => {
+    const paths = createPaths(tempDir);
+    await mkdir(paths.workspace("ws"), { recursive: true });
+    await writeFile(paths.workspaceConfig("ws"), JSON.stringify({ name: "ws", repos: [] }));
+
+    const result = await readWorkspaceConfig("ws", paths);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toBe("ws");
+      expect(result.value.repos).toEqual([]);
+    }
+  });
+
+  it("passes CONFIG_INVALID through unchanged", async () => {
+    const paths = createPaths(tempDir);
+    await mkdir(paths.workspace("ws"), { recursive: true });
+    await writeFile(paths.workspaceConfig("ws"), "{not valid json");
+
+    const result = await readWorkspaceConfig("ws", paths);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("CONFIG_INVALID");
+    }
+  });
+});
+
+describe("readRepoFromWorkspace", () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await createTestDir();
+  });
+
+  afterEach(() => cleanup(tempDir));
+
+  it("returns REPO_NOT_FOUND when workspace exists but repo is not registered", async () => {
+    const paths = createPaths(tempDir);
+    await mkdir(paths.workspace("ws"), { recursive: true });
+    await writeFile(
+      paths.workspaceConfig("ws"),
+      JSON.stringify({ name: "ws", repos: [{ name: "other", path: "/tmp/other" }] }),
+    );
+
+    const result = await readRepoFromWorkspace("ws", "missing-repo", paths);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("REPO_NOT_FOUND");
+      expect(result.error).toContain("missing-repo");
+      expect(result.error).toContain("ws");
+    }
+  });
+
+  it("returns WORKSPACE_NOT_FOUND when workspace is missing", async () => {
+    const paths = createPaths(tempDir);
+    const result = await readRepoFromWorkspace("missing-ws", "any-repo", paths);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe("WORKSPACE_NOT_FOUND");
+      expect(result.error).toContain("missing-ws");
+    }
+  });
+
+  it("returns config and repo on happy path", async () => {
+    const paths = createPaths(tempDir);
+    await mkdir(paths.workspace("ws"), { recursive: true });
+    await writeFile(
+      paths.workspaceConfig("ws"),
+      JSON.stringify({
+        name: "ws",
+        repos: [{ name: "myrepo", path: "/tmp/myrepo" }],
+      }),
+    );
+
+    const result = await readRepoFromWorkspace("ws", "myrepo", paths);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.config.name).toBe("ws");
+      expect(result.value.repo.name).toBe("myrepo");
+      expect(result.value.repo.path).toBe("/tmp/myrepo");
     }
   });
 });

@@ -1,6 +1,6 @@
 import type { Paths } from "../constants";
-import { readConfig } from "../lib/config";
-import { err, ok, type Result, type WorktreeEntry } from "../types";
+import { readWorkspaceConfig } from "../lib/config";
+import { ok, type Result, type WorktreeEntry } from "../types";
 import { listRepos, type RepoInfo } from "./repo";
 import { listWorktrees } from "./worktree";
 
@@ -16,11 +16,8 @@ export interface WorkspaceStatus {
 
 export async function getStatus(workspace: string, paths: Paths): Promise<Result<WorkspaceStatus>> {
   const wsPath = paths.workspace(workspace);
-  const configResult = await readConfig(paths.workspaceConfig(workspace));
+  const configResult = await readWorkspaceConfig(workspace, paths);
   if (!configResult.ok) {
-    if (configResult.code === "CONFIG_NOT_FOUND") {
-      return err(`Workspace "${workspace}" not found`, "WORKSPACE_NOT_FOUND");
-    }
     return configResult;
   }
 
