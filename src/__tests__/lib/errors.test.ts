@@ -3,10 +3,11 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import type { ErrorEntry } from "../../lib/errors";
-import { ERROR_CATALOG, mapFsError, renderErrorsMarkdown } from "../../lib/errors";
+import { ERROR_CATALOG, mapFsError } from "../../lib/errors";
+import { renderErrorsMarkdown } from "../../lib/errors-renderer";
 
 describe("ERROR_CATALOG", () => {
-  it("has unique codes (object keys are inherently unique, but verify the type matches)", () => {
+  it("has no duplicate codes", () => {
     const codes = Object.keys(ERROR_CATALOG);
     expect(new Set(codes).size).toBe(codes.length);
   });

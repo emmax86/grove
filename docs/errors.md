@@ -50,7 +50,7 @@ Failed to read the current branch name via `git symbolic-ref --short HEAD`.
 
 ## GIT_WORKTREE_REMOVE_ERROR
 
-`git worktree remove` failed.
+The underlying `git worktree remove` command failed for a single worktree.
 
 ## INVALID_FLAGS
 
@@ -134,4 +134,4 @@ The named worktree does not exist.
 
 ## WORKTREE_REMOVE_FAILED
 
-Removing a worktree failed.
+One or more worktrees failed to be removed during a higher-level grove operation (repo or workspace removal).
