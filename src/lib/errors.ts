@@ -130,6 +130,12 @@ export const ERROR_CATALOG = {
   WORKSPACE_HAS_REPOS: {
     description: "The workspace has registered repos and cannot be removed without --force.",
   },
+
+  // CLI input
+  MISSING_ARG: {
+    description: "Required positional argument was not provided.",
+    hint: "Pass the argument, or run `grove <command> --help` for details.",
+  },
 } as const satisfies Record<string, ErrorEntry>;
 
 export type ErrorCode = keyof typeof ERROR_CATALOG;

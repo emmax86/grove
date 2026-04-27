@@ -60,6 +60,12 @@ Mutually exclusive flags were supplied together.
 
 A workspace, repo, or branch name failed validation.
 
+## MISSING_ARG
+
+Required positional argument was not provided.
+
+**Hint:** Pass the argument, or run `grove <command> --help` for details.
+
 ## NOT_A_GIT_REPO
 
 The path is not a git repository.
