@@ -50,6 +50,23 @@ describe("helpText", () => {
     expect(out).toContain("Global flags:");
     expect(out).toContain("--json");
     expect(out).toContain("Run `grove <command> --help`");
+    // At root depth, global flags must show descriptions, not just names
+    expect(out).toContain("JSON output ({ok, data} envelope)");
+    // The flag and its description should be on the same line
+    const lines = out.split("\n");
+    const jsonLine = lines.find((l) => l.includes("--json") && l.includes("JSON output"));
+    expect(jsonLine).toBeDefined();
+  });
+
+  it("group: global flags use compact comma-separated form", () => {
+    const view = {
+      path: ["grove", "ws"],
+      node: fixture.children[0],
+      globalFlags: GLOBAL_FLAGS,
+    };
+    const out = helpText(view, baseCtx);
+    expect(out).toContain("--json, --porcelain, --text, --no-color, --ascii");
+    expect(out).not.toContain("JSON output ({ok, data} envelope)");
   });
 
   it("group: title with aliases line, subcommands list", () => {

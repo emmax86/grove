@@ -41,7 +41,8 @@ export function helpText(view: HelpView, ctx: FormatterCtx): string {
     appendLeafBody(lines, view, view.node, ctx);
   }
 
-  appendGlobalFlags(lines, view.globalFlags, ctx);
+  const isRoot = view.path.length === 1;
+  appendGlobalFlags(lines, view.globalFlags, isRoot, ctx);
   appendFooter(lines, view, ctx);
 
   return lines.join("\n");
@@ -141,13 +142,27 @@ function formatFlagLabel(flag: HelpFlag): string {
   return flag.valueLabel ? `--${flag.name} ${flag.valueLabel}` : `--${flag.name}`;
 }
 
-function appendGlobalFlags(lines: string[], flags: readonly HelpFlag[], ctx: FormatterCtx): void {
+function appendGlobalFlags(
+  lines: string[],
+  flags: readonly HelpFlag[],
+  isRoot: boolean,
+  ctx: FormatterCtx,
+): void {
   if (flags.length === 0) {
     return;
   }
   lines.push("");
   lines.push(bold("Global flags:", ctx.colorEnabled));
-  lines.push(`  ${flags.map((f) => `--${f.name}`).join(", ")}`);
+  if (isRoot) {
+    const labels = flags.map((f) => `--${f.name}`);
+    const colWidth = Math.max(...labels.map((l) => l.length)) + 2;
+    for (let i = 0; i < flags.length; i++) {
+      const label = labels[i].padEnd(colWidth, " ");
+      lines.push(`  ${cyan(label, ctx.colorEnabled)}${flags[i].summary}`);
+    }
+  } else {
+    lines.push(`  ${flags.map((f) => `--${f.name}`).join(", ")}`);
+  }
 }
 
 function appendFooter(lines: string[], view: HelpView, ctx: FormatterCtx): void {
