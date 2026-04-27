@@ -6,95 +6,161 @@ import { type HelpGroup, type HelpNode, REGISTRY } from "../../../lib/help/regis
 
 const CLI_PATH = join(import.meta.dir, "../../../cli.ts");
 
-function extractDispatchCases(source: string): string[] {
-  const out: string[] = [];
-  const re = /case\s+"([^"]+)":/g;
-  let m = re.exec(source);
+/**
+ * Extract full case-stack paths from TypeScript source.
+ *
+ * Walks `case "X":`, `{`, `}` tokens with a brace-depth counter. Each `case`
+ * pushes onto a stack at the current depth; sibling cases (same depth) replace
+ * the previous; closing braces pop cases entered deeper than the new depth.
+ * The emitted path is the joined case stack, so a `case "add":` nested inside
+ * `case "repo":` produces `"repo add"` rather than `"add"`.
+ *
+ * Does not parse strings or comments — relies on cli.ts not containing literal
+ * `case "..."`-shaped text outside actual case statements.
+ */
+function extractDispatchPaths(source: string): Set<string> {
+  const paths = new Set<string>();
+  const stack: { name: string; depthEntered: number }[] = [];
+  let depth = 0;
+  const re = /case\s+"([^"]+)":|[{}]/g;
+  let m: RegExpExecArray | null = re.exec(source);
   while (m !== null) {
-    out.push(m[1]);
+    const tok = m[0];
+    if (tok === "{") {
+      depth++;
+    } else if (tok === "}") {
+      depth--;
+      while (stack.length > 0 && stack[stack.length - 1].depthEntered > depth) {
+        stack.pop();
+      }
+    } else {
+      const name = m[1];
+      while (stack.length > 0 && stack[stack.length - 1].depthEntered >= depth) {
+        stack.pop();
+      }
+      stack.push({ name, depthEntered: depth });
+      paths.add(stack.map((s) => s.name).join(" "));
+    }
     m = re.exec(source);
+  }
+  return paths;
+}
+
+/**
+ * Build the set of dispatch full paths reachable from cli.ts.
+ *
+ * Combines case-stack paths (prefixed with `ws ` since they live inside the ws
+ * subcmd switch), top-level `cmd === "X"` checks (mcp-server, ws), and
+ * `argv[N] === "X"` inline guards (e.g. `ws exec`, prefixed with `ws `).
+ */
+function buildReachablePaths(source: string): Set<string> {
+  const out = new Set<string>();
+  for (const p of extractDispatchPaths(source)) {
+    out.add(`ws ${p}`);
+  }
+  const reCmd = /cmd === "([^"]+)"/g;
+  let m: RegExpExecArray | null = reCmd.exec(source);
+  while (m !== null) {
+    out.add(m[1]);
+    m = reCmd.exec(source);
+  }
+  const reArgv = /argv\[\d+\] === "([^"]+)"/g;
+  m = reArgv.exec(source);
+  while (m !== null) {
+    out.add(`ws ${m[1]}`);
+    m = reArgv.exec(source);
   }
   return out;
 }
 
-function extractRegistryTokens(node: HelpNode = REGISTRY): Set<string> {
-  const set = new Set<string>();
+function registryFullPaths(node: HelpNode = REGISTRY, parents: readonly string[] = []): string[] {
+  const paths: string[] = [];
+  if (parents.length > 0) {
+    // node.name without the registry's "grove" root
+    paths.push([...parents.slice(1), node.name].join(" "));
+  }
   if (node.kind === "group") {
     for (const child of node.children) {
-      set.add(child.name);
-      for (const alias of child.aliases ?? []) {
-        set.add(alias);
-      }
-      for (const tok of extractRegistryTokens(child)) {
-        set.add(tok);
-      }
+      paths.push(...registryFullPaths(child, [...parents, node.name]));
     }
   }
-  return set;
+  return paths;
 }
 
+describe("extractDispatchPaths", () => {
+  it("returns flat case names at the top level of a switch", () => {
+    const src = `switch (x) { case "a": {} case "b": {} }`;
+    const paths = extractDispatchPaths(src);
+    expect(paths.has("a")).toBe(true);
+    expect(paths.has("b")).toBe(true);
+  });
+
+  it("returns nested case paths separated by space", () => {
+    const src = `
+      switch (x) {
+        case "outer": {
+          switch (y) {
+            case "inner": {}
+          }
+        }
+      }
+    `;
+    const paths = extractDispatchPaths(src);
+    expect(paths.has("outer")).toBe(true);
+    expect(paths.has("outer inner")).toBe(true);
+    expect(paths.has("inner")).toBe(false);
+  });
+
+  it("distinguishes same-named cases under different parents", () => {
+    const src = `
+      switch (x) {
+        case "a": { switch (y) { case "x": {} } }
+        case "b": { switch (z) { case "x": {} } }
+      }
+    `;
+    const paths = extractDispatchPaths(src);
+    expect(paths.has("a x")).toBe(true);
+    expect(paths.has("b x")).toBe(true);
+    // bare "x" must not appear because it's only ever nested under a or b
+    expect(paths.has("x")).toBe(false);
+  });
+});
+
 describe("registry vs dispatch drift", () => {
-  let dispatchCases: Set<string>;
-  let registryTokens: Set<string>;
+  let reachable: Set<string>;
 
   beforeAll(async () => {
     const source = await readFile(CLI_PATH, "utf-8");
-    dispatchCases = new Set(extractDispatchCases(source));
-    registryTokens = extractRegistryTokens();
+    reachable = buildReachablePaths(source);
   });
 
-  it("every dispatch case has a registry node (excluding ws exec subcommand values)", () => {
+  it("every registry full path is reachable through dispatch", () => {
     const missing: string[] = [];
-    const execSubcommandValues = new Set([
-      "setup",
-      "format",
-      "test",
-      "check",
-      "test:file",
-      "test:match",
-    ]);
-    for (const c of dispatchCases) {
-      if (execSubcommandValues.has(c)) {
+    for (const path of registryFullPaths()) {
+      if (!reachable.has(path)) {
+        missing.push(path);
+      }
+    }
+    expect(missing, `registry paths not reached by dispatch: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("every dispatch path has a registry node (excluding aliases and exec arg values)", () => {
+    // Aliases (e.g. "workspaces" === "ws") and exec arg values are not registry leaves.
+    const registryPathSet = new Set(registryFullPaths());
+    registryPathSet.add("workspaces");
+    const execArgValues = new Set(["setup", "format", "test", "check", "test:file", "test:match"]);
+    const extras: string[] = [];
+    for (const p of reachable) {
+      if (registryPathSet.has(p)) {
         continue;
       }
-      if (!registryTokens.has(c)) {
-        missing.push(c);
+      const lastToken = p.split(" ").at(-1);
+      if (lastToken !== undefined && execArgValues.has(lastToken)) {
+        continue;
       }
+      extras.push(p);
     }
-    expect(missing, `dispatch cases missing from registry: ${missing.join(", ")}`).toEqual([]);
-  });
-
-  it("every registry leaf is reachable through dispatch", async () => {
-    const source = await readFile(CLI_PATH, "utf-8");
-    const reachable = new Set([...dispatchCases]);
-    // Capture: cmd === "X" style top-level guards
-    const reTopLevel = /cmd === "([^"]+)"/g;
-    let m = reTopLevel.exec(source);
-    while (m !== null) {
-      reachable.add(m[1]);
-      m = reTopLevel.exec(source);
-    }
-    // Capture: argv[N] === "X" style inline guards (e.g. ws exec)
-    const reArgv = /argv\[\d+\] === "([^"]+)"/g;
-    let m2 = reArgv.exec(source);
-    while (m2 !== null) {
-      reachable.add(m2[1]);
-      m2 = reArgv.exec(source);
-    }
-    const missing: string[] = [];
-    function walk(node: HelpNode): void {
-      if (node.kind === "group") {
-        for (const c of node.children) {
-          walk(c);
-        }
-      } else {
-        if (!reachable.has(node.name)) {
-          missing.push(node.name);
-        }
-      }
-    }
-    walk(REGISTRY);
-    expect(missing, `registry leaves not reached by dispatch: ${missing.join(", ")}`).toEqual([]);
+    expect(extras, `dispatch paths missing from registry: ${extras.join(", ")}`).toEqual([]);
   });
 });
 

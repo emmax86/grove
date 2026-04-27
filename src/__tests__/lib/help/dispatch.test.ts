@@ -18,7 +18,12 @@ const fixture: HelpGroup = {
       aliases: ["workspaces"],
       summary: "ws",
       children: [
-        { kind: "leaf", name: "add", summary: "add workspace" },
+        {
+          kind: "leaf",
+          name: "add",
+          summary: "add workspace",
+          flags: [{ name: "workspace", valueLabel: "<name>", summary: "ws name" }],
+        },
         {
           kind: "group",
           name: "repo",
@@ -163,6 +168,28 @@ describe("resolveCommandPath", () => {
     const r = resolveCommandPath(["ws", "fooo", "--help"], fixture);
     expect(r.path).toEqual(["root", "ws"]);
     expect(r.unmatched).toEqual(["fooo"]);
+  });
+
+  it("uses the passed registry's value-taking flags, not the module REGISTRY", () => {
+    // A fixture registry with a flag name that the real REGISTRY doesn't know about.
+    // If stripFlags consults the module-level REGISTRY, --xyzflag is treated as boolean
+    // and "VALUE" becomes a positional that fails to match any child.
+    const fixtureWithCustomFlag: HelpGroup = {
+      kind: "group",
+      name: "root",
+      summary: "root",
+      children: [
+        {
+          kind: "leaf",
+          name: "cmd",
+          summary: "cmd",
+          flags: [{ name: "xyzflag", valueLabel: "<v>", summary: "fixture-only flag" }],
+        },
+      ],
+    };
+    const r = resolveCommandPath(["--xyzflag", "VALUE", "cmd"], fixtureWithCustomFlag);
+    expect(r.path).toEqual(["root", "cmd"]);
+    expect(r.unmatched).toEqual([]);
   });
 });
 

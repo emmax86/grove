@@ -7,11 +7,19 @@ const HELP_FLAGS = new Set(["--help", "-h"]);
 const HELP_POSITIONAL = "help";
 
 /**
- * Set of flag names (without `--`) that take a value, derived from the registry.
- * Computed once: any flag with a `valueLabel` anywhere in GLOBAL_FLAGS or any leaf
- * in the registry tree is value-taking. Boolean flags (no `valueLabel`) are not.
+ * Per-registry cache of value-taking flag names (those with a `valueLabel`).
+ * Avoids re-walking the registry tree on every dispatch call.
  */
-const VALUE_TAKING_FLAGS: ReadonlySet<string> = collectValueTakingFlags(REGISTRY);
+const valueTakingFlagsCache = new WeakMap<HelpGroup, ReadonlySet<string>>();
+
+function valueTakingFlags(registry: HelpGroup): ReadonlySet<string> {
+  let cached = valueTakingFlagsCache.get(registry);
+  if (cached === undefined) {
+    cached = collectValueTakingFlags(registry);
+    valueTakingFlagsCache.set(registry, cached);
+  }
+  return cached;
+}
 
 function collectValueTakingFlags(registry: HelpGroup): Set<string> {
   const out = new Set<string>();
@@ -40,11 +48,12 @@ function collectValueTakingFlags(registry: HelpGroup): Set<string> {
 /**
  * Strip flag tokens from argv, returning only positional arguments.
  * `--help` and `-h` are boolean flags so they never consume the next token.
- * `--flag` tokens consume the next token only if `flag` is in VALUE_TAKING_FLAGS
- * (derived from the registry). Boolean flags like `--json`, `--porcelain`, `--force`
+ * `--flag` tokens consume the next token only if `flag` has a `valueLabel`
+ * in the supplied registry. Boolean flags like `--json`, `--porcelain`, `--force`
  * never consume the next token, even if it doesn't start with `--`.
  */
-function stripFlags(argv: readonly string[]): string[] {
+function stripFlags(argv: readonly string[], registry: HelpGroup): string[] {
+  const valueFlags = valueTakingFlags(registry);
   const out: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -54,7 +63,7 @@ function stripFlags(argv: readonly string[]): string[] {
     if (arg.startsWith("--")) {
       const flagName = arg.slice(2).split("=")[0];
       const inlineValue = arg.includes("=");
-      if (!inlineValue && VALUE_TAKING_FLAGS.has(flagName)) {
+      if (!inlineValue && valueFlags.has(flagName)) {
         const next = argv[i + 1];
         if (next !== undefined && !next.startsWith("--")) {
           i++;
@@ -75,7 +84,7 @@ export function isHelpRequested(argv: readonly string[], registry: HelpGroup): b
     }
   }
   // Positional "help": only when it's at a command-slot position (a group, not after a leaf or an unmatched token)
-  const positionals = stripFlags(argv);
+  const positionals = stripFlags(argv, registry);
   const helpIndex = positionals.indexOf(HELP_POSITIONAL);
   if (helpIndex === -1) {
     return false;
@@ -107,7 +116,7 @@ export interface ResolveResult {
 }
 
 export function resolveCommandPath(argv: readonly string[], registry: HelpGroup): ResolveResult {
-  const positionals = stripFlags(argv).filter((a) => a !== HELP_POSITIONAL);
+  const positionals = stripFlags(argv, registry).filter((a) => a !== HELP_POSITIONAL);
 
   let node: HelpNode = registry;
   const path: string[] = [registry.name];
