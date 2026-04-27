@@ -112,6 +112,46 @@ describe("help: output modes", () => {
   });
 });
 
+describe("help: missing required argument", () => {
+  it("grove ws add with no name -> MISSING_ARG plus help on stderr, exit 1", async () => {
+    const r = await runCli(["ws", "add"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: name");
+    expect(r.stderr).toContain("grove ws add");
+    expect(r.stderr).toContain("Arguments:");
+  });
+
+  it("grove ws add --json with no name -> JSON envelope with help payload, exit 1", async () => {
+    const r = await runCli(["ws", "add", "--json"]);
+    expect(r.exitCode).toBe(1);
+    const parsed = JSON.parse(r.stderr);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.code).toBe("MISSING_ARG");
+    expect(parsed.help.path).toEqual(["grove", "ws", "add"]);
+    expect(parsed.help.node.name).toBe("add");
+  });
+
+  it("grove ws repo add with no path -> MISSING_ARG with ws repo add help", async () => {
+    const r = await runCli(["ws", "repo", "add"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: path");
+    expect(r.stderr).toContain("grove ws repo add");
+  });
+
+  it("grove ws worktree add with no branch -> MISSING_ARG with worktree add help", async () => {
+    const r = await runCli(["ws", "worktree", "add"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: branch");
+  });
+
+  it("grove ws exec with no command -> MISSING_ARG with ws exec help", async () => {
+    const r = await runCli(["ws", "exec", "--workspace", "myws"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: command");
+    expect(r.stderr).toContain("grove ws exec");
+  });
+});
+
 describe("help: regression — non-help flows unchanged", () => {
   it("grove fooo -> UNKNOWN_COMMAND, exit 1", async () => {
     const r = await runCli(["fooo"]);
