@@ -49,6 +49,9 @@ describe("isHelpRequested", () => {
     expect(isHelpRequested([])).toBe(false);
     expect(isHelpRequested(["ws", "add", "myws"])).toBe(false);
     expect(isHelpRequested(["--workspace", "foo"])).toBe(false);
+    // NEW: flag value happening to equal "help" must not trip help mode
+    expect(isHelpRequested(["ws", "add", "--workspace", "help"])).toBe(false);
+    expect(isHelpRequested(["--workspace", "help"])).toBe(false);
   });
 });
 
