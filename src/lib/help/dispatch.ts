@@ -1,4 +1,6 @@
+import type { HelpView } from "../render/formatters/help";
 import type { HelpGroup, HelpNode } from "./registry";
+import { GLOBAL_FLAGS } from "./registry";
 
 const HELP_FLAGS = new Set(["--help", "-h"]);
 const HELP_POSITIONAL = "help";
@@ -89,4 +91,29 @@ export function resolveCommandPath(argv: readonly string[], registry: HelpGroup)
     node = child;
   }
   return { path, node, unmatched: positionals.slice(i) };
+}
+
+export interface MissingArgPayload {
+  ok: false;
+  code: "MISSING_ARG";
+  error: string;
+  help: HelpView;
+}
+
+export function buildMissingArgPayload(
+  argName: string,
+  commandPath: readonly string[],
+  registry: HelpGroup,
+): MissingArgPayload {
+  const result = resolveCommandPath(commandPath, registry);
+  return {
+    ok: false,
+    code: "MISSING_ARG",
+    error: `missing required argument: ${argName}`,
+    help: {
+      path: result.path,
+      node: result.node,
+      globalFlags: GLOBAL_FLAGS,
+    },
+  };
 }

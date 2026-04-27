@@ -93,13 +93,26 @@ export function render<T>(result: Result<T>, kind: CommandKind, ctx: RenderConte
 
   if (!result.ok) {
     if (ctx.mode === "json") {
-      const payload = { ok: false, error: result.error, code: result.code };
+      const payload: Record<string, unknown> = {
+        ok: false,
+        error: result.error,
+        code: result.code,
+      };
+      if (result.help !== undefined) {
+        payload.help = result.help;
+      }
       const stderr = ctx.isStderrTTY ? JSON.stringify(payload, null, 2) : JSON.stringify(payload);
       return { stdout: "", stderr, exitCode: 1 };
     }
+    const errorText = formatError(result.error, result.code, { colorEnabled: ctx.colorEnabled });
+    if (result.help !== undefined) {
+      const helpStr =
+        ctx.mode === "porcelain" ? helpPorcelain(result.help) : helpText(result.help, ctx);
+      return { stdout: "", stderr: `${errorText}\n\n${helpStr}`, exitCode: 1 };
+    }
     return {
       stdout: "",
-      stderr: formatError(result.error, result.code, { colorEnabled: ctx.colorEnabled }),
+      stderr: errorText,
       exitCode: 1,
     };
   }

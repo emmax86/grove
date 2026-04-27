@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { GLOBAL_FLAGS, type HelpGroup } from "../../../../lib/help/registry";
+import { render } from "../../../../lib/render";
 import { stripAnsi } from "../../../../lib/render/color";
 import { helpPorcelain, helpText } from "../../../../lib/render/formatters/help";
 
@@ -202,5 +203,55 @@ describe("helpPorcelain", () => {
         expect(part.includes("\t"), `field "${part}" contains an embedded tab`).toBe(false);
       }
     }
+  });
+});
+
+describe("render: enriched MISSING_ARG error", () => {
+  it("text mode: error then help text on stderr, exit 1", () => {
+    const view = {
+      path: ["grove", "ws", "add"],
+      node: (fixture.children[0] as HelpGroup).children[0],
+      globalFlags: GLOBAL_FLAGS,
+    };
+    const r = render(
+      { ok: false, code: "MISSING_ARG", error: "missing required argument: name", help: view },
+      "help",
+      {
+        mode: "text",
+        colorEnabled: false,
+        unicodeEnabled: true,
+        isTTY: false,
+        isStderrTTY: false,
+        warnings: [],
+      },
+    );
+    expect(r.exitCode).toBe(1);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain("missing required argument: name");
+    expect(r.stderr).toContain("grove ws add");
+  });
+
+  it("json mode: payload includes help field", () => {
+    const view = {
+      path: ["grove", "ws", "add"],
+      node: (fixture.children[0] as HelpGroup).children[0],
+      globalFlags: GLOBAL_FLAGS,
+    };
+    const r = render(
+      { ok: false, code: "MISSING_ARG", error: "missing required argument: name", help: view },
+      "help",
+      {
+        mode: "json",
+        colorEnabled: false,
+        unicodeEnabled: true,
+        isTTY: false,
+        isStderrTTY: false,
+        warnings: [],
+      },
+    );
+    const parsed = JSON.parse(r.stderr);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.code).toBe("MISSING_ARG");
+    expect(parsed.help.path).toEqual(["grove", "ws", "add"]);
   });
 });

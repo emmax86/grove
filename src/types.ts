@@ -1,6 +1,9 @@
 import type { ErrorCode } from "./lib/errors";
+import type { HelpView } from "./lib/render/formatters/help";
 
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string; code: ErrorCode };
+export type Result<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: string; code: ErrorCode; help?: HelpView };
 
 export { ERROR_CATALOG, type ErrorCode, type ErrorEntry, err, ok } from "./lib/errors";
 

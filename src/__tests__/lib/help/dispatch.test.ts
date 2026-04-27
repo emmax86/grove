@@ -1,7 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
-import { isHelpRequested, resolveCommandPath } from "../../../lib/help/dispatch";
-import type { HelpGroup } from "../../../lib/help/registry";
+import {
+  buildMissingArgPayload,
+  isHelpRequested,
+  resolveCommandPath,
+} from "../../../lib/help/dispatch";
+import { type HelpGroup, REGISTRY } from "../../../lib/help/registry";
 
 const fixture: HelpGroup = {
   kind: "group",
@@ -129,5 +133,23 @@ describe("resolveCommandPath", () => {
     const r = resolveCommandPath(["ws", "fooo", "--help"], fixture);
     expect(r.path).toEqual(["root", "ws"]);
     expect(r.unmatched).toEqual(["fooo"]);
+  });
+});
+
+describe("buildMissingArgPayload", () => {
+  it("builds error payload with code, message, and matching help view", () => {
+    const r = buildMissingArgPayload("name", ["ws", "add"], REGISTRY);
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe("MISSING_ARG");
+    expect(r.error).toBe("missing required argument: name");
+    expect(r.help.path).toEqual(["grove", "ws", "add"]);
+    expect(r.help.node.kind).toBe("leaf");
+    expect(r.help.node.name).toBe("add");
+  });
+
+  it("works for nested commands", () => {
+    const r = buildMissingArgPayload("path", ["ws", "repo", "add"], REGISTRY);
+    expect(r.help.path).toEqual(["grove", "ws", "repo", "add"]);
+    expect(r.help.node.name).toBe("add");
   });
 });
