@@ -10,6 +10,9 @@ import { addWorktree, listWorktrees, pruneWorktrees, removeWorktree } from "./co
 import { createPaths, DEFAULT_WORKSPACES_ROOT } from "./constants";
 import { inferContext } from "./context";
 import { discoverDaemon, startDaemon } from "./lib/daemon";
+import { isHelpRequested, resolveCommandPath } from "./lib/help/dispatch";
+import { GLOBAL_FLAGS, REGISTRY } from "./lib/help/registry";
+import type { HelpView } from "./lib/render";
 import { type CommandKind, type RenderContext, render } from "./lib/render";
 import { resolveRenderContext } from "./lib/render/flags";
 import { err, ok, type Result } from "./types";
@@ -97,10 +100,6 @@ function resolveWorkspace(
 
 async function main() {
   const argv = process.argv.slice(2);
-  if (argv.length === 0) {
-    console.error("Usage: grove <ws|workspaces> <subcommand> [args...]");
-    process.exit(1);
-  }
 
   const root = process.env.GROVE_ROOT || process.env.DOTCLAUDE_ROOT || DEFAULT_WORKSPACES_ROOT;
   warnDeprecatedEnv("DOTCLAUDE_ROOT", "GROVE_ROOT");
@@ -167,6 +166,21 @@ async function main() {
     for (const warning of renderCtx.warnings) {
       process.stderr.write(`warning: ${warning}\n`);
     }
+  }
+
+  // ── help interceptor ─────────────────────────────────────────────
+  if (argv.length === 0 || isHelpRequested(argv)) {
+    const result = resolveCommandPath(argv, REGISTRY);
+    const view: HelpView = {
+      path: result.path,
+      node: result.node,
+      globalFlags: GLOBAL_FLAGS,
+      note:
+        result.unmatched.length > 0
+          ? `unknown subcommand '${result.unmatched.join(" ")}' under '${result.path.join(" ")}' — showing help for \`${result.path.join(" ")}\``
+          : undefined,
+    };
+    emit(ok(view), "help", renderCtx);
   }
 
   // ── ws exec subcommand ───────────────────────────────────────────
