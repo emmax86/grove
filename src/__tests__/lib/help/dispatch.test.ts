@@ -63,6 +63,14 @@ describe("isHelpRequested", () => {
     expect(isHelpRequested(["mcp-server", "help"], fixture)).toBe(false);
     expect(isHelpRequested(["ws", "fooo", "help"], fixture)).toBe(false);
   });
+
+  it("boolean global flag before a command does not swallow the command", () => {
+    // Regression: stripFlags used to consume the next token after any --flag,
+    // which made `--json ws help` resolve as just `--json` consumed `ws` and `help`.
+    expect(isHelpRequested(["--json", "ws", "--help"], fixture)).toBe(true);
+    expect(isHelpRequested(["--porcelain", "ws", "help"], fixture)).toBe(true);
+    expect(isHelpRequested(["--no-color", "help"], fixture)).toBe(true);
+  });
 });
 
 describe("resolveCommandPath", () => {
@@ -126,6 +134,28 @@ describe("resolveCommandPath", () => {
   it("flags with values do not pollute the path", () => {
     const r = resolveCommandPath(["--workspace", "myws", "ws", "add", "--help"], fixture);
     expect(r.path).toEqual(["root", "ws", "add"]);
+    expect(r.unmatched).toEqual([]);
+  });
+
+  it("boolean flags before the command do not swallow the next token", () => {
+    // --json/--porcelain/--text/--no-color/--ascii are boolean — must not eat the next positional
+    const a = resolveCommandPath(["--json", "ws"], fixture);
+    expect(a.path).toEqual(["root", "ws"]);
+
+    const b = resolveCommandPath(["--porcelain", "ws", "repo", "add"], fixture);
+    expect(b.node.name).toBe("add");
+    expect(b.path).toEqual(["root", "ws", "repo", "add"]);
+
+    const c = resolveCommandPath(["--no-color", "ws", "--help"], fixture);
+    expect(c.path).toEqual(["root", "ws"]);
+
+    const d = resolveCommandPath(["--ascii", "ws", "repo"], fixture);
+    expect(d.path).toEqual(["root", "ws", "repo"]);
+  });
+
+  it("boolean flag before help -> root resolution remains correct", () => {
+    const r = resolveCommandPath(["--json", "--help"], fixture);
+    expect(r.path).toEqual(["root"]);
     expect(r.unmatched).toEqual([]);
   });
 

@@ -83,6 +83,39 @@ describe("help: subcommand", () => {
     expect(r.stdout.split("\n")[0]).toContain("note:");
     expect(r.stdout).toContain("Subcommands:");
   });
+
+  it("leaf with positional arg + --help -> no spurious typo note", async () => {
+    // `/path` is the value of the required <path> arg, not an unknown subcommand.
+    const r = await runCli(["ws", "repo", "add", "/some/path", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).not.toContain("unknown subcommand");
+    expect(r.stdout).not.toContain("note:");
+    expect(r.stdout).toContain("grove ws repo add");
+  });
+
+  it("typo note under --ascii uses '--' not em-dash", async () => {
+    const r = await runCli(["ws", "fooo", "--help", "--ascii"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("note:");
+    // Whole stdout (note + body) must be ASCII-clean under --ascii
+    expect(r.stdout).not.toContain("—");
+    expect(r.stdout).toContain("--");
+  });
+
+  it("grove mcp-server --help -> leaf help, exit 0, daemon NOT started", async () => {
+    const r = await runCli(["mcp-server", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("grove mcp-server");
+    expect(r.stdout).toContain("Flags:");
+    expect(r.stderr).not.toContain("[mcp-server] listening");
+  });
+
+  it("grove mcp-server --workspace foo --help -> help, NOT daemon start", async () => {
+    const r = await runCli(["mcp-server", "--workspace", "foo", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("grove mcp-server");
+    expect(r.stderr).not.toContain("[mcp-server] listening");
+  });
 });
 
 describe("help: output modes", () => {

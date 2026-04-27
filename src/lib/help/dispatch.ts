@@ -1,17 +1,48 @@
 import type { Result } from "../../types";
 import type { HelpView } from "../render/formatters/help";
-import type { HelpGroup, HelpNode } from "./registry";
+import type { HelpFlag, HelpGroup, HelpNode } from "./registry";
 import { GLOBAL_FLAGS, REGISTRY } from "./registry";
 
 const HELP_FLAGS = new Set(["--help", "-h"]);
 const HELP_POSITIONAL = "help";
 
 /**
+ * Set of flag names (without `--`) that take a value, derived from the registry.
+ * Computed once: any flag with a `valueLabel` anywhere in GLOBAL_FLAGS or any leaf
+ * in the registry tree is value-taking. Boolean flags (no `valueLabel`) are not.
+ */
+const VALUE_TAKING_FLAGS: ReadonlySet<string> = collectValueTakingFlags(REGISTRY);
+
+function collectValueTakingFlags(registry: HelpGroup): Set<string> {
+  const out = new Set<string>();
+  for (const f of GLOBAL_FLAGS) {
+    if (f.valueLabel !== undefined) {
+      out.add(f.name);
+    }
+  }
+  function walk(node: HelpNode): void {
+    if (node.kind === "leaf") {
+      for (const f of node.flags ?? []) {
+        if ((f as HelpFlag).valueLabel !== undefined) {
+          out.add(f.name);
+        }
+      }
+    } else {
+      for (const child of node.children) {
+        walk(child);
+      }
+    }
+  }
+  walk(registry);
+  return out;
+}
+
+/**
  * Strip flag tokens from argv, returning only positional arguments.
  * `--help` and `-h` are boolean flags so they never consume the next token.
- * Other `--flag` tokens consume the next token as a value if it doesn't start with `--`.
- * Single-dash short flags besides `-h` are not currently produced by the grove CLI;
- * if encountered, they are treated as positionals (acceptable since grove has no short flags besides `-h`).
+ * `--flag` tokens consume the next token only if `flag` is in VALUE_TAKING_FLAGS
+ * (derived from the registry). Boolean flags like `--json`, `--porcelain`, `--force`
+ * never consume the next token, even if it doesn't start with `--`.
  */
 function stripFlags(argv: readonly string[]): string[] {
   const out: string[] = [];
@@ -21,9 +52,13 @@ function stripFlags(argv: readonly string[]): string[] {
       continue;
     }
     if (arg.startsWith("--")) {
-      const next = argv[i + 1];
-      if (next !== undefined && !next.startsWith("--")) {
-        i++;
+      const flagName = arg.slice(2).split("=")[0];
+      const inlineValue = arg.includes("=");
+      if (!inlineValue && VALUE_TAKING_FLAGS.has(flagName)) {
+        const next = argv[i + 1];
+        if (next !== undefined && !next.startsWith("--")) {
+          i++;
+        }
       }
       continue;
     }

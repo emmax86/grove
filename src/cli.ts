@@ -150,6 +150,24 @@ async function main() {
     }
   }
 
+  // ── help interceptor (must run before any subcommand dispatch) ──
+  if (argv.length === 0 || isHelpRequested(argv, REGISTRY)) {
+    const result = resolveCommandPath(argv, REGISTRY);
+    const dash = renderCtx.unicodeEnabled ? "—" : "--";
+    // Only flag a typo note when the deepest match is a group — for leaves,
+    // trailing tokens are the leaf's positional args, not unknown subcommands.
+    const view: HelpView = {
+      path: result.path,
+      node: result.node,
+      globalFlags: GLOBAL_FLAGS,
+      note:
+        result.node.kind === "group" && result.unmatched.length > 0
+          ? `unknown subcommand '${result.unmatched.join(" ")}' under '${result.path.join(" ")}' ${dash} showing help for \`${result.path.join(" ")}\``
+          : undefined,
+    };
+    emit(ok(view), "help", renderCtx);
+  }
+
   // ── mcp-server subcommand ────────────────────────────────────────
   if (cmd === "mcp-server") {
     const parsed = parseArgs(argv.slice(1));
@@ -178,21 +196,6 @@ async function main() {
     // Keep process alive — daemon runs until shutdown signal
     await new Promise<void>(() => {});
     return;
-  }
-
-  // ── help interceptor ─────────────────────────────────────────────
-  if (argv.length === 0 || isHelpRequested(argv, REGISTRY)) {
-    const result = resolveCommandPath(argv, REGISTRY);
-    const view: HelpView = {
-      path: result.path,
-      node: result.node,
-      globalFlags: GLOBAL_FLAGS,
-      note:
-        result.unmatched.length > 0
-          ? `unknown subcommand '${result.unmatched.join(" ")}' under '${result.path.join(" ")}' — showing help for \`${result.path.join(" ")}\``
-          : undefined,
-    };
-    emit(ok(view), "help", renderCtx);
   }
 
   // ── ws exec subcommand ───────────────────────────────────────────
