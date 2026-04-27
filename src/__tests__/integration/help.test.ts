@@ -150,6 +150,15 @@ describe("help: missing required argument", () => {
     expect(r.stderr).toContain("missing required argument: command");
     expect(r.stderr).toContain("grove ws exec");
   });
+
+  it("grove mcp-server --json (no workspace) -> MISSING_ARG JSON envelope", async () => {
+    const r = await runCli(["mcp-server", "--json"]);
+    expect(r.exitCode).toBe(1);
+    const parsed = JSON.parse(r.stderr);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.code).toBe("MISSING_ARG");
+    expect(parsed.help.path).toEqual(["grove", "mcp-server"]);
+  });
 });
 
 describe("help: regression — non-help flows unchanged", () => {

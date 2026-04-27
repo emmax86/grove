@@ -125,46 +125,7 @@ async function main() {
   // argv[0] = cmd
   const cmd = argv[0];
 
-  // ── mcp-server subcommand ────────────────────────────────────────
-  if (cmd === "mcp-server") {
-    const parsed = parseArgs(argv.slice(1));
-    const workspaceName = resolveWorkspace(parsed, ctx.workspace);
-    const portArg = flagValue(parsed, "port");
-    const port = portArg !== undefined ? parseInt(portArg, 10) : 0;
-    if (portArg !== undefined && (Number.isNaN(port) || port < 0 || port > 65535)) {
-      console.error(`Invalid port: ${portArg}`);
-      process.exit(1);
-    }
-
-    if (!workspaceName) {
-      // mcp-server runs before renderCtx is resolved; build a minimal fallback ctx
-      const mcpCtx: RenderContext = {
-        mode: "text",
-        colorEnabled: false,
-        unicodeEnabled: true,
-        isTTY: Boolean(process.stdout.isTTY),
-        isStderrTTY: Boolean(process.stderr.isTTY),
-        warnings: [],
-      };
-      emitMissingArg("workspace", ["mcp-server"], mcpCtx);
-    }
-
-    // Check if already running
-    const existing = await discoverDaemon(workspaceName, paths);
-    if (existing) {
-      process.stderr.write(`[mcp-server] already running at ${existing.url}\n`);
-      process.exit(0);
-    }
-
-    const info = await startDaemon({ workspace: workspaceName, paths, port });
-    process.stderr.write(`[mcp-server] listening at ${info.url}\n`);
-
-    // Keep process alive — daemon runs until shutdown signal
-    await new Promise<void>(() => {});
-    return;
-  }
-
-  // Resolve render context once — used by all subcommands including ws exec
+  // Resolve render context once — used by all subcommands including mcp-server
   const ctxResult = resolveRenderContext({
     argv,
     env: process.env,
@@ -187,6 +148,36 @@ async function main() {
     for (const warning of renderCtx.warnings) {
       process.stderr.write(`warning: ${warning}\n`);
     }
+  }
+
+  // ── mcp-server subcommand ────────────────────────────────────────
+  if (cmd === "mcp-server") {
+    const parsed = parseArgs(argv.slice(1));
+    const workspaceName = resolveWorkspace(parsed, ctx.workspace);
+    const portArg = flagValue(parsed, "port");
+    const port = portArg !== undefined ? parseInt(portArg, 10) : 0;
+    if (portArg !== undefined && (Number.isNaN(port) || port < 0 || port > 65535)) {
+      console.error(`Invalid port: ${portArg}`);
+      process.exit(1);
+    }
+
+    if (!workspaceName) {
+      emitMissingArg("workspace", ["mcp-server"], renderCtx);
+    }
+
+    // Check if already running
+    const existing = await discoverDaemon(workspaceName, paths);
+    if (existing) {
+      process.stderr.write(`[mcp-server] already running at ${existing.url}\n`);
+      process.exit(0);
+    }
+
+    const info = await startDaemon({ workspace: workspaceName, paths, port });
+    process.stderr.write(`[mcp-server] listening at ${info.url}\n`);
+
+    // Keep process alive — daemon runs until shutdown signal
+    await new Promise<void>(() => {});
+    return;
   }
 
   // ── help interceptor ─────────────────────────────────────────────
