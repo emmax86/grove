@@ -11,6 +11,7 @@ import {
   repoRemoveText,
 } from "./formatters/repo";
 import { statusPorcelain, statusText } from "./formatters/status";
+import { versionPorcelain, versionText } from "./formatters/version";
 import {
   workspaceAddPorcelain,
   workspaceAddText,
@@ -60,7 +61,8 @@ export type CommandKind =
   | "worktree-prune"
   | "status"
   | "exec-dry-run"
-  | "help";
+  | "help"
+  | "version";
 
 export interface RenderOutput {
   stdout: string;
@@ -84,6 +86,7 @@ const KNOWN_KINDS: ReadonlySet<CommandKind> = new Set<CommandKind>([
   "status",
   "exec-dry-run",
   "help",
+  "version",
 ]);
 
 export function render<T>(result: Result<T>, kind: CommandKind, ctx: RenderContext): RenderOutput {
@@ -219,6 +222,12 @@ function renderTextOrPorcelain<T>(value: T, kind: CommandKind, ctx: RenderContex
           helpText(value as any, ctx)
         : // biome-ignore lint/suspicious/noExplicitAny: same
           helpPorcelain(value as any);
+    case "version":
+      return ctx.mode === "text"
+        ? // biome-ignore lint/suspicious/noExplicitAny: dispatcher accepts the value typed by the kind
+          versionText(value as any)
+        : // biome-ignore lint/suspicious/noExplicitAny: same
+          versionPorcelain(value as any);
   }
 }
 

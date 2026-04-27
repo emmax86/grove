@@ -2,6 +2,7 @@
 
 import { relative } from "node:path";
 
+import packageJson from "../package.json";
 import { execCommand, type StandardCommand } from "./commands/exec";
 import { addRepo, listRepos, removeRepo } from "./commands/repo";
 import { getStatus } from "./commands/status";
@@ -166,6 +167,11 @@ async function main() {
           : undefined,
     };
     emit(ok(view), "help", renderCtx);
+  }
+
+  // ── --version / -V ───────────────────────────────────────────────
+  if (argv.includes("--version") || argv.includes("-V")) {
+    emit(ok({ version: packageJson.version }), "version", renderCtx);
   }
 
   // ── mcp-server subcommand ────────────────────────────────────────

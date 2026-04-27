@@ -107,6 +107,12 @@ describe("REGISTRY invariants", () => {
     expect(names).toContain("no-color");
     expect(names).toContain("ascii");
   });
+
+  it("GLOBAL_FLAGS includes --version with -V mentioned in summary", () => {
+    const version = GLOBAL_FLAGS.find((f) => f.name === "version");
+    expect(version).toBeDefined();
+    expect(version?.summary).toContain("-V");
+  });
 });
 
 const _exhaustive: HelpNode = REGISTRY satisfies HelpGroup;
