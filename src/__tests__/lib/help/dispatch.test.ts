@@ -152,4 +152,9 @@ describe("buildMissingArgPayload", () => {
     expect(r.help.path).toEqual(["grove", "ws", "repo", "add"]);
     expect(r.help.node.name).toBe("add");
   });
+
+  it("defaults to REGISTRY when no third arg passed", () => {
+    const r = buildMissingArgPayload("name", ["ws", "add"]);
+    expect(r.help.path).toEqual(["grove", "ws", "add"]);
+  });
 });

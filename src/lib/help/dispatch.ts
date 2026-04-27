@@ -1,6 +1,7 @@
+import type { Result } from "../../types";
 import type { HelpView } from "../render/formatters/help";
 import type { HelpGroup, HelpNode } from "./registry";
-import { GLOBAL_FLAGS } from "./registry";
+import { GLOBAL_FLAGS, REGISTRY } from "./registry";
 
 const HELP_FLAGS = new Set(["--help", "-h"]);
 const HELP_POSITIONAL = "help";
@@ -93,17 +94,16 @@ export function resolveCommandPath(argv: readonly string[], registry: HelpGroup)
   return { path, node, unmatched: positionals.slice(i) };
 }
 
-export interface MissingArgPayload {
-  ok: false;
+/** A `Result<T>` error variant pinned to MISSING_ARG with a required help view. */
+export type MissingArgPayload = Extract<Result<never>, { ok: false }> & {
   code: "MISSING_ARG";
-  error: string;
   help: HelpView;
-}
+};
 
 export function buildMissingArgPayload(
   argName: string,
   commandPath: readonly string[],
-  registry: HelpGroup,
+  registry: HelpGroup = REGISTRY,
 ): MissingArgPayload {
   const result = resolveCommandPath(commandPath, registry);
   return {
