@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { GLOBAL_FLAGS, type HelpGroup } from "../../../../lib/help/registry";
 import { stripAnsi } from "../../../../lib/render/color";
-import { helpText } from "../../../../lib/render/formatters/help";
+import { helpPorcelain, helpText } from "../../../../lib/render/formatters/help";
 
 const baseCtx = {
   colorEnabled: false,
@@ -132,5 +132,55 @@ describe("helpText", () => {
     const ascii = helpText(view, { ...baseCtx, unicodeEnabled: false });
     expect(ascii).toContain("grove -- manage workspaces");
     expect(ascii).not.toContain("—");
+  });
+});
+
+describe("helpPorcelain", () => {
+  it("leaf: single tab-separated row 'path<TAB>kind<TAB>summary'", () => {
+    const ws = fixture.children[0] as HelpGroup;
+    const view = {
+      path: ["grove", "ws", "add"],
+      node: ws.children[0],
+      globalFlags: GLOBAL_FLAGS,
+    };
+    const out = helpPorcelain(view);
+    expect(out).toBe("grove ws add\tleaf\tcreate a workspace");
+  });
+
+  it("group: one row per node in the subtree", () => {
+    const view = {
+      path: ["grove", "ws"],
+      node: fixture.children[0],
+      globalFlags: GLOBAL_FLAGS,
+    };
+    const out = helpPorcelain(view);
+    const rows = out.split("\n");
+    expect(rows).toContain("grove ws\tgroup\tmanage workspaces, repos, and worktrees");
+    expect(rows).toContain("grove ws add\tleaf\tcreate a workspace");
+  });
+
+  it("root: enumerates entire tree", () => {
+    const view = {
+      path: ["grove"],
+      node: fixture,
+      globalFlags: GLOBAL_FLAGS,
+    };
+    const out = helpPorcelain(view);
+    const rows = out.split("\n");
+    expect(rows[0]).toBe("grove\tgroup\tmanage workspaces");
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("every row has exactly three tab-separated fields", () => {
+    const view = {
+      path: ["grove"],
+      node: fixture,
+      globalFlags: GLOBAL_FLAGS,
+    };
+    const out = helpPorcelain(view);
+    for (const row of out.split("\n")) {
+      const parts = row.split("\t");
+      expect(parts.length).toBe(3);
+    }
   });
 });

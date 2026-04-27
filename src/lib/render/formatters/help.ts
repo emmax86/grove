@@ -138,6 +138,22 @@ function appendLeafBody(lines: string[], view: HelpView, leaf: HelpLeaf, ctx: Fo
   }
 }
 
+export function helpPorcelain(view: HelpView): string {
+  const rows: string[] = [];
+  walkPorcelain(view.node, view.path.slice(0, -1), rows);
+  return rows.join("\n");
+}
+
+function walkPorcelain(node: HelpNode, parentPath: readonly string[], rows: string[]): void {
+  const here = [...parentPath, node.name];
+  rows.push(`${here.join(" ")}\t${node.kind}\t${node.summary}`);
+  if (node.kind === "group") {
+    for (const child of node.children) {
+      walkPorcelain(child, here, rows);
+    }
+  }
+}
+
 function formatFlagLabel(flag: HelpFlag): string {
   return flag.valueLabel ? `--${flag.name} ${flag.valueLabel}` : `--${flag.name}`;
 }

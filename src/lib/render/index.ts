@@ -1,7 +1,7 @@
 import type { Result } from "../../types";
 import { formatError } from "./formatters/errors";
 import { execDryRunPorcelain, execDryRunText } from "./formatters/exec";
-import { helpText } from "./formatters/help";
+import { helpPorcelain, helpText } from "./formatters/help";
 import {
   repoAddPorcelain,
   repoAddText,
@@ -204,8 +204,8 @@ function renderTextOrPorcelain<T>(value: T, kind: CommandKind, ctx: RenderContex
       return ctx.mode === "text"
         ? // biome-ignore lint/suspicious/noExplicitAny: dispatcher accepts the value typed by the kind
           helpText(value as any, ctx)
-        : // biome-ignore lint/suspicious/noExplicitAny: porcelain implementation in Task 5
-          helpText(value as any, ctx);
+        : // biome-ignore lint/suspicious/noExplicitAny: same
+          helpPorcelain(value as any);
   }
 }
 
