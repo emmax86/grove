@@ -168,7 +168,7 @@ describe("helpPorcelain", () => {
     const out = helpPorcelain(view);
     const rows = out.split("\n");
     expect(rows[0]).toBe("grove\tgroup\tmanage workspaces");
-    expect(rows.length).toBeGreaterThanOrEqual(3);
+    expect(rows.length).toBe(3);
   });
 
   it("every row has exactly three tab-separated fields", () => {
@@ -181,6 +181,26 @@ describe("helpPorcelain", () => {
     for (const row of out.split("\n")) {
       const parts = row.split("\t");
       expect(parts.length).toBe(3);
+    }
+  });
+
+  it("live REGISTRY produces clean rows: 3 fields, no embedded tabs", async () => {
+    const { REGISTRY } = await import("../../../../lib/help/registry");
+    const view = {
+      path: ["grove"],
+      node: REGISTRY,
+      globalFlags: GLOBAL_FLAGS,
+    };
+    const out = helpPorcelain(view);
+    const rows = out.split("\n");
+    expect(rows.length).toBeGreaterThan(5); // sanity: registry has many nodes
+    for (const row of rows) {
+      const parts = row.split("\t");
+      expect(parts.length, `row "${row}" must have exactly 3 fields`).toBe(3);
+      // No embedded tabs in any field beyond the separators
+      for (const part of parts) {
+        expect(part.includes("\t"), `field "${part}" contains an embedded tab`).toBe(false);
+      }
     }
   });
 });
