@@ -298,7 +298,10 @@ async function main() {
             workspace = effectiveWorkspace ?? "";
             repoPath = repoArgs[0];
           }
-          if (!workspace || !repoPath) {
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "repo", "add"], renderCtx);
+          }
+          if (!repoPath) {
             emitMissingArg("path", ["ws", "repo", "add"], renderCtx);
           }
           // addRepo returns {name,path,status,defaultBranch,defaultBranchSlug}; formatter also needs workspace and worktreePath
@@ -343,7 +346,10 @@ async function main() {
             workspace = effectiveWorkspace ?? "";
             repoName = repoArgs[0];
           }
-          if (!workspace || !repoName) {
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "repo", "remove"], renderCtx);
+          }
+          if (!repoName) {
             emitMissingArg("name", ["ws", "repo", "remove"], renderCtx);
           }
           emit(
@@ -381,7 +387,13 @@ async function main() {
             branch = wtArgs[0];
           }
           const workspace = effectiveWorkspace ?? "";
-          if (!workspace || !repo || !branch) {
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "worktree", "add"], renderCtx);
+          }
+          if (!repo) {
+            emitMissingArg("repo", ["ws", "worktree", "add"], renderCtx);
+          }
+          if (!branch) {
             emitMissingArg("branch", ["ws", "worktree", "add"], renderCtx);
           }
           const isNew = flag(parsed, "new");
@@ -409,7 +421,10 @@ async function main() {
         case "list": {
           const workspace = effectiveWorkspace ?? "";
           const repo = wtArgs[0] ?? ctx.repo;
-          if (!workspace || !repo) {
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "worktree", "list"], renderCtx);
+          }
+          if (!repo) {
             emitMissingArg("repo", ["ws", "worktree", "list"], renderCtx);
           }
           emit(await listWorktrees(workspace, repo, paths), "worktree-list", renderCtx);
@@ -427,7 +442,13 @@ async function main() {
             repo = ctx.repo ?? "";
             slug = wtArgs[0];
           }
-          if (!workspace || !repo || !slug) {
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "worktree", "remove"], renderCtx);
+          }
+          if (!repo) {
+            emitMissingArg("repo", ["ws", "worktree", "remove"], renderCtx);
+          }
+          if (!slug) {
             emitMissingArg("slug", ["ws", "worktree", "remove"], renderCtx);
           }
           emit(

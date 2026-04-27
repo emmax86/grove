@@ -164,17 +164,54 @@ describe("help: missing required argument", () => {
     expect(parsed.help.node.name).toBe("add");
   });
 
-  it("grove ws repo add with no path -> MISSING_ARG with ws repo add help", async () => {
-    const r = await runCli(["ws", "repo", "add"]);
+  it("grove ws repo add --workspace foo (no path) -> MISSING_ARG names path", async () => {
+    const r = await runCli(["ws", "repo", "add", "--workspace", "foo"]);
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("missing required argument: path");
     expect(r.stderr).toContain("grove ws repo add");
   });
 
-  it("grove ws worktree add with no branch -> MISSING_ARG with worktree add help", async () => {
+  it("grove ws repo add /path (no workspace) -> MISSING_ARG names workspace, not path", async () => {
+    const r = await runCli(["ws", "repo", "add", "/some/path"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: workspace");
+  });
+
+  it("grove ws repo remove name (no workspace) -> MISSING_ARG names workspace, not name", async () => {
+    const r = await runCli(["ws", "repo", "remove", "somename"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: workspace");
+  });
+
+  it("grove ws worktree add (no args) -> MISSING_ARG names workspace, not branch", async () => {
     const r = await runCli(["ws", "worktree", "add"]);
     expect(r.exitCode).toBe(1);
-    expect(r.stderr).toContain("missing required argument: branch");
+    expect(r.stderr).toContain("missing required argument: workspace");
+  });
+
+  it("grove ws worktree add --workspace foo (no repo, no branch) -> MISSING_ARG names repo", async () => {
+    // 1 wtArg "main" is parsed as the branch; repo is uninferable -> repo is the missing one.
+    const r = await runCli(["ws", "worktree", "add", "--workspace", "foo", "main"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: repo");
+  });
+
+  it("grove ws worktree list (no workspace) -> MISSING_ARG names workspace, not repo", async () => {
+    const r = await runCli(["ws", "worktree", "list"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: workspace");
+  });
+
+  it("grove ws worktree list --workspace foo (no repo) -> MISSING_ARG names repo", async () => {
+    const r = await runCli(["ws", "worktree", "list", "--workspace", "foo"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: repo");
+  });
+
+  it("grove ws worktree remove slug (no workspace) -> MISSING_ARG names workspace, not slug", async () => {
+    const r = await runCli(["ws", "worktree", "remove", "someslug"]);
+    expect(r.exitCode).toBe(1);
+    expect(r.stderr).toContain("missing required argument: workspace");
   });
 
   it("grove ws exec with no command -> MISSING_ARG with ws exec help", async () => {
