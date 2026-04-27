@@ -97,3 +97,43 @@ describe("registry vs dispatch drift", () => {
     expect(missing, `registry leaves not reached by dispatch: ${missing.join(", ")}`).toEqual([]);
   });
 });
+
+const README_PATH = join(import.meta.dir, "../../../../README.md");
+
+function extractReadmeCommands(readme: string): Set<string> {
+  const tokens = new Set<string>();
+  const lines = readme.split("\n");
+  for (const line of lines) {
+    if (!line.startsWith("|")) {
+      continue;
+    }
+    const m = /\|\s*`([^`]+)`/.exec(line);
+    if (!m) {
+      continue;
+    }
+    const firstToken = m[1].trim().split(/\s+/)[0];
+    tokens.add(firstToken);
+  }
+  return tokens;
+}
+
+describe("registry vs README drift", () => {
+  it("every registry leaf appears in the README command tables", async () => {
+    const readme = await readFile(README_PATH, "utf-8");
+    const readmeCommands = extractReadmeCommands(readme);
+    const missing: string[] = [];
+    function walk(node: HelpNode, parentName?: string): void {
+      if (node.kind === "group") {
+        for (const child of node.children) {
+          walk(child, node.name);
+        }
+      } else {
+        if (!readmeCommands.has(node.name)) {
+          missing.push(parentName ? `${parentName} ${node.name}` : node.name);
+        }
+      }
+    }
+    walk(REGISTRY);
+    expect(missing, `registry leaves missing from README: ${missing.join(", ")}`).toEqual([]);
+  });
+});
