@@ -38,6 +38,12 @@ export const c = {
   dim: wrap("2", "22"),
 };
 
+// Named exports for use in formatters that prefer named imports over `c.*`.
+export const bold = c.bold;
+export const cyan = c.cyan;
+export const dim = c.dim;
+export const yellow = c.yellow;
+
 // Matches only SGR (Select Graphic Rendition) codes: ESC [ <params> m
 // This is sufficient because c.* wrappers only produce SGR sequences.
 export function stripAnsi(s: string): string {

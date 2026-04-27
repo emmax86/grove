@@ -1,6 +1,7 @@
 import type { Result } from "../../types";
 import { formatError } from "./formatters/errors";
 import { execDryRunPorcelain, execDryRunText } from "./formatters/exec";
+import { helpPorcelain, helpText } from "./formatters/help";
 import {
   repoAddPorcelain,
   repoAddText,
@@ -58,7 +59,8 @@ export type CommandKind =
   | "worktree-remove"
   | "worktree-prune"
   | "status"
-  | "exec-dry-run";
+  | "exec-dry-run"
+  | "help";
 
 export interface RenderOutput {
   stdout: string;
@@ -81,6 +83,7 @@ const KNOWN_KINDS: ReadonlySet<CommandKind> = new Set<CommandKind>([
   "worktree-prune",
   "status",
   "exec-dry-run",
+  "help",
 ]);
 
 export function render<T>(result: Result<T>, kind: CommandKind, ctx: RenderContext): RenderOutput {
@@ -90,13 +93,26 @@ export function render<T>(result: Result<T>, kind: CommandKind, ctx: RenderConte
 
   if (!result.ok) {
     if (ctx.mode === "json") {
-      const payload = { ok: false, error: result.error, code: result.code };
+      const payload: Record<string, unknown> = {
+        ok: false,
+        error: result.error,
+        code: result.code,
+      };
+      if (result.help !== undefined) {
+        payload.help = result.help;
+      }
       const stderr = ctx.isStderrTTY ? JSON.stringify(payload, null, 2) : JSON.stringify(payload);
       return { stdout: "", stderr, exitCode: 1 };
     }
+    const errorText = formatError(result.error, result.code, { colorEnabled: ctx.colorEnabled });
+    if (result.help !== undefined) {
+      const helpStr =
+        ctx.mode === "porcelain" ? helpPorcelain(result.help) : helpText(result.help, ctx);
+      return { stdout: "", stderr: `${errorText}\n\n${helpStr}`, exitCode: 1 };
+    }
     return {
       stdout: "",
-      stderr: formatError(result.error, result.code, { colorEnabled: ctx.colorEnabled }),
+      stderr: errorText,
       exitCode: 1,
     };
   }
@@ -197,5 +213,13 @@ function renderTextOrPorcelain<T>(value: T, kind: CommandKind, ctx: RenderContex
           execDryRunText(value as any, ctx)
         : // biome-ignore lint/suspicious/noExplicitAny: same
           execDryRunPorcelain(value as any);
+    case "help":
+      return ctx.mode === "text"
+        ? // biome-ignore lint/suspicious/noExplicitAny: dispatcher accepts the value typed by the kind
+          helpText(value as any, ctx)
+        : // biome-ignore lint/suspicious/noExplicitAny: same
+          helpPorcelain(value as any);
   }
 }
+
+export type { HelpView } from "./formatters/help";

@@ -10,6 +10,9 @@ import { addWorktree, listWorktrees, pruneWorktrees, removeWorktree } from "./co
 import { createPaths, DEFAULT_WORKSPACES_ROOT } from "./constants";
 import { inferContext } from "./context";
 import { discoverDaemon, startDaemon } from "./lib/daemon";
+import { buildMissingArgPayload, isHelpRequested, resolveCommandPath } from "./lib/help/dispatch";
+import { GLOBAL_FLAGS, REGISTRY } from "./lib/help/registry";
+import type { HelpView } from "./lib/render";
 import { type CommandKind, type RenderContext, render } from "./lib/render";
 import { resolveRenderContext } from "./lib/render/flags";
 import { err, ok, type Result } from "./types";
@@ -18,6 +21,22 @@ import { err, ok, type Result } from "./types";
 
 function emit<T>(result: Result<T>, kind: CommandKind, ctx: RenderContext): never {
   const { stdout, stderr, exitCode } = render(result, kind, ctx);
+  if (stdout) {
+    process.stdout.write(`${stdout}\n`);
+  }
+  if (stderr) {
+    process.stderr.write(`${stderr}\n`);
+  }
+  process.exit(exitCode);
+}
+
+function emitMissingArg(
+  argName: string,
+  commandPath: readonly string[],
+  ctx: RenderContext,
+): never {
+  const payload = buildMissingArgPayload(argName, commandPath);
+  const { stdout, stderr, exitCode } = render(payload, "help", ctx);
   if (stdout) {
     process.stdout.write(`${stdout}\n`);
   }
@@ -97,10 +116,6 @@ function resolveWorkspace(
 
 async function main() {
   const argv = process.argv.slice(2);
-  if (argv.length === 0) {
-    console.error("Usage: grove <ws|workspaces> <subcommand> [args...]");
-    process.exit(1);
-  }
 
   const root = process.env.GROVE_ROOT || process.env.DOTCLAUDE_ROOT || DEFAULT_WORKSPACES_ROOT;
   warnDeprecatedEnv("DOTCLAUDE_ROOT", "GROVE_ROOT");
@@ -110,41 +125,7 @@ async function main() {
   // argv[0] = cmd
   const cmd = argv[0];
 
-  // ── mcp-server subcommand ────────────────────────────────────────
-  if (cmd === "mcp-server") {
-    const parsed = parseArgs(argv.slice(1));
-    const workspaceName = resolveWorkspace(parsed, ctx.workspace);
-    const portArg = flagValue(parsed, "port");
-    const port = portArg !== undefined ? parseInt(portArg, 10) : 0;
-    if (portArg !== undefined && (Number.isNaN(port) || port < 0 || port > 65535)) {
-      console.error(`Invalid port: ${portArg}`);
-      process.exit(1);
-    }
-
-    if (!workspaceName) {
-      console.error(
-        "Usage: grove mcp-server [--workspace <name>] [--port <port>]\n" +
-          "  Workspace must be specified via --workspace, GROVE_WORKSPACE env, or inferred from cwd.",
-      );
-      process.exit(1);
-    }
-
-    // Check if already running
-    const existing = await discoverDaemon(workspaceName, paths);
-    if (existing) {
-      process.stderr.write(`[mcp-server] already running at ${existing.url}\n`);
-      process.exit(0);
-    }
-
-    const info = await startDaemon({ workspace: workspaceName, paths, port });
-    process.stderr.write(`[mcp-server] listening at ${info.url}\n`);
-
-    // Keep process alive — daemon runs until shutdown signal
-    await new Promise<void>(() => {});
-    return;
-  }
-
-  // Resolve render context once — used by all subcommands including ws exec
+  // Resolve render context once — used by all subcommands including mcp-server
   const ctxResult = resolveRenderContext({
     argv,
     env: process.env,
@@ -169,6 +150,54 @@ async function main() {
     }
   }
 
+  // ── help interceptor (must run before any subcommand dispatch) ──
+  if (argv.length === 0 || isHelpRequested(argv, REGISTRY)) {
+    const result = resolveCommandPath(argv, REGISTRY);
+    const dash = renderCtx.unicodeEnabled ? "—" : "--";
+    // Only flag a typo note when the deepest match is a group — for leaves,
+    // trailing tokens are the leaf's positional args, not unknown subcommands.
+    const view: HelpView = {
+      path: result.path,
+      node: result.node,
+      globalFlags: GLOBAL_FLAGS,
+      note:
+        result.node.kind === "group" && result.unmatched.length > 0
+          ? `unknown subcommand '${result.unmatched.join(" ")}' under '${result.path.join(" ")}' ${dash} showing help for \`${result.path.join(" ")}\``
+          : undefined,
+    };
+    emit(ok(view), "help", renderCtx);
+  }
+
+  // ── mcp-server subcommand ────────────────────────────────────────
+  if (cmd === "mcp-server") {
+    const parsed = parseArgs(argv.slice(1));
+    const workspaceName = resolveWorkspace(parsed, ctx.workspace);
+    const portArg = flagValue(parsed, "port");
+    const port = portArg !== undefined ? parseInt(portArg, 10) : 0;
+    if (portArg !== undefined && (Number.isNaN(port) || port < 0 || port > 65535)) {
+      console.error(`Invalid port: ${portArg}`);
+      process.exit(1);
+    }
+
+    if (!workspaceName) {
+      emitMissingArg("workspace", ["mcp-server"], renderCtx);
+    }
+
+    // Check if already running
+    const existing = await discoverDaemon(workspaceName, paths);
+    if (existing) {
+      process.stderr.write(`[mcp-server] already running at ${existing.url}\n`);
+      process.exit(0);
+    }
+
+    const info = await startDaemon({ workspace: workspaceName, paths, port });
+    process.stderr.write(`[mcp-server] listening at ${info.url}\n`);
+
+    // Keep process alive — daemon runs until shutdown signal
+    await new Promise<void>(() => {});
+    return;
+  }
+
   // ── ws exec subcommand ───────────────────────────────────────────
   if (cmd === "ws" && argv[1] === "exec") {
     const parsed = parseArgs(argv.slice(2));
@@ -176,14 +205,10 @@ async function main() {
     const command = parsed.positional[0] as StandardCommand | undefined;
 
     if (!workspaceName) {
-      console.error(
-        "Usage: grove ws exec <command> [file] [--match <pattern>] [--repo <name>] [--dry-run]",
-      );
-      process.exit(1);
+      emitMissingArg("workspace", ["ws", "exec"], renderCtx);
     }
     if (!command) {
-      console.error("Usage: grove ws exec <setup|format|test|check|test:file|test:match>");
-      process.exit(1);
+      emitMissingArg("command", ["ws", "exec"], renderCtx);
     }
 
     const file = parsed.positional[1];
@@ -222,8 +247,7 @@ async function main() {
 
   const subcmd = argv[1];
   if (!subcmd) {
-    console.error("Usage: grove ws <add|list|remove|repo|worktree|status|path|sync>");
-    process.exit(1);
+    emitMissingArg("subcommand", ["ws"], renderCtx);
   }
 
   // Parse everything after the subcommand
@@ -234,10 +258,7 @@ async function main() {
     case "add": {
       const name = parsed.positional[0];
       if (!name) {
-        console.error(
-          "Usage: grove ws add <name>\n  Output: --text (default), --porcelain, --json",
-        );
-        process.exit(1);
+        emitMissingArg("name", ["ws", "add"], renderCtx);
       }
       emit(await addWorkspace(name, paths), "workspace-add", renderCtx);
       break;
@@ -251,10 +272,7 @@ async function main() {
     case "remove": {
       const name = parsed.positional[0] ?? effectiveWorkspace;
       if (!name) {
-        console.error(
-          "Usage: grove ws remove <name>\n  Output: --text (default), --porcelain, --json",
-        );
-        process.exit(1);
+        emitMissingArg("name", ["ws", "remove"], renderCtx);
       }
       emit(
         await removeWorkspace(name, { force: flag(parsed, "force") }, paths),
@@ -280,11 +298,11 @@ async function main() {
             workspace = effectiveWorkspace ?? "";
             repoPath = repoArgs[0];
           }
-          if (!workspace || !repoPath) {
-            console.error(
-              "Usage: grove ws repo add [workspace] <path> [--name override]\n  Output: --text (default), --porcelain, --json",
-            );
-            process.exit(1);
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "repo", "add"], renderCtx);
+          }
+          if (!repoPath) {
+            emitMissingArg("path", ["ws", "repo", "add"], renderCtx);
           }
           // addRepo returns {name,path,status,defaultBranch,defaultBranchSlug}; formatter also needs workspace and worktreePath
           const repoAddResult = await addRepo(
@@ -312,10 +330,7 @@ async function main() {
         case "list": {
           const workspace = repoArgs[0] ?? effectiveWorkspace;
           if (!workspace) {
-            console.error(
-              "Usage: grove ws repo list [workspace]\n  Output: --text (default), --porcelain, --json",
-            );
-            process.exit(1);
+            emitMissingArg("workspace", ["ws", "repo", "list"], renderCtx);
           }
           emit(await listRepos(workspace, paths), "repo-list", renderCtx);
           break;
@@ -331,11 +346,11 @@ async function main() {
             workspace = effectiveWorkspace ?? "";
             repoName = repoArgs[0];
           }
-          if (!workspace || !repoName) {
-            console.error(
-              "Usage: grove ws repo remove [workspace] <name>\n  Output: --text (default), --porcelain, --json",
-            );
-            process.exit(1);
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "repo", "remove"], renderCtx);
+          }
+          if (!repoName) {
+            emitMissingArg("name", ["ws", "repo", "remove"], renderCtx);
           }
           emit(
             await removeRepo(workspace, repoName, { force: flag(parsed, "force") }, paths),
@@ -372,11 +387,14 @@ async function main() {
             branch = wtArgs[0];
           }
           const workspace = effectiveWorkspace ?? "";
-          if (!workspace || !repo || !branch) {
-            console.error(
-              "Usage: grove ws worktree add [repo] <branch> [--from base] [--new]\n  Output: --text (default), --porcelain, --json",
-            );
-            process.exit(1);
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "worktree", "add"], renderCtx);
+          }
+          if (!repo) {
+            emitMissingArg("repo", ["ws", "worktree", "add"], renderCtx);
+          }
+          if (!branch) {
+            emitMissingArg("branch", ["ws", "worktree", "add"], renderCtx);
           }
           const isNew = flag(parsed, "new");
           // adapter: addWorktree returns {repo,slug,branch,type,...extras}; formatter needs isNew and path
@@ -403,11 +421,11 @@ async function main() {
         case "list": {
           const workspace = effectiveWorkspace ?? "";
           const repo = wtArgs[0] ?? ctx.repo;
-          if (!workspace || !repo) {
-            console.error(
-              "Usage: grove ws worktree list [repo]\n  Output: --text (default), --porcelain, --json",
-            );
-            process.exit(1);
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "worktree", "list"], renderCtx);
+          }
+          if (!repo) {
+            emitMissingArg("repo", ["ws", "worktree", "list"], renderCtx);
           }
           emit(await listWorktrees(workspace, repo, paths), "worktree-list", renderCtx);
           break;
@@ -424,11 +442,14 @@ async function main() {
             repo = ctx.repo ?? "";
             slug = wtArgs[0];
           }
-          if (!workspace || !repo || !slug) {
-            console.error(
-              "Usage: grove ws worktree remove [repo] <slug> [--force]\n  Output: --text (default), --porcelain, --json",
-            );
-            process.exit(1);
+          if (!workspace) {
+            emitMissingArg("workspace", ["ws", "worktree", "remove"], renderCtx);
+          }
+          if (!repo) {
+            emitMissingArg("repo", ["ws", "worktree", "remove"], renderCtx);
+          }
+          if (!slug) {
+            emitMissingArg("slug", ["ws", "worktree", "remove"], renderCtx);
           }
           emit(
             await removeWorktree(workspace, repo, slug, { force: flag(parsed, "force") }, paths),
@@ -441,10 +462,7 @@ async function main() {
         case "prune": {
           const workspace = effectiveWorkspace ?? "";
           if (!workspace) {
-            console.error(
-              "Usage: grove ws worktree prune\n  Output: --text (default), --porcelain, --json",
-            );
-            process.exit(1);
+            emitMissingArg("workspace", ["ws", "worktree", "prune"], renderCtx);
           }
           // adapter: pruneWorktrees returns {pruned}; formatter needs {workspace, pruned}
           const pruneResult = await pruneWorktrees(workspace, paths);
@@ -469,10 +487,7 @@ async function main() {
     case "status": {
       const workspace = parsed.positional[0] ?? effectiveWorkspace;
       if (!workspace) {
-        console.error(
-          "Usage: grove ws status [workspace]\n  Output: --text (default), --porcelain, --json",
-        );
-        process.exit(1);
+        emitMissingArg("workspace", ["ws", "status"], renderCtx);
       }
       emit(await getStatus(workspace, paths), "status", renderCtx);
       break;
@@ -481,10 +496,7 @@ async function main() {
     case "sync": {
       const workspace = parsed.positional[0] ?? effectiveWorkspace;
       if (!workspace) {
-        console.error(
-          "Usage: grove ws sync [workspace]\n  Output: --text (default), --porcelain, --json",
-        );
-        process.exit(1);
+        emitMissingArg("workspace", ["ws", "sync"], renderCtx);
       }
       const syncResult = await syncWorkspace(workspace, paths);
       if (syncResult.ok) {
@@ -498,10 +510,7 @@ async function main() {
     case "path": {
       const workspace = parsed.positional[0] ?? effectiveWorkspace;
       if (!workspace) {
-        console.error(
-          "Usage: grove ws path [workspace]\n  Output: --text (default), --porcelain, --json",
-        );
-        process.exit(1);
+        emitMissingArg("workspace", ["ws", "path"], renderCtx);
       }
       emit(ok({ path: paths.workspace(workspace) }), "workspace-path", renderCtx);
       break;

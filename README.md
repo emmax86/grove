@@ -76,6 +76,7 @@ grove ws status --json | jq '.data.repos[] | select(.status=="dangling") | .name
 | `status [workspace]`      | Repos + worktrees overview              |
 | `path [workspace]`        | Print workspace path                    |
 | `sync [workspace]`        | Repair symlinks, prune dangling entries |
+| `exec <command> [file]`   | Run standard commands against a repo    |
 
 ### Repos — `grove ws repo <command>`
 
@@ -113,9 +114,9 @@ Options: `--repo <name>` (required when no file is given, otherwise inferred fro
 
 ### Other
 
-| Command                                       | Description                                  |
-| --------------------------------------------- | -------------------------------------------- |
-| `grove mcp-server [--workspace W] [--port P]` | Start MCP server (top-level, not under `ws`) |
+| Command                                 | Description                                  |
+| --------------------------------------- | -------------------------------------------- |
+| `mcp-server [--workspace W] [--port P]` | Start MCP server (top-level, not under `ws`) |
 
 Bracketed args are inferred from CWD. Override with `--workspace` flag or `GROVE_WORKSPACE` env var.
 

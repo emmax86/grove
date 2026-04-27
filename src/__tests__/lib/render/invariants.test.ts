@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
+import { GLOBAL_FLAGS } from "../../../lib/help/registry";
 import { stripAnsi } from "../../../lib/render/color";
 import { formatError } from "../../../lib/render/formatters/errors";
+import { type HelpView, helpText } from "../../../lib/render/formatters/help";
 import { repoAddText, repoListText } from "../../../lib/render/formatters/repo";
 import { statusText } from "../../../lib/render/formatters/status";
 import { workspaceListText } from "../../../lib/render/formatters/workspace";
@@ -34,6 +36,23 @@ const fixtures = {
   },
 };
 
+const helpView: HelpView = {
+  path: ["grove"],
+  node: {
+    kind: "group",
+    name: "grove",
+    summary: "manage workspaces",
+    children: [
+      {
+        kind: "leaf",
+        name: "ws",
+        summary: "manage workspaces, repos, and worktrees",
+      },
+    ],
+  },
+  globalFlags: GLOBAL_FLAGS,
+};
+
 const ttyOn = { colorEnabled: true, unicodeEnabled: true, isTTY: true, isStderrTTY: true };
 const ttyOff = { colorEnabled: false, unicodeEnabled: true, isTTY: true, isStderrTTY: true };
 
@@ -64,6 +83,12 @@ describe("color-strip equivalence", () => {
     expect(stripAnsi(formatError("oops", "BAD", { colorEnabled: true }))).toBe(
       formatError("oops", "BAD", { colorEnabled: false }),
     );
+  });
+
+  it("helpText: stripAnsi(color-on) === color-off", () => {
+    const colored = helpText(helpView, { colorEnabled: true, unicodeEnabled: true });
+    const plain = helpText(helpView, { colorEnabled: false, unicodeEnabled: true });
+    expect(stripAnsi(colored)).toBe(plain);
   });
 });
 
@@ -99,6 +124,14 @@ describe("ASCII fallback preserves identifiers", () => {
     );
     expect(out).toContain("->");
     expect(out).not.toContain("→");
+  });
+
+  it("helpText with unicode=false uses ASCII em-dash and contains flag names", () => {
+    const out = helpText(helpView, { colorEnabled: false, unicodeEnabled: false });
+    expect(out).toContain("grove -- manage workspaces");
+    expect(out).not.toContain("—");
+    expect(out).toContain("--json");
+    expect(out).toContain("--ascii");
   });
 });
 

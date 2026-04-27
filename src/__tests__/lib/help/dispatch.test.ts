@@ -1,0 +1,217 @@
+import { describe, expect, it } from "bun:test";
+
+import {
+  buildMissingArgPayload,
+  isHelpRequested,
+  resolveCommandPath,
+} from "../../../lib/help/dispatch";
+import { type HelpGroup, REGISTRY } from "../../../lib/help/registry";
+
+const fixture: HelpGroup = {
+  kind: "group",
+  name: "root",
+  summary: "root",
+  children: [
+    {
+      kind: "group",
+      name: "ws",
+      aliases: ["workspaces"],
+      summary: "ws",
+      children: [
+        {
+          kind: "leaf",
+          name: "add",
+          summary: "add workspace",
+          flags: [{ name: "workspace", valueLabel: "<name>", summary: "ws name" }],
+        },
+        {
+          kind: "group",
+          name: "repo",
+          summary: "repo",
+          children: [{ kind: "leaf", name: "add", summary: "add repo" }],
+        },
+      ],
+    },
+    { kind: "leaf", name: "mcp-server", summary: "mcp" },
+  ],
+};
+
+describe("isHelpRequested", () => {
+  it("true for --help anywhere", () => {
+    expect(isHelpRequested(["--help"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "--help"], fixture)).toBe(true);
+    expect(isHelpRequested(["--help", "ws"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "repo", "add", "--help"], fixture)).toBe(true);
+  });
+
+  it("true for -h", () => {
+    expect(isHelpRequested(["-h"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "-h", "repo"], fixture)).toBe(true);
+  });
+
+  it("true for positional 'help' at a command-slot (group) position", () => {
+    expect(isHelpRequested(["help"], fixture)).toBe(true);
+    expect(isHelpRequested(["help", "ws", "repo"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "help"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "help", "repo"], fixture)).toBe(true);
+  });
+
+  it("false otherwise", () => {
+    expect(isHelpRequested([], fixture)).toBe(false);
+    expect(isHelpRequested(["ws", "add", "myws"], fixture)).toBe(false);
+    expect(isHelpRequested(["--workspace", "foo"], fixture)).toBe(false);
+    // flag value happening to equal "help" must not trip help mode
+    expect(isHelpRequested(["ws", "add", "--workspace", "help"], fixture)).toBe(false);
+    expect(isHelpRequested(["--workspace", "help"], fixture)).toBe(false);
+    // positional "help" after a leaf or unmatched token is a data arg, not help trigger
+    expect(isHelpRequested(["ws", "add", "help"], fixture)).toBe(false);
+    expect(isHelpRequested(["mcp-server", "help"], fixture)).toBe(false);
+    expect(isHelpRequested(["ws", "fooo", "help"], fixture)).toBe(false);
+  });
+
+  it("boolean global flag before a command does not swallow the command", () => {
+    // Regression: stripFlags used to consume the next token after any --flag,
+    // which made `--json ws help` resolve as just `--json` consumed `ws` and `help`.
+    expect(isHelpRequested(["--json", "ws", "--help"], fixture)).toBe(true);
+    expect(isHelpRequested(["--porcelain", "ws", "help"], fixture)).toBe(true);
+    expect(isHelpRequested(["--no-color", "help"], fixture)).toBe(true);
+  });
+});
+
+describe("resolveCommandPath", () => {
+  it("empty argv -> root", () => {
+    const r = resolveCommandPath([], fixture);
+    expect(r.path).toEqual(["root"]);
+    expect(r.node.kind).toBe("group");
+    expect(r.unmatched).toEqual([]);
+  });
+
+  it("['ws'] -> ws group", () => {
+    const r = resolveCommandPath(["ws"], fixture);
+    expect(r.path).toEqual(["root", "ws"]);
+    expect(r.node.name).toBe("ws");
+    expect(r.unmatched).toEqual([]);
+  });
+
+  it("['ws', 'add'] -> ws/add leaf", () => {
+    const r = resolveCommandPath(["ws", "add"], fixture);
+    expect(r.path).toEqual(["root", "ws", "add"]);
+    expect(r.node.kind).toBe("leaf");
+    expect(r.node.name).toBe("add");
+  });
+
+  it("['ws', 'repo', 'add'] -> nested leaf", () => {
+    const r = resolveCommandPath(["ws", "repo", "add"], fixture);
+    expect(r.path).toEqual(["root", "ws", "repo", "add"]);
+    expect(r.node.name).toBe("add");
+  });
+
+  it("alias 'workspaces' resolves to 'ws'", () => {
+    const r = resolveCommandPath(["workspaces"], fixture);
+    expect(r.node.name).toBe("ws");
+  });
+
+  it("unmatched trailing token -> deepest match plus unmatched", () => {
+    const r = resolveCommandPath(["ws", "fooo"], fixture);
+    expect(r.path).toEqual(["root", "ws"]);
+    expect(r.node.name).toBe("ws");
+    expect(r.unmatched).toEqual(["fooo"]);
+  });
+
+  it("--help anywhere doesn't affect resolution", () => {
+    const a = resolveCommandPath(["--help", "ws", "repo", "add"], fixture);
+    const b = resolveCommandPath(["ws", "--help", "repo", "add"], fixture);
+    const c = resolveCommandPath(["ws", "repo", "add", "--help"], fixture);
+    expect(a.path).toEqual(b.path);
+    expect(b.path).toEqual(c.path);
+    expect(a.node.name).toBe("add");
+  });
+
+  it("positional 'help' is stripped from path walk", () => {
+    const a = resolveCommandPath(["help", "ws", "repo"], fixture);
+    const b = resolveCommandPath(["ws", "help", "repo"], fixture);
+    const c = resolveCommandPath(["ws", "repo", "--help"], fixture);
+    expect(a.node.name).toBe("repo");
+    expect(b.node.name).toBe("repo");
+    expect(c.node.name).toBe("repo");
+  });
+
+  it("flags with values do not pollute the path", () => {
+    const r = resolveCommandPath(["--workspace", "myws", "ws", "add", "--help"], fixture);
+    expect(r.path).toEqual(["root", "ws", "add"]);
+    expect(r.unmatched).toEqual([]);
+  });
+
+  it("boolean flags before the command do not swallow the next token", () => {
+    // --json/--porcelain/--text/--no-color/--ascii are boolean — must not eat the next positional
+    const a = resolveCommandPath(["--json", "ws"], fixture);
+    expect(a.path).toEqual(["root", "ws"]);
+
+    const b = resolveCommandPath(["--porcelain", "ws", "repo", "add"], fixture);
+    expect(b.node.name).toBe("add");
+    expect(b.path).toEqual(["root", "ws", "repo", "add"]);
+
+    const c = resolveCommandPath(["--no-color", "ws", "--help"], fixture);
+    expect(c.path).toEqual(["root", "ws"]);
+
+    const d = resolveCommandPath(["--ascii", "ws", "repo"], fixture);
+    expect(d.path).toEqual(["root", "ws", "repo"]);
+  });
+
+  it("boolean flag before help -> root resolution remains correct", () => {
+    const r = resolveCommandPath(["--json", "--help"], fixture);
+    expect(r.path).toEqual(["root"]);
+    expect(r.unmatched).toEqual([]);
+  });
+
+  it("an unmatched token before --help -> deepest match plus unmatched", () => {
+    const r = resolveCommandPath(["ws", "fooo", "--help"], fixture);
+    expect(r.path).toEqual(["root", "ws"]);
+    expect(r.unmatched).toEqual(["fooo"]);
+  });
+
+  it("uses the passed registry's value-taking flags, not the module REGISTRY", () => {
+    // A fixture registry with a flag name that the real REGISTRY doesn't know about.
+    // If stripFlags consults the module-level REGISTRY, --xyzflag is treated as boolean
+    // and "VALUE" becomes a positional that fails to match any child.
+    const fixtureWithCustomFlag: HelpGroup = {
+      kind: "group",
+      name: "root",
+      summary: "root",
+      children: [
+        {
+          kind: "leaf",
+          name: "cmd",
+          summary: "cmd",
+          flags: [{ name: "xyzflag", valueLabel: "<v>", summary: "fixture-only flag" }],
+        },
+      ],
+    };
+    const r = resolveCommandPath(["--xyzflag", "VALUE", "cmd"], fixtureWithCustomFlag);
+    expect(r.path).toEqual(["root", "cmd"]);
+    expect(r.unmatched).toEqual([]);
+  });
+});
+
+describe("buildMissingArgPayload", () => {
+  it("builds error payload with code, message, and matching help view", () => {
+    const r = buildMissingArgPayload("name", ["ws", "add"], REGISTRY);
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe("MISSING_ARG");
+    expect(r.error).toBe("missing required argument: name");
+    expect(r.help.path).toEqual(["grove", "ws", "add"]);
+    expect(r.help.node.kind).toBe("leaf");
+    expect(r.help.node.name).toBe("add");
+  });
+
+  it("works for nested commands", () => {
+    const r = buildMissingArgPayload("path", ["ws", "repo", "add"], REGISTRY);
+    expect(r.help.path).toEqual(["grove", "ws", "repo", "add"]);
+    expect(r.help.node.name).toBe("add");
+  });
+
+  it("defaults to REGISTRY when no third arg passed", () => {
+    const r = buildMissingArgPayload("name", ["ws", "add"]);
+    expect(r.help.path).toEqual(["grove", "ws", "add"]);
+  });
+});

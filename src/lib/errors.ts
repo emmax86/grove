@@ -110,6 +110,10 @@ export const ERROR_CATALOG = {
   INVALID_FLAGS: {
     description: "Mutually exclusive flags were supplied together.",
   },
+  MISSING_ARG: {
+    description: "Required positional argument was not provided.",
+    hint: "Pass the argument, or run `grove <command> --help` for details.",
+  },
 
   // Exec
   COMMAND_NOT_CONFIGURED: {
