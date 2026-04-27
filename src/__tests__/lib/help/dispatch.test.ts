@@ -29,29 +29,35 @@ const fixture: HelpGroup = {
 
 describe("isHelpRequested", () => {
   it("true for --help anywhere", () => {
-    expect(isHelpRequested(["--help"])).toBe(true);
-    expect(isHelpRequested(["ws", "--help"])).toBe(true);
-    expect(isHelpRequested(["--help", "ws"])).toBe(true);
-    expect(isHelpRequested(["ws", "repo", "add", "--help"])).toBe(true);
+    expect(isHelpRequested(["--help"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "--help"], fixture)).toBe(true);
+    expect(isHelpRequested(["--help", "ws"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "repo", "add", "--help"], fixture)).toBe(true);
   });
 
   it("true for -h", () => {
-    expect(isHelpRequested(["-h"])).toBe(true);
-    expect(isHelpRequested(["ws", "-h", "repo"])).toBe(true);
+    expect(isHelpRequested(["-h"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "-h", "repo"], fixture)).toBe(true);
   });
 
-  it("true for positional 'help'", () => {
-    expect(isHelpRequested(["help"])).toBe(true);
-    expect(isHelpRequested(["help", "ws", "repo"])).toBe(true);
+  it("true for positional 'help' at a command-slot (group) position", () => {
+    expect(isHelpRequested(["help"], fixture)).toBe(true);
+    expect(isHelpRequested(["help", "ws", "repo"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "help"], fixture)).toBe(true);
+    expect(isHelpRequested(["ws", "help", "repo"], fixture)).toBe(true);
   });
 
   it("false otherwise", () => {
-    expect(isHelpRequested([])).toBe(false);
-    expect(isHelpRequested(["ws", "add", "myws"])).toBe(false);
-    expect(isHelpRequested(["--workspace", "foo"])).toBe(false);
-    // NEW: flag value happening to equal "help" must not trip help mode
-    expect(isHelpRequested(["ws", "add", "--workspace", "help"])).toBe(false);
-    expect(isHelpRequested(["--workspace", "help"])).toBe(false);
+    expect(isHelpRequested([], fixture)).toBe(false);
+    expect(isHelpRequested(["ws", "add", "myws"], fixture)).toBe(false);
+    expect(isHelpRequested(["--workspace", "foo"], fixture)).toBe(false);
+    // flag value happening to equal "help" must not trip help mode
+    expect(isHelpRequested(["ws", "add", "--workspace", "help"], fixture)).toBe(false);
+    expect(isHelpRequested(["--workspace", "help"], fixture)).toBe(false);
+    // positional "help" after a leaf or unmatched token is a data arg, not help trigger
+    expect(isHelpRequested(["ws", "add", "help"], fixture)).toBe(false);
+    expect(isHelpRequested(["mcp-server", "help"], fixture)).toBe(false);
+    expect(isHelpRequested(["ws", "fooo", "help"], fixture)).toBe(false);
   });
 });
 

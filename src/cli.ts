@@ -169,7 +169,7 @@ async function main() {
   }
 
   // ── help interceptor ─────────────────────────────────────────────
-  if (argv.length === 0 || isHelpRequested(argv)) {
+  if (argv.length === 0 || isHelpRequested(argv, REGISTRY)) {
     const result = resolveCommandPath(argv, REGISTRY);
     const view: HelpView = {
       path: result.path,

@@ -118,4 +118,15 @@ describe("help: regression — non-help flows unchanged", () => {
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("UNKNOWN_COMMAND");
   });
+
+  it("grove ws add help -> creates a workspace named 'help', NOT help mode", async () => {
+    const r = await runCli(["ws", "add", "help"]);
+    // It should attempt to create the workspace (will fail because the test GROVE_ROOT
+    // doesn't exist, but the failure mode must be a workspace-create error, NOT help output)
+    expect(r.stdout).not.toContain("Commands:");
+    expect(r.stdout).not.toContain("Subcommands:");
+    expect(r.stdout).not.toContain("Arguments:");
+    // Either succeeded (unlikely with bogus GROVE_ROOT) or failed with a real workspace error
+    // Both are acceptable — the failure mode "showed help instead" is what we're guarding against
+  });
 });

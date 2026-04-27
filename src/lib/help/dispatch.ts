@@ -29,13 +29,34 @@ function stripFlags(argv: readonly string[]): string[] {
   return out;
 }
 
-export function isHelpRequested(argv: readonly string[]): boolean {
+export function isHelpRequested(argv: readonly string[], registry: HelpGroup): boolean {
+  // --help / -h: unambiguous, anywhere in argv
   for (const arg of argv) {
     if (HELP_FLAGS.has(arg)) {
       return true;
     }
   }
-  return stripFlags(argv).includes(HELP_POSITIONAL);
+  // Positional "help": only when it's at a command-slot position (a group, not after a leaf or an unmatched token)
+  const positionals = stripFlags(argv);
+  const helpIndex = positionals.indexOf(HELP_POSITIONAL);
+  if (helpIndex === -1) {
+    return false;
+  }
+  // Walk tokens before "help" against the registry. If we reach a leaf or hit an unmatched token, "help" is an arg.
+  let node: HelpNode = registry;
+  for (const token of positionals.slice(0, helpIndex)) {
+    if (node.kind !== "group") {
+      return false; // hit a leaf before reaching help
+    }
+    const child: HelpNode | undefined = node.children.find(
+      (c) => c.name === token || (c.aliases?.includes(token) ?? false),
+    );
+    if (!child) {
+      return false; // unmatched token before help
+    }
+    node = child;
+  }
+  return node.kind === "group";
 }
 
 export interface ResolveResult {
