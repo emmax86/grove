@@ -61,6 +61,7 @@ export const GLOBAL_FLAGS: readonly HelpFlag[] = [
   { name: "text", summary: "human-readable output (default)" },
   { name: "no-color", summary: "disable ANSI color" },
   { name: "ascii", summary: "use ASCII tree characters (also LANG=C)" },
+  { name: "version", summary: "show grove version (also -V)" },
 ];
 
 const WS_GROUP: HelpGroup = {

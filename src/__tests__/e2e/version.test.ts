@@ -34,4 +34,10 @@ describe("grove --version", () => {
     expect(r.stdout).toBe(VERSION);
     expect(r.stderr).toBe("");
   });
+
+  it("appears in `grove --help` global flags listing", async () => {
+    const r = await runCLI(["--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("--version");
+  });
 });

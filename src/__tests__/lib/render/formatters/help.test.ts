@@ -66,7 +66,7 @@ describe("helpText", () => {
       globalFlags: GLOBAL_FLAGS,
     };
     const out = helpText(view, baseCtx);
-    expect(out).toContain("--json, --porcelain, --text, --no-color, --ascii");
+    expect(out).toContain("--json, --porcelain, --text, --no-color, --ascii, --version");
     expect(out).not.toContain("JSON output ({ok, data} envelope)");
   });
 
