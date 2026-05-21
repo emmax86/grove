@@ -10,11 +10,13 @@ const HOOK_SCRIPT = path.resolve(
 );
 
 let tempDir: string;
+let groveRoot: string;
 let groveCwd: string;
 let nonGroveCwd: string;
 
 async function invokeScript(input: unknown): Promise<{ denied: boolean }> {
   const proc = Bun.spawn(["bun", "run", HOOK_SCRIPT], {
+    env: { ...process.env, GROVE_ROOT: groveRoot },
     stdin: new Blob([JSON.stringify(input)]),
     stdout: "pipe",
     stderr: "inherit", // surface errors in test output; avoids pipe deadlock
@@ -38,7 +40,7 @@ function cmdInCwd(command: string, cwd: string) {
 }
 
 function withCwd(input: unknown, cwd: string): unknown {
-  return input !== null && typeof input === "object" ? { cwd, ...input } : input;
+  return input !== null && typeof input === "object" ? { ...input, cwd } : input;
 }
 
 const DENY_CASES: [string, unknown][] = [
@@ -155,7 +157,8 @@ const ALLOW_CASES: [string, unknown][] = [
 describe("reject-git-worktree hook script", () => {
   beforeEach(async () => {
     tempDir = await createTestDir();
-    groveCwd = path.join(tempDir, "workspace");
+    groveRoot = path.join(tempDir, "grove-root");
+    groveCwd = path.join(groveRoot, "workspace");
     nonGroveCwd = path.join(tempDir, "plain");
 
     await mkdir(groveCwd, { recursive: true });
@@ -181,16 +184,43 @@ describe("reject-git-worktree hook script", () => {
     expect(result.denied).toBe(false);
   });
 
+  it("allows direct git worktree in a workspace.json directory outside GROVE_ROOT", async () => {
+    const foreignCwd = path.join(tempDir, "foreign-workspace");
+    await mkdir(foreignCwd, { recursive: true });
+    await writeFile(path.join(foreignCwd, "workspace.json"), JSON.stringify({ name: "foreign" }));
+
+    const result = await invokeScript(cmdInCwd("git worktree list", foreignCwd));
+
+    expect(result.denied).toBe(false);
+  });
+
+  it("denies direct git worktree under GROVE_ROOT without a workspace.json marker", async () => {
+    const unmarkedCwd = path.join(groveRoot, "scratch", "nested");
+    await mkdir(unmarkedCwd, { recursive: true });
+
+    const result = await invokeScript(cmdInCwd("git worktree list", unmarkedCwd));
+
+    expect(result.denied).toBe(true);
+  });
+
   it("allows direct git worktree when cwd is missing", async () => {
     const result = await invokeScript(cmd("git worktree list"));
 
     expect(result.denied).toBe(false);
   });
 
-  it("denies direct git worktree when cwd is nested under tool_input", async () => {
+  it("allows direct git worktree when cwd is only nested under tool_input", async () => {
     const result = await invokeScript({
       tool_input: { command: "git worktree list", cwd: groveCwd },
     });
+
+    expect(result.denied).toBe(false);
+  });
+
+  it("withCwd overrides an existing top-level cwd", async () => {
+    const result = await invokeScript(
+      withCwd(cmdInCwd("git worktree list", nonGroveCwd), groveCwd),
+    );
 
     expect(result.denied).toBe(true);
   });
