@@ -63,6 +63,16 @@ describe("help: subcommand", () => {
     expect(r.stdout).toContain("Examples:");
   });
 
+  it("grove ws context --help -> leaf help", async () => {
+    const r = await runCli(["ws", "context", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("grove ws context");
+    expect(r.stdout).toContain("[workspace]");
+    expect(r.stdout).toContain("[target]");
+    expect(r.stdout).toContain("--workspace");
+    expect(r.stdout).toContain("Examples:");
+  });
+
   it("position invariance: --help anywhere yields the same path", async () => {
     const a = await runCli(["ws", "repo", "add", "--help"]);
     const b = await runCli(["--help", "ws", "repo", "add"]);

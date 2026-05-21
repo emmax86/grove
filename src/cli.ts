@@ -3,13 +3,15 @@
 import { relative } from "node:path";
 
 import packageJson from "../package.json";
+import { getTargetContext, getWorkspaceContext } from "./commands/context";
 import { execCommand, type StandardCommand } from "./commands/exec";
 import { addRepo, listRepos, removeRepo } from "./commands/repo";
 import { getStatus } from "./commands/status";
 import { addWorkspace, listWorkspaces, removeWorkspace, syncWorkspace } from "./commands/workspace";
 import { addWorktree, listWorktrees, pruneWorktrees, removeWorktree } from "./commands/worktree";
-import { createPaths, DEFAULT_WORKSPACES_ROOT } from "./constants";
+import { createPaths, DEFAULT_WORKSPACES_ROOT, type Paths } from "./constants";
 import { inferContext } from "./context";
+import { readWorkspaceConfig } from "./lib/config";
 import { discoverDaemon, startDaemon } from "./lib/daemon";
 import { buildMissingArgPayload, isHelpRequested, resolveCommandPath } from "./lib/help/dispatch";
 import { GLOBAL_FLAGS, REGISTRY } from "./lib/help/registry";
@@ -55,6 +57,8 @@ interface ParsedArgs {
   flags: Map<string, string | true>; // --flag or --flag value
 }
 
+const VALUE_FLAGS = new Set(["workspace", "name", "from", "repo", "match", "port"]);
+
 function parseArgs(argv: string[]): ParsedArgs {
   const positional: string[] = [];
   const flags = new Map<string, string | true>();
@@ -64,8 +68,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     if (arg.startsWith("--")) {
       const key = arg.slice(2);
       const next = argv[i + 1];
-      // If next arg is not a flag, consume it as the value
-      if (next !== undefined && !next.startsWith("--")) {
+      if (VALUE_FLAGS.has(key) && next !== undefined && !next.startsWith("--")) {
         flags.set(key, next);
         i++;
       } else {
@@ -111,6 +114,37 @@ function resolveWorkspace(
     process.env.DOTCLAUDE_WORKSPACE ||
     ctxWorkspace
   );
+}
+
+function isContextTargetLike(value: string): boolean {
+  return (
+    value === "." ||
+    value.startsWith(".") ||
+    value.startsWith("/") ||
+    value.includes("/") ||
+    value === "trees" ||
+    value.startsWith("trees/")
+  );
+}
+
+function isWorkspaceRelativeContextTarget(value: string): boolean {
+  return value === "trees" || value.startsWith("trees/");
+}
+
+function canBeWorkspaceName(value: string): boolean {
+  return (
+    value !== "." &&
+    value.length > 0 &&
+    !value.startsWith("/") &&
+    !value.includes("/") &&
+    !value.includes("\\") &&
+    !value.includes("..")
+  );
+}
+
+async function isExistingContextWorkspace(value: string, paths: Paths): Promise<boolean> {
+  const result = await readWorkspaceConfig(value, paths);
+  return result.ok || result.code !== "WORKSPACE_NOT_FOUND";
 }
 
 // ---- Main ----
@@ -487,6 +521,58 @@ async function main() {
             renderCtx,
           );
       }
+      break;
+    }
+
+    case "context": {
+      const [first, second] = parsed.positional;
+      const workspaceFlag = flagValue(parsed, "workspace");
+      const hasWorkspaceFlag = flag(parsed, "workspace");
+      let workspace: string | undefined;
+      let target: string | undefined;
+      let targetCwd = process.env.PWD ?? process.cwd();
+
+      if (hasWorkspaceFlag) {
+        workspace = workspaceFlag;
+        target = first;
+        if (workspace && target && isWorkspaceRelativeContextTarget(target)) {
+          targetCwd = paths.workspace(workspace);
+        }
+      } else if (first && second) {
+        workspace = first;
+        target = second;
+        if (isWorkspaceRelativeContextTarget(target)) {
+          targetCwd = paths.workspace(workspace);
+        }
+      } else if (!first) {
+        workspace = effectiveWorkspace;
+      } else if (effectiveWorkspace) {
+        if (canBeWorkspaceName(first) && (await isExistingContextWorkspace(first, paths))) {
+          workspace = first;
+        } else {
+          workspace = effectiveWorkspace;
+          target = first;
+          if (isWorkspaceRelativeContextTarget(target)) {
+            targetCwd = paths.workspace(workspace);
+          }
+        }
+      } else if (canBeWorkspaceName(first) && (await isExistingContextWorkspace(first, paths))) {
+        workspace = first;
+      } else if (isContextTargetLike(first)) {
+        emitMissingArg("workspace", ["ws", "context"], renderCtx);
+      } else {
+        workspace = first;
+      }
+
+      if (!workspace) {
+        emitMissingArg("workspace", ["ws", "context"], renderCtx);
+      }
+
+      if (!target) {
+        emit(await getWorkspaceContext(workspace, paths), "context", renderCtx);
+      }
+
+      emit(await getTargetContext(workspace, target, targetCwd, paths), "context", renderCtx);
       break;
     }
 
