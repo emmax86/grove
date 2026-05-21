@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
 // PreToolUse hook: deny direct `git worktree` commands in grove workspaces.
+
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+
 //
 // Strategy: tokenize the command in a single quote-aware pass that simultaneously
 // handles shell operators (;  &  |  newline) as segment boundaries and strips
@@ -132,11 +136,55 @@ function extractCommand(input: unknown): string {
   return "";
 }
 
+function extractCwd(input: unknown): string | null {
+  if (
+    input !== null &&
+    typeof input === "object" &&
+    "cwd" in input &&
+    typeof (input as { cwd: unknown }).cwd === "string"
+  ) {
+    return (input as { cwd: string }).cwd;
+  }
+  if (
+    input !== null &&
+    typeof input === "object" &&
+    "tool_input" in input &&
+    typeof (input as { tool_input: unknown }).tool_input === "object" &&
+    (input as { tool_input: unknown }).tool_input !== null &&
+    "cwd" in (input as { tool_input: object }).tool_input &&
+    typeof (input as { tool_input: { cwd: unknown } }).tool_input.cwd === "string"
+  ) {
+    return (input as { tool_input: { cwd: string } }).tool_input.cwd;
+  }
+  return null;
+}
+
+function isInsideGroveWorkspace(cwd: string): boolean {
+  let dir = resolve(cwd);
+
+  while (true) {
+    if (existsSync(join(dir, "workspace.json"))) {
+      return true;
+    }
+
+    const parent = dirname(dir);
+    if (parent === dir) {
+      return false;
+    }
+    dir = parent;
+  }
+}
+
 let input: unknown;
 try {
   input = JSON.parse(await Bun.stdin.text());
 } catch {
   process.exit(0); // malformed input — fail open
+}
+
+const cwd = extractCwd(input);
+if (cwd === null || !isInsideGroveWorkspace(cwd)) {
+  process.exit(0);
 }
 
 const command = extractCommand(input);
