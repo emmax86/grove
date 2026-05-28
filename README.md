@@ -68,15 +68,19 @@ grove ws status --json | jq '.data.repos[] | select(.status=="dangling") | .name
 
 ### Workspaces — `grove ws <command>`
 
-| Command                   | Description                             |
-| ------------------------- | --------------------------------------- |
-| `add <name>`              | Create a workspace                      |
-| `list`                    | List workspaces                         |
-| `remove [name] [--force]` | Remove a workspace                      |
-| `status [workspace]`      | Repos + worktrees overview              |
-| `path [workspace]`        | Print workspace path                    |
-| `sync [workspace]`        | Repair symlinks, prune dangling entries |
-| `exec <command> [file]`   | Run standard commands against a repo    |
+| Command                          | Description                                |
+| -------------------------------- | ------------------------------------------ |
+| `add <name>`                     | Create a workspace                         |
+| `list`                           | List workspaces                            |
+| `remove [name] [--force]`        | Remove a workspace                         |
+| `status [workspace]`             | Repos + worktrees overview                 |
+| `context [workspace] [target]`   | Agent context and lazy instruction scopes  |
+| `path [workspace]`               | Print workspace path                       |
+| `sync [workspace]`               | Repair symlinks, prune dangling entries    |
+| `exec <command> [file]`          | Run standard commands against a repo       |
+
+See [docs/context-loading.md](docs/context-loading.md) for the `context`
+loading contract, instruction priority, and porcelain row schemas.
 
 ### Repos — `grove ws repo <command>`
 

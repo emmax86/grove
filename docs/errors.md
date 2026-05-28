@@ -28,6 +28,18 @@ The workspace config file is missing.
 
 Writing the workspace config file failed.
 
+## CONTEXT_TARGET_AMBIGUOUS
+
+The supplied context target is ambiguous.
+
+**Hint:** Pass a path to a specific worktree or nested directory under trees/<repo>/<slug>.
+
+## CONTEXT_TARGET_NOT_FOUND
+
+The supplied context target could not be resolved to a Grove worktree.
+
+**Hint:** Run `grove ws context` to see valid worktree targets.
+
 ## DANGLING_SYMLINK
 
 A symlink points at a path that does not exist.

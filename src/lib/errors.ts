@@ -115,6 +115,16 @@ export const ERROR_CATALOG = {
     hint: "Pass the argument, or run `grove <command> --help` for details.",
   },
 
+  // Context
+  CONTEXT_TARGET_AMBIGUOUS: {
+    description: "The supplied context target is ambiguous.",
+    hint: "Pass a path to a specific worktree or nested directory under trees/<repo>/<slug>.",
+  },
+  CONTEXT_TARGET_NOT_FOUND: {
+    description: "The supplied context target could not be resolved to a Grove worktree.",
+    hint: "Run `grove ws context` to see valid worktree targets.",
+  },
+
   // Exec
   COMMAND_NOT_CONFIGURED: {
     description: "The requested command is not configured for the repo.",

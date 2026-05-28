@@ -104,6 +104,39 @@ const WS_GROUP: HelpGroup = {
     },
     {
       kind: "leaf",
+      name: "context",
+      summary: "show Grove agent context and lazy instruction scopes",
+      args: [
+        {
+          name: "workspace",
+          required: false,
+          defaultFrom: "context-workspace",
+          summary: "workspace name (defaults to inferred)",
+        },
+        {
+          name: "target",
+          required: false,
+          summary: "worktree path, directory, or file target",
+        },
+      ],
+      flags: [WORKSPACE_FLAG],
+      examples: [
+        {
+          command: "grove ws context",
+          description: "Show workspace context and instruction index for the inferred workspace",
+        },
+        {
+          command: "grove ws context trees/api/feature-auth/packages/auth",
+          description: "Load instructions for a nested target scope",
+        },
+        {
+          command: "grove ws context myproject trees/api/feature-auth",
+          description: "Load instructions for a target in an explicit workspace",
+        },
+      ],
+    },
+    {
+      kind: "leaf",
       name: "path",
       summary: "print workspace directory path",
       args: [{ name: "workspace", required: false, defaultFrom: "context-workspace" }],

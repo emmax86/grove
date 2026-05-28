@@ -12,6 +12,12 @@ describe("ERROR_CATALOG", () => {
       expect(entry.description.length, `${code} description length`).toBeGreaterThan(0);
     }
   });
+
+  it("includes context target errors", () => {
+    const codes = entries().map(([code]) => code);
+    expect(codes).toContain("CONTEXT_TARGET_AMBIGUOUS");
+    expect(codes).toContain("CONTEXT_TARGET_NOT_FOUND");
+  });
 });
 
 describe("renderErrorsMarkdown", () => {

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
-import { cleanupTempRoot, createTempRoot, runCLI } from "./helpers";
+import { cleanupTempRoot, createGitRepo, createTempRoot, runCLI } from "./helpers";
 
 describe("CLI output modes (smoke)", () => {
   let root: string;
@@ -120,5 +122,295 @@ describe("CLI output modes (smoke)", () => {
     expect(Array.isArray(json.data.pruned)).toBe(true);
     expect(Array.isArray(json.data.repos)).toBe(true);
     expect(json.data.name).toBe("myws");
+  });
+
+  it("ws context --json returns workspace context envelope", async () => {
+    await runCLI(["ws", "add", "myws"], { root });
+    const r = await runCLI(["ws", "context", "myws", "--json"], { root });
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("workspace");
+    expect(json.data.workspace.name).toBe("myws");
+    expect(Array.isArray(json.data.index)).toBe(true);
+  });
+
+  it("ws context --json with inferred workspace returns workspace context envelope", async () => {
+    await runCLI(["ws", "add", "myws"], { root });
+    const r = await runCLI(["ws", "context", "--json"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("workspace");
+    expect(json.data.workspace.name).toBe("myws");
+  });
+
+  it("ws context explicit workspace positional overrides inferred workspace", async () => {
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "add", "other"], { root });
+    const r = await runCLI(["ws", "context", "myws", "--json"], {
+      root,
+      cwd: join(root, "other"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("workspace");
+    expect(json.data.workspace.name).toBe("myws");
+  });
+
+  it("ws context target-like existing workspace positional overrides inferred workspace", async () => {
+    await runCLI(["ws", "add", "trees"], { root });
+    await runCLI(["ws", "add", ".hidden"], { root });
+    await runCLI(["ws", "add", "other"], { root });
+
+    for (const workspace of ["trees", ".hidden"]) {
+      for (const cwd of [root, join(root, "other")]) {
+        const r = await runCLI(["ws", "context", workspace, "--json"], {
+          root,
+          cwd,
+        });
+
+        expect(r.exitCode).toBe(0);
+        const json = JSON.parse(r.stdout);
+        expect(json.ok).toBe(true);
+        expect(json.data.mode).toBe("workspace");
+        expect(json.data.workspace.name).toBe(workspace);
+      }
+    }
+  });
+
+  it("ws context --json before workspace keeps workspace positional", async () => {
+    await runCLI(["ws", "add", "myws"], { root });
+    const r = await runCLI(["ws", "context", "--json", "myws"], { root });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("workspace");
+    expect(json.data.workspace.name).toBe("myws");
+  });
+
+  it("ws context accepts a plain workspace name starting with trees", async () => {
+    await runCLI(["ws", "add", "trees-api"], { root });
+    const r = await runCLI(["ws", "context", "trees-api", "--json"], { root });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("workspace");
+    expect(json.data.workspace.name).toBe("trees-api");
+  });
+
+  it("ws context surfaces corrupted workspace configs instead of treating them as targets", async () => {
+    await runCLI(["ws", "add", "bad"], { root });
+    await runCLI(["ws", "add", "other"], { root });
+    await writeFile(join(root, "bad", "workspace.json"), "{not json");
+
+    const r = await runCLI(["ws", "context", "bad", "--json"], {
+      root,
+      cwd: join(root, "other"),
+    });
+
+    expect(r.exitCode).toBe(1);
+    const json = JSON.parse(r.stderr);
+    expect(json.ok).toBe(false);
+    expect(json.code).toBe("CONFIG_INVALID");
+  });
+
+  it("ws context --workspace <workspace> <target> --json returns target context", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    const r = await runCLI(["ws", "context", "--workspace", "myws", "trees/api/main", "--json"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("target");
+    expect(json.data.workspace.name).toBe("myws");
+    expect(json.data.repo).toBe("api");
+    expect(json.data.slug).toBe("main");
+  });
+
+  it("ws context --json before target keeps target positional", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    const r = await runCLI(["ws", "context", "--json", "trees/api/main"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("target");
+    expect(json.data.workspace.name).toBe("myws");
+    expect(json.data.repo).toBe("api");
+    expect(json.data.slug).toBe("main");
+  });
+
+  it("ws context resolves logical target with workspace from env outside workspace", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    const r = await runCLI(["ws", "context", "trees/api/main", "--json"], {
+      root,
+      cwd: root,
+      env: { GROVE_WORKSPACE: "myws" },
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("target");
+    expect(json.data.workspace.name).toBe("myws");
+    expect(json.data.repo).toBe("api");
+    expect(json.data.slug).toBe("main");
+  });
+
+  it("ws context resolves logical target from inferred workspace inside worktree", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    const r = await runCLI(["ws", "context", "trees/api/main", "--json"], {
+      root,
+      cwd: join(root, "myws", "trees", "api", "main"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("target");
+    expect(json.data.workspace.name).toBe("myws");
+    expect(json.data.repo).toBe("api");
+    expect(json.data.slug).toBe("main");
+  });
+
+  it("ws context --workspace keeps dot target relative to cwd", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    const r = await runCLI(["ws", "context", "--workspace", "myws", ".", "--json"], {
+      root,
+      cwd: join(root, "myws", "trees", "api", "main"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("target");
+    expect(json.data.workspace.name).toBe("myws");
+    expect(json.data.repo).toBe("api");
+    expect(json.data.slug).toBe("main");
+  });
+
+  it("ws context <workspace> <target> overrides env workspace", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "add", "other"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    const r = await runCLI(["ws", "context", "myws", "trees/api/main", "--json"], {
+      root,
+      cwd: join(root, "myws"),
+      env: { GROVE_WORKSPACE: "other" },
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("target");
+    expect(json.data.workspace.name).toBe("myws");
+    expect(json.data.repo).toBe("api");
+    expect(json.data.slug).toBe("main");
+  });
+
+  it("ws context <workspace> <target> overrides workspace inferred from cwd", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "add", "other"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    const r = await runCLI(["ws", "context", "myws", "trees/api/main", "--json"], {
+      root,
+      cwd: join(root, "other"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(r.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("target");
+    expect(json.data.workspace.name).toBe("myws");
+    expect(json.data.repo).toBe("api");
+    expect(json.data.slug).toBe("main");
+  });
+
+  it("ws context target text includes resolved worktree and scoped AGENTS entries", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    const worktreeRoot = join(root, "myws", "trees", "api", "main");
+    await writeFile(join(worktreeRoot, "AGENTS.md"), "# api root\n");
+    await mkdir(join(worktreeRoot, "packages", "auth"), { recursive: true });
+    await writeFile(join(worktreeRoot, "packages", "auth", "AGENTS.md"), "# auth scope\n");
+
+    const r = await runCLI(["ws", "context", "trees/api/main/packages/auth"], {
+      root,
+      cwd: join(root, "myws"),
+      pwd: join(root, "myws"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("Resolved worktree: api/main");
+    expect(r.stdout).toContain("Context key: myws/api/main/packages/auth");
+    expect(r.stdout).toContain("### trees/api/main/AGENTS.md");
+    expect(r.stdout).toContain("### trees/api/main/packages/auth/AGENTS.md");
+    expect(r.stdout).toContain("# auth scope");
+  });
+
+  it("ws context path-like single positional without workspace returns missing workspace", async () => {
+    const r = await runCLI(["ws", "context", "trees/api", "--json"], { root });
+
+    expect(r.exitCode).toBe(1);
+    const json = JSON.parse(r.stderr);
+    expect(json.ok).toBe(false);
+    expect(json.code).toBe("MISSING_ARG");
+    expect(json.help.path).toEqual(["grove", "ws", "context"]);
+  });
+
+  it("ws context bare trees target explains how to target a local trees directory", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+    const worktreeRoot = join(root, "myws", "trees", "api", "main");
+    await mkdir(join(worktreeRoot, "trees"), { recursive: true });
+
+    const r = await runCLI(["ws", "context", "trees", "--json"], {
+      root,
+      cwd: worktreeRoot,
+      pwd: worktreeRoot,
+    });
+
+    expect(r.exitCode).toBe(1);
+    const json = JSON.parse(r.stderr);
+    expect(json.ok).toBe(false);
+    expect(json.code).toBe("CONTEXT_TARGET_NOT_FOUND");
+    expect(json.error).toContain("./trees");
   });
 });

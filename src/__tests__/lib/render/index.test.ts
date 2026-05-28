@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
+import type { GroveContext } from "../../../commands/context";
 import { render } from "../../../lib/render";
 import { err, ok } from "../../../types";
 
@@ -143,5 +144,38 @@ describe("render — unknown command kind", () => {
     };
     // biome-ignore lint/suspicious/noExplicitAny: testing exhaustiveness escape hatch
     expect(() => render(ok({}), "unknown-kind" as any, ctx)).toThrow();
+  });
+});
+
+describe("render — context kind", () => {
+  it("dispatches context values through text formatter", () => {
+    const value: GroveContext = {
+      mode: "target",
+      workspace: { name: "myws", path: "/workspaces/myws" },
+      target: "trees/api/main",
+      repo: "api",
+      slug: "main",
+      worktreePath: "trees/api/main",
+      loadedScope: "trees/api/main",
+      contextKey: "myws/api/main",
+      contextHash: "sha256:abc123",
+      sources: [],
+      skipped: [],
+    };
+
+    const out = render(ok(value), "context", {
+      mode: "text",
+      colorEnabled: false,
+      unicodeEnabled: true,
+      isTTY: false,
+      isStderrTTY: false,
+      warnings: [],
+    });
+
+    expect(out.stdout).toContain("# Grove Context");
+    expect(out.stdout).toContain("Resolved worktree: api/main");
+    expect(out.stdout).toContain("Reload with `grove ws context myws trees/api/main`");
+    expect(out.stderr).toBe("");
+    expect(out.exitCode).toBe(0);
   });
 });
