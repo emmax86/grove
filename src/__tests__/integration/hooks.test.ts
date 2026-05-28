@@ -221,6 +221,14 @@ describe("reject-git-worktree hook script", () => {
     expect(result.denied).toBe(false);
   });
 
+  it("allows direct git worktree when GROVE_ROOT does not exist", async () => {
+    groveRoot = path.join(tempDir, "missing-grove-root");
+
+    const result = await invokeScript(cmdInCwd("git worktree list", nonGroveCwd));
+
+    expect(result.denied).toBe(false);
+  });
+
   it("allows direct git worktree when cwd is only nested under tool_input", async () => {
     const result = await invokeScript({
       tool_input: { command: "git worktree list", cwd: groveCwd },
@@ -229,6 +237,7 @@ describe("reject-git-worktree hook script", () => {
     expect(result.denied).toBe(false);
   });
 
+  // This validates test fixture plumbing: cases wrapped with withCwd must use the wrapper cwd.
   it("withCwd overrides an existing top-level cwd", async () => {
     const result = await invokeScript(
       withCwd(cmdInCwd("git worktree list", nonGroveCwd), groveCwd),
