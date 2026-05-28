@@ -129,6 +129,26 @@ describe("context command", () => {
     expect(result.value.skipped).toEqual([]);
   });
 
+  it("records symlinked subdirectories as skipped when indexing workspace context", async () => {
+    const root = paths.worktreeDir("myws", "api", "feature-auth");
+    const shared = join(tempDir, "shared");
+    await mkdir(shared, { recursive: true });
+    await writeFile(join(shared, "AGENTS.md"), "# shared\n");
+    await symlink(shared, join(root, "shared"));
+
+    const result = await getWorkspaceContext("myws", paths);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.index.map((entry) => entry.scope)).not.toContain("api/feature-auth/shared");
+    expect(result.value.skipped).toContainEqual({
+      path: "trees/api/feature-auth/shared",
+      reason: "Symlinked directory not indexed",
+    });
+  });
+
   it("records unclassifiable worktree entries as skipped", async () => {
     await writeFile(join(paths.repoDir("myws", "api"), "not-a-worktree"), "not a directory\n");
 
@@ -363,6 +383,28 @@ describe("context command", () => {
     expect(result.value.worktreePath).toBe("trees/api/feature-auth");
     expect(result.value.loadedScope).toBe("trees/api/feature-auth");
     expect(result.value.sources[0].path).toBe("trees/api/feature-auth/AGENTS.md");
+  });
+
+  it("resolves a linked worktree target from the registered repo path", async () => {
+    const nested = join(repoPath, "packages", "auth");
+    await mkdir(nested, { recursive: true });
+    await writeFile(join(repoPath, "AGENTS.md"), "# repo root\n");
+    await writeFile(join(nested, "AGENTS.md"), "# auth package\n");
+
+    const result = await getTargetContext("myws", nested, paths.workspace("myws"), paths);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.repo).toBe("api");
+    expect(result.value.slug).toBe("main");
+    expect(result.value.worktreePath).toBe("trees/api/main");
+    expect(result.value.loadedScope).toBe("trees/api/main/packages/auth");
+    expect(result.value.sources.map((source) => source.path)).toEqual([
+      "trees/api/main/AGENTS.md",
+      "trees/api/main/packages/auth/AGENTS.md",
+    ]);
   });
 
   it("uses the worktree root as loaded scope when no instructions are found", async () => {

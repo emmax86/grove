@@ -207,6 +207,22 @@ describe("CLI output modes (smoke)", () => {
     expect(json.data.workspace.name).toBe("trees-api");
   });
 
+  it("ws context does not classify corrupted configs as existing workspaces", async () => {
+    await runCLI(["ws", "add", "bad"], { root });
+    await runCLI(["ws", "add", "other"], { root });
+    await writeFile(join(root, "bad", "workspace.json"), "{not json");
+
+    const r = await runCLI(["ws", "context", "bad", "--json"], {
+      root,
+      cwd: join(root, "other"),
+    });
+
+    expect(r.exitCode).toBe(1);
+    const json = JSON.parse(r.stderr);
+    expect(json.ok).toBe(false);
+    expect(json.code).toBe("CONTEXT_TARGET_NOT_FOUND");
+  });
+
   it("ws context --workspace <workspace> <target> --json returns target context", async () => {
     const repoPath = await createGitRepo(root, "api");
     await runCLI(["ws", "add", "myws"], { root });

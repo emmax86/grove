@@ -11,6 +11,7 @@ import { addWorkspace, listWorkspaces, removeWorkspace, syncWorkspace } from "./
 import { addWorktree, listWorktrees, pruneWorktrees, removeWorktree } from "./commands/worktree";
 import { createPaths, DEFAULT_WORKSPACES_ROOT, type Paths } from "./constants";
 import { inferContext } from "./context";
+import { type ParsedArgs, parseArgs } from "./lib/args";
 import { readWorkspaceConfig } from "./lib/config";
 import { discoverDaemon, startDaemon } from "./lib/daemon";
 import { buildMissingArgPayload, isHelpRequested, resolveCommandPath } from "./lib/help/dispatch";
@@ -47,39 +48,6 @@ function emitMissingArg(
     process.stderr.write(`${stderr}\n`);
   }
   process.exit(exitCode);
-}
-
-// ---- Arg parsing ----
-// Flat parse: extract all --flags and all positional args from the full argv
-
-interface ParsedArgs {
-  positional: string[];
-  flags: Map<string, string | true>; // --flag or --flag value
-}
-
-const VALUE_FLAGS = new Set(["workspace", "name", "from", "repo", "match", "port"]);
-
-function parseArgs(argv: string[]): ParsedArgs {
-  const positional: string[] = [];
-  const flags = new Map<string, string | true>();
-
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg.startsWith("--")) {
-      const key = arg.slice(2);
-      const next = argv[i + 1];
-      if (VALUE_FLAGS.has(key) && next !== undefined && !next.startsWith("--")) {
-        flags.set(key, next);
-        i++;
-      } else {
-        flags.set(key, true);
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-
-  return { positional, flags };
 }
 
 function flag(parsed: ParsedArgs, name: string): boolean {
@@ -144,7 +112,7 @@ function canBeWorkspaceName(value: string): boolean {
 
 async function isExistingContextWorkspace(value: string, paths: Paths): Promise<boolean> {
   const result = await readWorkspaceConfig(value, paths);
-  return result.ok || result.code !== "WORKSPACE_NOT_FOUND";
+  return result.ok;
 }
 
 // ---- Main ----
@@ -570,9 +538,9 @@ async function main() {
 
       if (!target) {
         emit(await getWorkspaceContext(workspace, paths), "context", renderCtx);
+      } else {
+        emit(await getTargetContext(workspace, target, targetCwd, paths), "context", renderCtx);
       }
-
-      emit(await getTargetContext(workspace, target, targetCwd, paths), "context", renderCtx);
       break;
     }
 

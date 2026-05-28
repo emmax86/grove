@@ -21,7 +21,7 @@ function valueTakingFlags(registry: HelpGroup): ReadonlySet<string> {
   return cached;
 }
 
-function collectValueTakingFlags(registry: HelpGroup): Set<string> {
+export function collectValueTakingFlags(registry: HelpGroup): Set<string> {
   const out = new Set<string>();
   for (const f of GLOBAL_FLAGS) {
     if (f.valueLabel !== undefined) {

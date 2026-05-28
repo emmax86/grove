@@ -231,6 +231,21 @@ interface ResolvedTarget {
   worktreePath: string;
 }
 
+function relativeToCandidateRoot(
+  candidateRoot: string,
+  realCandidateRoot: string,
+  targetPath: string,
+  realTargetPath: string,
+): string | null {
+  if (isInsideOrEqual(realCandidateRoot, realTargetPath)) {
+    return relative(realCandidateRoot, realTargetPath);
+  }
+  if (isInsideOrEqual(candidateRoot, targetPath)) {
+    return relative(candidateRoot, targetPath);
+  }
+  return null;
+}
+
 function repoContainerError(repo: string, slugs: string[]): Result<never> {
   const available = slugs.length > 0 ? slugs.join(", ") : "none";
   return err(
@@ -243,33 +258,39 @@ async function resolveLogicalTarget(
   targetPath: string,
   workspace: string,
   paths: Paths,
-  repos: { name: string; worktrees: WorktreeEntry[] }[],
+  repos: { name: string; path: string; worktrees: WorktreeEntry[] }[],
 ): Promise<Result<ResolvedTarget>> {
   const workspaceRoot = paths.workspace(workspace);
   const realTargetPath = await tryRealpath(targetPath);
 
   for (const repo of repos) {
     for (const worktree of repo.worktrees) {
-      const poolRoot = paths.worktreePoolEntry(worktree.repo, worktree.slug);
-      const realPoolRoot = await tryRealpath(poolRoot);
-      const targetInRealPool = isInsideOrEqual(realPoolRoot, realTargetPath);
-      const targetInLogicalPool = isInsideOrEqual(poolRoot, targetPath);
-
-      if (!targetInRealPool && !targetInLogicalPool) {
-        continue;
+      const candidates = [paths.worktreePoolEntry(worktree.repo, worktree.slug)];
+      if (worktree.type === "linked") {
+        candidates.push(repo.path);
       }
 
-      const relToPool = targetInRealPool
-        ? relative(realPoolRoot, realTargetPath)
-        : relative(poolRoot, targetPath);
       const worktreeRoot = paths.worktreeDir(workspace, worktree.repo, worktree.slug);
-      return ok({
-        repo: worktree.repo,
-        slug: worktree.slug,
-        targetPath: join(worktreeRoot, relToPool),
-        worktreeRoot,
-        worktreePath: toWorkspaceRelative(worktreeRoot, workspaceRoot),
-      });
+      for (const candidateRoot of candidates) {
+        const realCandidateRoot = await tryRealpath(candidateRoot);
+        const relToCandidate = relativeToCandidateRoot(
+          candidateRoot,
+          realCandidateRoot,
+          targetPath,
+          realTargetPath,
+        );
+        if (relToCandidate === null) {
+          continue;
+        }
+
+        return ok({
+          repo: worktree.repo,
+          slug: worktree.slug,
+          targetPath: join(worktreeRoot, relToCandidate),
+          worktreeRoot,
+          worktreePath: toWorkspaceRelative(worktreeRoot, workspaceRoot),
+        });
+      }
     }
   }
 
@@ -353,6 +374,18 @@ async function indexInstructionScopes(
 
     if (stats.isDirectory()) {
       await indexInstructionScopes(workspace, workspaceRoot, repo, slug, child, index, skipped);
+    } else if (stats.isSymbolicLink()) {
+      try {
+        const targetStats = await stat(child);
+        if (targetStats.isDirectory()) {
+          skipped.push({
+            path: toWorkspaceRelative(child, workspaceRoot),
+            reason: "Symlinked directory not indexed",
+          });
+        }
+      } catch (e) {
+        skipped.push({ path: toWorkspaceRelative(child, workspaceRoot), reason: String(e) });
+      }
     }
   }
 }

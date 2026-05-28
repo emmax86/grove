@@ -41,7 +41,7 @@ const targetValue: GroveContext = {
   repo: "api",
   slug: "feature-auth",
   worktreePath: "trees/api/feature-auth",
-  loadedScope: "api/feature-auth/packages/auth",
+  loadedScope: "trees/api/feature-auth/packages/auth",
   contextKey: "myws/api/feature-auth/packages/auth",
   contextHash: "sha256:def456",
   sources: [
@@ -99,6 +99,7 @@ describe("contextText", () => {
     const out = contextText(targetValue, baseCtx);
 
     expect(out).toContain("Resolved worktree: api/feature-auth");
+    expect(out).toContain("Loaded scope: trees/api/feature-auth/packages/auth");
     expect(out).toContain("Context hash: sha256:def456");
     expect(out).toContain("### trees/api/feature-auth/packages/auth/AGENTS.md");
     expect(out).toContain("Source hash: abc123");
@@ -139,7 +140,7 @@ describe("contextPorcelain", () => {
         "myws",
         "api",
         "feature-auth",
-        "api/feature-auth/packages/auth",
+        "trees/api/feature-auth/packages/auth",
         "trees/api/feature-auth",
         "myws/api/feature-auth/packages/auth",
         "sha256:def456",
@@ -171,7 +172,7 @@ describe("contextPorcelain", () => {
         "myws",
         "api",
         "feature-auth",
-        "api/feature-auth/packages/auth",
+        "trees/api/feature-auth/packages/auth",
         "trees/api/feature-auth",
         "myws/api/feature-auth/packages/auth",
         "sha256:def456",
