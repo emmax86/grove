@@ -207,7 +207,7 @@ describe("CLI output modes (smoke)", () => {
     expect(json.data.workspace.name).toBe("trees-api");
   });
 
-  it("ws context does not classify corrupted configs as existing workspaces", async () => {
+  it("ws context surfaces corrupted workspace configs instead of treating them as targets", async () => {
     await runCLI(["ws", "add", "bad"], { root });
     await runCLI(["ws", "add", "other"], { root });
     await writeFile(join(root, "bad", "workspace.json"), "{not json");
@@ -220,7 +220,7 @@ describe("CLI output modes (smoke)", () => {
     expect(r.exitCode).toBe(1);
     const json = JSON.parse(r.stderr);
     expect(json.ok).toBe(false);
-    expect(json.code).toBe("CONTEXT_TARGET_NOT_FOUND");
+    expect(json.code).toBe("CONFIG_INVALID");
   });
 
   it("ws context --workspace <workspace> <target> --json returns target context", async () => {

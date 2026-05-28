@@ -65,6 +65,52 @@ describe("context command", () => {
     expect(result.value.index[0].kind).toBe("AGENTS.override.md");
   });
 
+  it("does not fall back to lower-priority index instructions when override exists but is unreadable", async () => {
+    const root = paths.worktreeDir("myws", "api", "feature-auth");
+    await symlink("missing.md", join(root, "AGENTS.override.md"));
+    await writeFile(join(root, "AGENTS.md"), "# agents\n");
+
+    const result = await getWorkspaceContext("myws", paths);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.index.map((entry) => entry.sourcePath)).not.toContain(
+      "trees/api/feature-auth/AGENTS.md",
+    );
+    const skipped = result.value.skipped.find(
+      (entry) => entry.path === "trees/api/feature-auth/AGENTS.override.md",
+    );
+    expect(skipped?.reason).toContain("ENOENT");
+  });
+
+  it("does not fall back to lower-priority target instructions when override exists but is unreadable", async () => {
+    const root = paths.worktreeDir("myws", "api", "feature-auth");
+    await symlink("missing.md", join(root, "AGENTS.override.md"));
+    await writeFile(join(root, "AGENTS.md"), "# agents\n");
+    await writeFile(join(root, "login.ts"), "export const x = 1;\n");
+
+    const result = await getTargetContext(
+      "myws",
+      "trees/api/feature-auth/login.ts",
+      paths.workspace("myws"),
+      paths,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.sources.map((source) => source.sourcePath)).not.toContain(
+      "trees/api/feature-auth/AGENTS.md",
+    );
+    const skipped = result.value.skipped.find(
+      (entry) => entry.path === "trees/api/feature-auth/AGENTS.override.md",
+    );
+    expect(skipped?.reason).toContain("ENOENT");
+  });
+
   it("computes a deterministic SHA-256 hash for instruction content", async () => {
     const root = paths.worktreeDir("myws", "api", "feature-auth");
     await writeFile(join(root, "AGENTS.md"), "known content\n");

@@ -112,7 +112,7 @@ function canBeWorkspaceName(value: string): boolean {
 
 async function isExistingContextWorkspace(value: string, paths: Paths): Promise<boolean> {
   const result = await readWorkspaceConfig(value, paths);
-  return result.ok;
+  return result.ok || result.code !== "WORKSPACE_NOT_FOUND";
 }
 
 // ---- Main ----
@@ -534,9 +534,7 @@ async function main() {
 
       if (!workspace) {
         emitMissingArg("workspace", ["ws", "context"], renderCtx);
-      }
-
-      if (!target) {
+      } else if (!target) {
         emit(await getWorkspaceContext(workspace, paths), "context", renderCtx);
       } else {
         emit(await getTargetContext(workspace, target, targetCwd, paths), "context", renderCtx);

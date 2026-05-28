@@ -9,6 +9,8 @@ export interface ParsedArgs {
 export function parseArgs(argv: readonly string[], registry: HelpGroup = REGISTRY): ParsedArgs {
   const positional: string[] = [];
   const flags = new Map<string, string | true>();
+  // Any flag read through flagValue() must have valueLabel in the help registry; only
+  // registry-declared value-taking flags consume the following token as a value.
   const valueFlags = collectValueTakingFlags(registry);
 
   for (let i = 0; i < argv.length; i++) {

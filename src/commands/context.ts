@@ -153,6 +153,7 @@ async function addInstructionEntry(
       return;
     } catch (e) {
       skipped.push({ path: sourcePath, reason: String(e) });
+      return;
     }
   }
 }
@@ -198,6 +199,7 @@ async function readInstructionSource(
       };
     } catch (e) {
       skipped.push({ path: sourcePath, reason: String(e) });
+      return null;
     }
   }
 
@@ -384,6 +386,8 @@ async function indexInstructionScopes(
     if (stats.isDirectory()) {
       await indexInstructionScopes(workspace, workspaceRoot, repo, slug, child, index, skipped);
     } else if (stats.isSymbolicLink()) {
+      // Do not recurse through directory symlinks from workspace indexing: targets may escape the
+      // worktree. Record the skipped path so the omission is visible in rendered context.
       try {
         const targetStats = await stat(child);
         if (targetStats.isDirectory()) {
