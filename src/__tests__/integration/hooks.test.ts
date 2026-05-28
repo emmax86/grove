@@ -229,6 +229,14 @@ describe("reject-git-worktree hook script", () => {
     expect(result.denied).toBe(false);
   });
 
+  it("allows direct git worktree when cwd does not exist on disk", async () => {
+    const result = await invokeScript(
+      cmdInCwd("git worktree list", path.join(groveRoot, "nonexistent-dir")),
+    );
+
+    expect(result.denied).toBe(false);
+  });
+
   it("allows direct git worktree when cwd is only nested under tool_input", async () => {
     const result = await invokeScript({
       tool_input: { command: "git worktree list", cwd: groveCwd },
