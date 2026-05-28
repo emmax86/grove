@@ -139,7 +139,7 @@ describe("contextPorcelain", () => {
     );
   });
 
-  it("renders target metadata row followed by source rows", () => {
+  it("renders target metadata row with the same scope format as source rows", () => {
     const out = contextPorcelain(targetValue);
     const rows = out.split("\n");
 
@@ -149,7 +149,7 @@ describe("contextPorcelain", () => {
         "myws",
         "api",
         "feature-auth",
-        "trees/api/feature-auth/packages/auth",
+        "api/feature-auth/packages/auth",
         "trees/api/feature-auth",
         "myws/api/feature-auth/packages/auth",
         "sha256:def456",
@@ -181,7 +181,7 @@ describe("contextPorcelain", () => {
         "myws",
         "api",
         "feature-auth",
-        "trees/api/feature-auth/packages/auth",
+        "api/feature-auth/packages/auth",
         "trees/api/feature-auth",
         "myws/api/feature-auth/packages/auth",
         "sha256:def456",

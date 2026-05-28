@@ -134,7 +134,7 @@ export function contextPorcelain(value: GroveContextValue): string {
     value.workspace.name,
     value.repo,
     value.slug,
-    value.loadedScope,
+    value.loadedScope.replace(/^trees\//, ""),
     value.worktreePath,
     value.contextKey,
     value.contextHash,

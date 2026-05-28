@@ -83,7 +83,7 @@ index <workspace> <repo> <slug> <scope> <source-path> <kind> <hash> <context-key
 Target metadata rows:
 
 ```text
-target <workspace> <repo> <slug> <loaded-scope> <worktree-path> <context-key> <context-hash>
+target <workspace> <repo> <slug> <scope> <worktree-path> <context-key> <context-hash>
 ```
 
 Loaded source rows:
@@ -92,6 +92,7 @@ Loaded source rows:
 source <workspace> <repo> <slug> <scope> <source-path> <kind> <hash> <context-key>
 ```
 
-`scope` omits the leading `trees/` prefix and is used by `index` and `source`
-rows. `loaded-scope` keeps the leading `trees/` prefix and is used by `target`
-rows because it is directly reusable as a stable reload target.
+`scope` omits the leading `trees/` prefix and is used consistently in column 5
+for `index`, `target`, and `source` rows. Text and JSON target output still keep
+`loadedScope` with the leading `trees/` prefix because it is directly reusable
+as a stable reload target.
