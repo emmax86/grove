@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // PreToolUse hook: deny direct `git worktree` commands in grove workspaces.
 
+import { realpath } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 
 //
@@ -147,11 +148,25 @@ function extractCwd(input: unknown): string | null {
   return null;
 }
 
-function isInsideGroveWorkspace(cwd: string): boolean {
+async function tryRealpath(path: string): Promise<string | null> {
+  try {
+    return await realpath(path);
+  } catch {
+    return null;
+  }
+}
+
+async function isInsideGroveWorkspace(cwd: string): Promise<boolean> {
   const root = resolve(
     process.env.GROVE_ROOT ?? join(process.env.HOME ?? "/tmp", "grove-workspaces"),
   );
-  const rel = relative(root, resolve(cwd));
+  const realRoot = await tryRealpath(root);
+  const realCwd = await tryRealpath(cwd);
+  if (realRoot === null || realCwd === null) {
+    return false;
+  }
+
+  const rel = relative(realRoot, realCwd);
 
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`));
 }
@@ -164,7 +179,7 @@ try {
 }
 
 const cwd = extractCwd(input);
-if (cwd === null || !isInsideGroveWorkspace(cwd)) {
+if (cwd === null || !(await isInsideGroveWorkspace(cwd))) {
   process.exit(0);
 }
 

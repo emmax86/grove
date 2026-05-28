@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { cleanup, createTestDir } from "../helpers";
@@ -163,7 +163,6 @@ describe("reject-git-worktree hook script", () => {
 
     await mkdir(groveCwd, { recursive: true });
     await mkdir(nonGroveCwd, { recursive: true });
-    await writeFile(path.join(groveCwd, "workspace.json"), JSON.stringify({ name: "workspace" }));
   });
 
   afterEach(() => cleanup(tempDir));
@@ -194,11 +193,24 @@ describe("reject-git-worktree hook script", () => {
     expect(result.denied).toBe(false);
   });
 
-  it("denies direct git worktree under GROVE_ROOT without a workspace.json marker", async () => {
-    const unmarkedCwd = path.join(groveRoot, "scratch", "nested");
-    await mkdir(unmarkedCwd, { recursive: true });
+  it("denies direct git worktree for any path under GROVE_ROOT", async () => {
+    const nestedCwd = path.join(groveRoot, "scratch", "nested");
+    await mkdir(nestedCwd, { recursive: true });
 
-    const result = await invokeScript(cmdInCwd("git worktree list", unmarkedCwd));
+    const result = await invokeScript(cmdInCwd("git worktree list", nestedCwd));
+
+    expect(result.denied).toBe(true);
+  });
+
+  it("denies direct git worktree when GROVE_ROOT is a symlink and cwd is canonical", async () => {
+    const realRoot = path.join(tempDir, "real-grove-root");
+    const linkedRoot = path.join(tempDir, "linked-grove-root");
+    const canonicalCwd = path.join(realRoot, "workspace");
+    await mkdir(canonicalCwd, { recursive: true });
+    await symlink(realRoot, linkedRoot, "dir");
+    groveRoot = linkedRoot;
+
+    const result = await invokeScript(cmdInCwd("git worktree list", canonicalCwd));
 
     expect(result.denied).toBe(true);
   });
