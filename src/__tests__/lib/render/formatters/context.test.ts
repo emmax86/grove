@@ -27,7 +27,7 @@ const workspaceValue: GroveContext = {
       sourcePath: "trees/api/feature-auth/packages/auth/AGENTS.md",
       kind: "AGENTS.md",
       contextKey: "myws/api/feature-auth/packages/auth",
-      loadCommand: "grove ws context trees/api/feature-auth/packages/auth",
+      loadCommand: "grove ws context myws trees/api/feature-auth/packages/auth",
       hash: "abc123",
     },
   ],
@@ -54,7 +54,7 @@ const targetValue: GroveContext = {
       path: "trees/api/feature-auth/packages/auth/AGENTS.md",
       kind: "AGENTS.md",
       contextKey: "myws/api/feature-auth/packages/auth",
-      loadCommand: "grove ws context trees/api/feature-auth/packages/auth",
+      loadCommand: "grove ws context myws trees/api/feature-auth/packages/auth",
       hash: "abc123",
       content: "# Instructions\n\nUse the auth package conventions.",
     },
@@ -79,7 +79,7 @@ describe("contextText", () => {
     expect(out).toContain("## Instruction Index");
     expect(out).toContain("trees/api/feature-auth/packages/auth/AGENTS.md");
     expect(out).toContain("myws/api/feature-auth/packages/auth");
-    expect(out).toContain("grove ws context trees/api/feature-auth/packages/auth");
+    expect(out).toContain("grove ws context myws trees/api/feature-auth/packages/auth");
   });
 
   it("renders workspace skipped section with path and reason", () => {
@@ -109,7 +109,9 @@ describe("contextText", () => {
   it("renders target reload command with the stable loaded scope", () => {
     const out = contextText({ ...targetValue, target: "." }, baseCtx);
 
-    expect(out).toContain("Reload with `grove ws context trees/api/feature-auth/packages/auth`");
+    expect(out).toContain(
+      "Reload with `grove ws context myws trees/api/feature-auth/packages/auth`",
+    );
     expect(out).not.toContain("Reload with `grove ws context .`");
   });
 

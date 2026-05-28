@@ -147,7 +147,7 @@ async function addInstructionEntry(
         sourcePath,
         kind: file,
         contextKey: `${workspace}/${scope}`,
-        loadCommand: `grove ws context ${scopePath}`,
+        loadCommand: `grove ws context ${workspace} ${scopePath}`,
         hash: hashContent(content),
       });
       return;
@@ -192,7 +192,7 @@ async function readInstructionSource(
         path: sourcePath,
         kind: file,
         contextKey: `${workspace}/${scope}`,
-        loadCommand: `grove ws context ${scopePath}`,
+        loadCommand: `grove ws context ${workspace} ${scopePath}`,
         hash,
         content,
       };

@@ -87,7 +87,7 @@ function targetText(value: TargetContext): string {
     `Context hash: ${value.contextHash}`,
     "",
     "## Agent Protocol",
-    `Reload with \`grove ws context ${value.loadedScope}\` when instructions may have changed.`,
+    `Reload with \`grove ws context ${value.workspace.name} ${value.loadedScope}\` when instructions may have changed.`,
     "",
     "## Loaded Instructions",
   ];

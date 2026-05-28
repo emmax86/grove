@@ -156,7 +156,7 @@ describe("render — context kind", () => {
       repo: "api",
       slug: "main",
       worktreePath: "trees/api/main",
-      loadedScope: "api/main",
+      loadedScope: "trees/api/main",
       contextKey: "myws/api/main",
       contextHash: "sha256:abc123",
       sources: [],
@@ -174,6 +174,7 @@ describe("render — context kind", () => {
 
     expect(out.stdout).toContain("# Grove Context");
     expect(out.stdout).toContain("Resolved worktree: api/main");
+    expect(out.stdout).toContain("Reload with `grove ws context myws trees/api/main`");
     expect(out.stderr).toBe("");
     expect(out.exitCode).toBe(0);
   });

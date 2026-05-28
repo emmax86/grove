@@ -44,7 +44,7 @@ describe("context command", () => {
       "api/feature-auth",
       "api/feature-auth/packages/auth",
     ]);
-    expect(result.value.index[0].loadCommand).toBe("grove ws context trees/api/feature-auth");
+    expect(result.value.index[0].loadCommand).toBe("grove ws context myws trees/api/feature-auth");
     expect(result.value.index[0]).not.toHaveProperty("content");
   });
 
