@@ -294,11 +294,17 @@ async function resolveLogicalTarget(
     }
   }
 
-  if (!isInsideOrEqual(workspaceRoot, targetPath)) {
+  const realWorkspaceRoot = await tryRealpath(workspaceRoot);
+  const relToWorkspace = relativeToCandidateRoot(
+    workspaceRoot,
+    realWorkspaceRoot,
+    targetPath,
+    realTargetPath,
+  );
+  if (relToWorkspace === null) {
     return err(`Target is not inside workspace trees: ${targetPath}`, "CONTEXT_TARGET_NOT_FOUND");
   }
 
-  const relToWorkspace = relative(workspaceRoot, targetPath);
   const parts = relToWorkspace.split(sep).filter(Boolean);
   if (parts[0] !== "trees") {
     return err(`Target is not inside workspace trees: ${targetPath}`, "CONTEXT_TARGET_NOT_FOUND");
@@ -306,7 +312,10 @@ async function resolveLogicalTarget(
 
   const repoName = parts[1];
   if (!repoName) {
-    return err(`Target is not inside a repo tree: ${targetPath}`, "CONTEXT_TARGET_NOT_FOUND");
+    return err(
+      `Target is not inside a repo tree: ${targetPath}. Use "trees/<repo>/<worktree>" for a workspace-relative target, or "./trees" for a worktree subdirectory named "trees".`,
+      "CONTEXT_TARGET_NOT_FOUND",
+    );
   }
 
   const repo = repos.find((entry) => entry.name === repoName);

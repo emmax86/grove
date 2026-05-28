@@ -106,6 +106,13 @@ describe("contextText", () => {
     expect(out).toContain("# Instructions\n\nUse the auth package conventions.");
   });
 
+  it("renders target reload command with the stable loaded scope", () => {
+    const out = contextText({ ...targetValue, target: "." }, baseCtx);
+
+    expect(out).toContain("Reload with `grove ws context trees/api/feature-auth/packages/auth`");
+    expect(out).not.toContain("Reload with `grove ws context .`");
+  });
+
   it("renders target no-instructions message when sources is empty", () => {
     const out = contextText({ ...targetValue, sources: [] }, baseCtx);
 

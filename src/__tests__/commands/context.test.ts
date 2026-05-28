@@ -293,6 +293,35 @@ describe("context command", () => {
     expect(result.value.sources[0].content).toBe("# absolute\n");
   });
 
+  it("resolves an absolute workspace-tree target path through a realpath alias", async () => {
+    const realRoot = join(tempDir, "real-workspaces");
+    const linkedRoot = join(tempDir, "linked-workspaces");
+    await mkdir(realRoot, { recursive: true });
+    await symlink(realRoot, linkedRoot, "dir");
+    const aliasPaths = createPaths(linkedRoot);
+    await addWorkspace("aliasws", aliasPaths);
+    await addRepo("aliasws", repoPath, "api", aliasPaths, GIT_ENV);
+    const legacyRoot = aliasPaths.worktreeDir("aliasws", "api", "legacy");
+    await mkdir(legacyRoot, { recursive: true });
+    await writeFile(join(legacyRoot, "AGENTS.md"), "# legacy\n");
+    const realTarget = join(realRoot, "aliasws", "trees", "api", "legacy", "AGENTS.md");
+
+    const result = await getTargetContext(
+      "aliasws",
+      realTarget,
+      aliasPaths.workspace("aliasws"),
+      aliasPaths,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.worktreePath).toBe("trees/api/legacy");
+    expect(result.value.loadedScope).toBe("trees/api/legacy");
+    expect(result.value.sources[0].content).toBe("# legacy\n");
+  });
+
   it("resolves a relative target from inside a nested worktree cwd", async () => {
     const featureRoot = paths.worktreeDir("myws", "api", "feature-auth");
     const nested = join(featureRoot, "packages", "auth");

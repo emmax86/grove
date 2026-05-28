@@ -393,4 +393,24 @@ describe("CLI output modes (smoke)", () => {
     expect(json.code).toBe("MISSING_ARG");
     expect(json.help.path).toEqual(["grove", "ws", "context"]);
   });
+
+  it("ws context bare trees target explains how to target a local trees directory", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+    const worktreeRoot = join(root, "myws", "trees", "api", "main");
+    await mkdir(join(worktreeRoot, "trees"), { recursive: true });
+
+    const r = await runCLI(["ws", "context", "trees", "--json"], {
+      root,
+      cwd: worktreeRoot,
+      pwd: worktreeRoot,
+    });
+
+    expect(r.exitCode).toBe(1);
+    const json = JSON.parse(r.stderr);
+    expect(json.ok).toBe(false);
+    expect(json.code).toBe("CONTEXT_TARGET_NOT_FOUND");
+    expect(json.error).toContain("./trees");
+  });
 });
