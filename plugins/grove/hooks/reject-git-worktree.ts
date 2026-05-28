@@ -1,5 +1,9 @@
 #!/usr/bin/env bun
 // PreToolUse hook: deny direct `git worktree` commands in grove workspaces.
+
+import { realpath } from "node:fs/promises";
+import { join, relative, resolve, sep } from "node:path";
+
 //
 // Strategy: tokenize the command in a single quote-aware pass that simultaneously
 // handles shell operators (;  &  |  newline) as segment boundaries and strips
@@ -132,11 +136,51 @@ function extractCommand(input: unknown): string {
   return "";
 }
 
+function extractCwd(input: unknown): string | null {
+  if (
+    input !== null &&
+    typeof input === "object" &&
+    "cwd" in input &&
+    typeof (input as { cwd: unknown }).cwd === "string"
+  ) {
+    return (input as { cwd: string }).cwd;
+  }
+  return null;
+}
+
+async function tryRealpath(path: string): Promise<string | null> {
+  try {
+    return await realpath(path);
+  } catch {
+    return null;
+  }
+}
+
+async function isInsideGroveWorkspace(cwd: string): Promise<boolean> {
+  const root = resolve(
+    process.env.GROVE_ROOT ?? join(process.env.HOME ?? "/tmp", "grove-workspaces"),
+  );
+  const realRoot = await tryRealpath(root);
+  const realCwd = await tryRealpath(cwd);
+  if (realRoot === null || realCwd === null) {
+    return false;
+  }
+
+  const rel = relative(realRoot, realCwd);
+
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`));
+}
+
 let input: unknown;
 try {
   input = JSON.parse(await Bun.stdin.text());
 } catch {
   process.exit(0); // malformed input — fail open
+}
+
+const cwd = extractCwd(input);
+if (cwd === null || !(await isInsideGroveWorkspace(cwd))) {
+  process.exit(0);
 }
 
 const command = extractCommand(input);
