@@ -12,7 +12,6 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const SRC = join(ROOT, "src");
 
 async function collectFiles(dir: string): Promise<string[]> {
   const files: string[] = [];
@@ -27,10 +26,13 @@ async function collectFiles(dir: string): Promise<string[]> {
   return files;
 }
 
-function findSyncCalls(filePath: string, content: string): { line: number; name: string }[] {
+export type SyncCallViolation = { line: number; name: string };
+export type SyncScanViolation = SyncCallViolation & { file: string };
+
+export function findSyncCalls(filePath: string, content: string): SyncCallViolation[] {
   const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
 
-  const violations: { line: number; name: string }[] = [];
+  const violations: SyncCallViolation[] = [];
 
   function visit(node: ts.Node) {
     if (ts.isCallExpression(node)) {
@@ -55,20 +57,31 @@ function findSyncCalls(filePath: string, content: string): { line: number; name:
   return violations;
 }
 
-const files = await collectFiles(SRC);
-let violations = 0;
+export async function scanSyncViolations(root = ROOT): Promise<SyncScanViolation[]> {
+  const files = await collectFiles(join(root, "src"));
+  const violations: SyncScanViolation[] = [];
 
-for (const file of files) {
-  const content = await readFile(file, "utf-8");
-  for (const { line, name } of findSyncCalls(file, content)) {
-    console.error(`${relative(ROOT, file)}:${line}: ${name}(`);
-    violations++;
+  for (const file of files) {
+    const content = await readFile(file, "utf-8");
+    for (const { line, name } of findSyncCalls(file, content)) {
+      violations.push({ file: relative(root, file), line, name });
+    }
   }
+
+  return violations;
 }
 
-if (violations > 0) {
-  console.error(`\n${violations} sync violation(s) found.`);
-  process.exit(1);
-}
+if (import.meta.main) {
+  const violations = await scanSyncViolations();
 
-console.log("check-no-sync: ok");
+  for (const { file, line, name } of violations) {
+    console.error(`${file}:${line}: ${name}(`);
+  }
+
+  if (violations.length > 0) {
+    console.error(`\n${violations.length} sync violation(s) found.`);
+    process.exit(1);
+  }
+
+  console.log("check-no-sync: ok");
+}
