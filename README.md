@@ -139,27 +139,44 @@ Output captured to a file or piped to another command is byte-identical to termi
 ## Integrations
 
 - **Claude Code plugin** — `.claude-plugin/marketplace.json` is the Claude marketplace file, and `plugins/grove/commands/` contains the `/workspace`, `/workspace-status`, `/worktree`, `/repo`, `/exec` slash command implementations
-- **Codex plugin** — `.agents/plugins/marketplace.json` exposes `plugins/grove/` as a Codex plugin that reuses Grove's CLI-first skills
+- **Codex plugin** — `.agents/plugins/marketplace.json` exposes `plugins/grove/` as a Codex plugin; `plugins/grove/.codex-plugin/plugin.json` is the manifest, `plugins/grove/skills/` contains Codex skills, and `plugins/grove/hooks/hooks.json` is the default bundled hook config
 - **MCP server** — `grove mcp-server` exposes workspace operations over MCP for AI tool integration
 - **Auto-generated files** — adding/removing repos creates `CLAUDE.md` once (if absent), then regenerates `.claude/trees.md` and `{workspace}.code-workspace` to keep editor and agent configs in sync
 
 ### Codex
 
 The Codex integration is intentionally CLI-first. The plugin in `plugins/grove/`
-packages Grove's existing skills so Codex uses:
+packages Grove's existing skills and a bundled lifecycle hook so Codex uses:
 
 - `grove ws status` to discover workspace context
 - `grove ws worktree ...` to create and manage worktrees
-- the `reject-git-worktree.ts` hook to steer the agent away from raw `git worktree`
+- the `PreToolUse` hook declared at `plugins/grove/hooks/hooks.json` to steer the agent away from raw `git worktree`
 
 This keeps the `grove` CLI as the source of truth. MCP support remains available,
 but Codex does not depend on it for the primary workflow.
 
-To use the local plugin in Codex, point Codex at this repo's marketplace file:
+Codex discovers plugin-bundled hooks at `hooks/hooks.json` by default, so
+`plugins/grove/.codex-plugin/plugin.json` intentionally does not include a
+`hooks` field. The hook command resolves through
+`${PLUGIN_ROOT}/hooks/reject-git-worktree.ts`; Claude Code support remains
+separate in `plugins/grove/.claude-plugin/plugin.json` and uses
+`${CLAUDE_PLUGIN_ROOT}`.
 
-```text
-.agents/plugins/marketplace.json
+To use the local plugin in Codex from this Grove workspace, add the repository
+root as a local marketplace source and install the `grove` entry:
+
+```bash
+cd <your-grove-workspace>
+codex plugin marketplace add <path-to-grove-repo-main-tree>
+codex plugin add grove@grove
 ```
+
+Codex resolves `.agents/plugins/marketplace.json` from that marketplace root and
+then resolves the plugin `source.path` relative to the root. After installing or
+reinstalling, start a new Codex thread in your Grove workspace and run `/hooks`
+to review and trust the Grove `PreToolUse` hook from
+`plugins/grove/hooks/hooks.json`. Codex skips non-managed command hooks until
+they are trusted and requires review again when a hook definition changes.
 
 ## Development
 

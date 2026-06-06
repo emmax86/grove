@@ -67,6 +67,21 @@ The Grove CLI is the source of truth. Agent integrations should prefer calling
 `grove ws ...` directly. The Claude plugin, Codex plugin, and MCP server are
 adapters around the CLI rather than alternative implementations.
 
+### Plugin packaging
+
+- Claude Code support uses `plugins/grove/.claude-plugin/plugin.json`,
+  `plugins/grove/commands/*.md`, and `${CLAUDE_PLUGIN_ROOT}` in Claude hook
+  commands.
+- Codex support uses `plugins/grove/.codex-plugin/plugin.json`,
+  `plugins/grove/skills/`, and the default plugin-bundled hook file at
+  `plugins/grove/hooks/hooks.json`.
+- Do not add a `hooks` field to the Codex manifest. Codex discovers
+  `hooks/hooks.json` by default, and the local plugin validator rejects
+  unsupported manifest fields.
+- Codex hook commands should resolve from `${PLUGIN_ROOT}`. After installing or
+  reinstalling the plugin, use `/hooks` in a new Codex thread to review and
+  trust non-managed command hooks before relying on them.
+
 ### Output rendering
 
 All CLI output goes through `render(result, kind, ctx)` in `src/lib/render/`. Three mutually-exclusive modes:

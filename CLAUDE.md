@@ -66,7 +66,9 @@ Output invariants enforced by tests in `src/__tests__/lib/render/invariants.test
 
 ### Plugin
 
-`plugins/grove/` contains the Claude Code plugin. `plugins/grove/.claude-plugin/plugin.json` is the manifest and `plugins/grove/commands/*.md` are the slash-command definitions. The grove repo acts as a marketplace source installable via `claude plugin marketplace add emmax86/grove --sparse .claude-plugin plugins`.
+`plugins/grove/` contains both Claude Code and Codex plugin assets. Claude Code support uses `plugins/grove/.claude-plugin/plugin.json` plus `plugins/grove/commands/*.md` slash-command definitions, and remains installable with `claude plugin marketplace add emmax86/grove --sparse .claude-plugin plugins`.
+
+Codex support uses `plugins/grove/.codex-plugin/plugin.json`, `plugins/grove/skills/`, and the default plugin-bundled hook file at `plugins/grove/hooks/hooks.json`. Do not add a `hooks` field to the Codex manifest; the local validator rejects it, and Codex discovers the default hook path automatically. Codex hook commands should resolve from `${PLUGIN_ROOT}`. Claude Code hook commands should keep using `${CLAUDE_PLUGIN_ROOT}`.
 
 ## Tests
 
