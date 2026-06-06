@@ -162,15 +162,15 @@ To use the local plugin in Codex from this Grove workspace, add the repository
 root as a local marketplace source and install the `grove` entry:
 
 ```bash
-cd /home/emma/grove-workspaces/ai
-codex plugin marketplace add /home/emma/grove-workspaces/ai/trees/grove/main
+cd <your-grove-workspace>
+codex plugin marketplace add <path-to-grove-repo-main-tree>
 codex plugin add grove@grove
 ```
 
 Codex resolves `.agents/plugins/marketplace.json` from that marketplace root and
 then resolves the plugin `source.path` relative to the root. After installing or
-reinstalling, start a new Codex thread in `/home/emma/grove-workspaces/ai` and
-run `/hooks` to review and trust the Grove `PreToolUse` hook from
+reinstalling, start a new Codex thread in your Grove workspace and run `/hooks`
+to review and trust the Grove `PreToolUse` hook from
 `plugins/grove/hooks/hooks.json`. Codex skips non-managed command hooks until
 they are trusted and requires review again when a hook definition changes.
 

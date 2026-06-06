@@ -186,6 +186,8 @@ describe("Codex plugin hook layout", () => {
         ];
       };
     };
+    expect(hookConfig.hooks.PreToolUse).toHaveLength(1);
+    expect(hookConfig.hooks.PreToolUse[0].hooks).toHaveLength(1);
     const command = hookConfig.hooks.PreToolUse[0].hooks[0].command;
     const pluginRootVar = "$" + "{PLUGIN_ROOT}";
     expect(command).toBe(`bun run ${pluginRootVar}/hooks/reject-git-worktree.ts`);
