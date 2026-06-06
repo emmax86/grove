@@ -1,1 +1,1 @@
-bunx --no lint-staged && bun run lint:no-sync && bun run typecheck
+bunx --no lint-staged && bun run typecheck

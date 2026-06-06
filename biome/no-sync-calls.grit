@@ -1,0 +1,12 @@
+language js(typescript)
+
+or {
+  `$fn($args)` where {
+    $fn <: r".*Sync$",
+    register_diagnostic(span=$fn, message="Do not call synchronous APIs in source files.")
+  },
+  `$fn?.($args)` where {
+    $fn <: r".*Sync$",
+    register_diagnostic(span=$fn, message="Do not call synchronous APIs in source files.")
+  }
+}
