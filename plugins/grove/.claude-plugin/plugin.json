@@ -12,7 +12,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/reject-git-worktree.ts",
+            "command": "bun run ${CLAUDE_PLUGIN_ROOT}/hooks/claude-reject-git-worktree.ts",
             "timeout": 5
           }
         ]

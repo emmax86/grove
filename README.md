@@ -158,9 +158,10 @@ but Codex does not depend on it for the primary workflow.
 Codex discovers plugin-bundled hooks at `hooks/hooks.json` by default, so
 `plugins/grove/.codex-plugin/plugin.json` intentionally does not include a
 `hooks` field. The hook command resolves through
-`${PLUGIN_ROOT}/hooks/reject-git-worktree.ts`; Claude Code support remains
-separate in `plugins/grove/.claude-plugin/plugin.json` and uses
-`${CLAUDE_PLUGIN_ROOT}`.
+`${PLUGIN_ROOT}/hooks/codex-reject-git-worktree.ts`; Claude Code support
+remains separate in `plugins/grove/.claude-plugin/plugin.json` and resolves
+through `${CLAUDE_PLUGIN_ROOT}/hooks/claude-reject-git-worktree.ts`. Both
+adapters share the same git worktree policy.
 
 To use the local plugin in Codex from this Grove workspace, add the repository
 root as a local marketplace source and install the `grove` entry:
