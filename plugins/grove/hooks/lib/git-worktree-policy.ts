@@ -8,10 +8,10 @@ export const DENY_OUTPUT = {
     permissionDecisionReason: "Direct git worktree commands are not allowed in grove workspaces.",
     additionalContext:
       "Use grove skills to manage worktrees:\n" +
-      "- /worktree add [repo] <branch> [--new] - create a worktree\n" +
-      "- /worktree list [repo] - list worktrees\n" +
-      "- /worktree remove [repo] <slug> - remove a worktree\n" +
-      "- /worktree prune - clean up stale worktrees\n\n" +
+      "- /worktree add [repo] <branch> [--new] \u2014 create a worktree\n" +
+      "- /worktree list [repo] \u2014 list worktrees\n" +
+      "- /worktree remove [repo] <slug> \u2014 remove a worktree\n" +
+      "- /worktree prune \u2014 clean up stale worktrees\n\n" +
       "Or use the create-grove-worktree skill when starting work on a new branch.",
   },
 };
@@ -26,6 +26,11 @@ const VALUE_FLAGS = new Set([
   "--super-prefix",
 ]);
 
+// Strategy: tokenize the command in a single quote-aware pass that treats shell
+// operators as segment boundaries and strips single/double quotes. Known gaps:
+// backtick command substitution, fd-redirect prefixes, and heredoc-embedded
+// calls are not detected. Full shell parsing is out of scope; $() is caught
+// because "(" starts a new segment.
 function tokenizeIntoSegments(command: string): string[][] {
   const segments: string[][] = [[]];
   let current = "";

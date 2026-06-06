@@ -42,10 +42,12 @@ export function extractPreToolUseBashCommand(input: unknown): HookCommandPayload
   };
 }
 
+// Codex-specific payload parsing belongs here when the Codex schema differs.
 export function extractCodexPreToolUseBashCommand(input: unknown): HookCommandPayload | null {
   return extractPreToolUseBashCommand(input);
 }
 
+// Claude-specific payload parsing belongs here when the Claude Code schema differs.
 export function extractClaudePreToolUseBashCommand(input: unknown): HookCommandPayload | null {
   return extractPreToolUseBashCommand(input);
 }

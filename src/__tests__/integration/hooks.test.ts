@@ -108,7 +108,7 @@ function preToolUseCmdInCwd(command: string, cwd: string, toolName = "Bash") {
 }
 
 function preToolUseBashCmdInCwd(command: string, cwd: string) {
-  return preToolUseCmdInCwd(command, cwd);
+  return preToolUseCmdInCwd(command, cwd, "Bash");
 }
 
 function withCwd(input: unknown, cwd: string): unknown {
@@ -418,6 +418,7 @@ describe("Codex reject-git-worktree hook adapter", () => {
 
     expect(output.permissionDecision).toBe("deny");
     expect(output.additionalContext).toContain("/worktree");
+    expect(output.additionalContext).toContain("\u2014 create a worktree");
     expect(output.additionalContext).toContain("create-grove-worktree");
   });
 });
@@ -435,6 +436,16 @@ describe("Claude reject-git-worktree hook adapter", () => {
 
   afterEach(() => cleanup(tempDir));
 
+  it.each(DENY_CASES)("denies: %s", async (_, input) => {
+    const result = await invokeClaude(withCwd(input, groveCwd));
+    expect(result.denied).toBe(true);
+  });
+
+  it.each(ALLOW_CASES)("allows: %s", async (_, input) => {
+    const result = await invokeClaude(withCwd(input, groveCwd));
+    expect(result.denied).toBe(false);
+  });
+
   it("denies Claude Bash payloads inside Grove workspaces", async () => {
     const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", groveCwd));
 
@@ -446,6 +457,14 @@ describe("Claude reject-git-worktree hook adapter", () => {
 
   it("allows Claude Bash payloads outside Grove workspaces", async () => {
     const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", nonGroveCwd));
+
+    expect(result.denied).toBe(false);
+  });
+
+  it("allows Claude PreToolUse payloads for non-Bash tools", async () => {
+    const result = await invokeClaude(
+      preToolUseCmdInCwd("git worktree list", groveCwd, "mcp__fs__read"),
+    );
 
     expect(result.denied).toBe(false);
   });
