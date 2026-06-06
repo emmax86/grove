@@ -18,6 +18,23 @@ const workspaceValue: GroveContext = {
       path: "trees/api/feature-auth",
     },
   ],
+  workspaceInstructions: {
+    repo: "",
+    slug: "",
+    scope: "workspace",
+    scopePath: ".grove",
+    sourcePath: ".grove/instructions.md",
+    path: ".grove/instructions.md",
+    kind: "workspace",
+    layer: "workspace",
+    ownership: "user",
+    selectionReason: "workspace instruction file",
+    contentHash: "workspace-content-hash",
+    contextKey: "myws/workspace",
+    loadCommand: "grove ws context myws",
+    hash: "workspace-content-hash",
+    content: "# Workspace\n\nUse shared workspace instructions.",
+  },
   index: [
     {
       repo: "api",
@@ -26,11 +43,19 @@ const workspaceValue: GroveContext = {
       scopePath: "trees/api/feature-auth/packages/auth",
       sourcePath: "trees/api/feature-auth/packages/auth/AGENTS.md",
       kind: "AGENTS.md",
+      layer: "target",
+      ownership: "user",
+      selectionReason: "selected by worktree instruction priority",
+      contentHash: "abc123",
       contextKey: "myws/api/feature-auth/packages/auth",
       loadCommand: "grove ws context myws trees/api/feature-auth/packages/auth",
       hash: "abc123",
     },
   ],
+  graph: {
+    root: "sha256:workspace-root",
+    nodes: [],
+  },
   skipped: [],
 };
 
@@ -46,6 +71,23 @@ const targetValue: GroveContext = {
   contextHash: "sha256:def456",
   sources: [
     {
+      repo: "",
+      slug: "",
+      scope: "workspace",
+      scopePath: ".grove",
+      sourcePath: ".grove/instructions.md",
+      path: ".grove/instructions.md",
+      kind: "workspace",
+      layer: "workspace",
+      ownership: "user",
+      selectionReason: "workspace instruction file",
+      contentHash: "workspace-content-hash",
+      contextKey: "myws/workspace",
+      loadCommand: "grove ws context myws",
+      hash: "workspace-content-hash",
+      content: "# Workspace\n\nUse shared workspace instructions.",
+    },
+    {
       repo: "api",
       slug: "feature-auth",
       scope: "api/feature-auth/packages/auth",
@@ -53,12 +95,20 @@ const targetValue: GroveContext = {
       sourcePath: "trees/api/feature-auth/packages/auth/AGENTS.md",
       path: "trees/api/feature-auth/packages/auth/AGENTS.md",
       kind: "AGENTS.md",
+      layer: "target",
+      ownership: "user",
+      selectionReason: "selected by worktree instruction priority",
+      contentHash: "abc123",
       contextKey: "myws/api/feature-auth/packages/auth",
       loadCommand: "grove ws context myws trees/api/feature-auth/packages/auth",
       hash: "abc123",
       content: "# Instructions\n\nUse the auth package conventions.",
     },
   ],
+  graph: {
+    root: "sha256:def456",
+    nodes: [],
+  },
   skipped: [],
 };
 
@@ -69,8 +119,18 @@ describe("contextText", () => {
     expect(out).toContain("# Grove Context");
     expect(out).toContain("Workspace: myws");
     expect(out).toContain("Path: /workspaces/myws");
+    expect(out).toContain("Context hash: sha256:workspace-root");
     expect(out).toContain("## Agent Protocol");
     expect(out).toContain("grove ws context <target>");
+    expect(out).toContain("## Workspace Instructions");
+    expect(out).toContain("### .grove/instructions.md");
+    expect(out).toContain("Kind: workspace");
+    expect(out).toContain("Layer: workspace");
+    expect(out).toContain("Ownership: user");
+    expect(out).toContain("Selection reason: workspace instruction file");
+    expect(out).toContain("Source/content hash: workspace-content-hash");
+    expect(out).not.toContain("Provenance hash:");
+    expect(out).toContain("# Workspace\n\nUse shared workspace instructions.");
     expect(out).toContain("## Worktrees");
     expect(out).toContain("- api/main (linked, branch: main) - trees/api/main");
     expect(out).toContain(
@@ -78,6 +138,11 @@ describe("contextText", () => {
     );
     expect(out).toContain("## Instruction Index");
     expect(out).toContain("trees/api/feature-auth/packages/auth/AGENTS.md");
+    expect(out).toContain("  layer: target");
+    expect(out).toContain("  ownership: user");
+    expect(out).toContain("  selection reason: selected by worktree instruction priority");
+    expect(out).toContain("  source/content hash: abc123");
+    expect(out).not.toContain("  provenance hash:");
     expect(out).toContain("myws/api/feature-auth/packages/auth");
     expect(out).toContain("grove ws context myws trees/api/feature-auth/packages/auth");
   });
@@ -101,8 +166,15 @@ describe("contextText", () => {
     expect(out).toContain("Resolved worktree: api/feature-auth");
     expect(out).toContain("Loaded scope: trees/api/feature-auth/packages/auth");
     expect(out).toContain("Context hash: sha256:def456");
+    expect(out).toContain("### .grove/instructions.md");
+    expect(out).toContain("Kind: workspace");
     expect(out).toContain("### trees/api/feature-auth/packages/auth/AGENTS.md");
-    expect(out).toContain("Source hash: abc123");
+    expect(out).toContain("Kind: AGENTS.md");
+    expect(out).toContain("Layer: target");
+    expect(out).toContain("Ownership: user");
+    expect(out).toContain("Selection reason: selected by worktree instruction priority");
+    expect(out).toContain("Source/content hash: abc123");
+    expect(out).not.toContain("Provenance hash:");
     expect(out).toContain("# Instructions\n\nUse the auth package conventions.");
   });
 
@@ -123,19 +195,40 @@ describe("contextText", () => {
 });
 
 describe("contextPorcelain", () => {
-  it("renders workspace row exactly matching the schema", () => {
+  it("renders workspace rows exactly matching the schema", () => {
     expect(contextPorcelain(workspaceValue)).toBe(
       [
-        "index",
-        "myws",
-        "api",
-        "feature-auth",
-        "api/feature-auth/packages/auth",
-        "trees/api/feature-auth/packages/auth/AGENTS.md",
-        "AGENTS.md",
-        "abc123",
-        "myws/api/feature-auth/packages/auth",
-      ].join("\t"),
+        [
+          "source",
+          "myws",
+          "",
+          "",
+          "workspace",
+          ".grove/instructions.md",
+          "workspace",
+          "workspace-content-hash",
+          "myws/workspace",
+          "workspace",
+          "user",
+          "workspace instruction file",
+          "workspace-content-hash",
+        ].join("\t"),
+        [
+          "index",
+          "myws",
+          "api",
+          "feature-auth",
+          "api/feature-auth/packages/auth",
+          "trees/api/feature-auth/packages/auth/AGENTS.md",
+          "AGENTS.md",
+          "abc123",
+          "myws/api/feature-auth/packages/auth",
+          "target",
+          "user",
+          "selected by worktree instruction priority",
+          "abc123",
+        ].join("\t"),
+      ].join("\n"),
     );
   });
 
@@ -159,6 +252,23 @@ describe("contextPorcelain", () => {
       [
         "source",
         "myws",
+        "",
+        "",
+        "workspace",
+        ".grove/instructions.md",
+        "workspace",
+        "workspace-content-hash",
+        "myws/workspace",
+        "workspace",
+        "user",
+        "workspace instruction file",
+        "workspace-content-hash",
+      ].join("\t"),
+    );
+    expect(rows).toContain(
+      [
+        "source",
+        "myws",
         "api",
         "feature-auth",
         "api/feature-auth/packages/auth",
@@ -166,12 +276,22 @@ describe("contextPorcelain", () => {
         "AGENTS.md",
         "abc123",
         "myws/api/feature-auth/packages/auth",
+        "target",
+        "user",
+        "selected by worktree instruction priority",
+        "abc123",
       ].join("\t"),
     );
   });
 
   it("returns empty string for workspace mode with no index entries", () => {
-    expect(contextPorcelain({ ...workspaceValue, index: [] })).toBe("");
+    expect(
+      contextPorcelain({
+        ...workspaceValue,
+        workspaceInstructions: undefined,
+        index: [],
+      }),
+    ).toBe("");
   });
 
   it("renders target metadata row when there are no loaded sources", () => {

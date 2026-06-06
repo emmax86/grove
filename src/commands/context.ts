@@ -8,6 +8,10 @@ import { err, ok, type Result, type WorktreeEntry } from "../types";
 import { getStatus } from "./status";
 
 export type InstructionFileName = "AGENTS.override.md" | "AGENTS.md" | "CLAUDE.md";
+export type ContextInstructionLayer = "workspace" | "target";
+// "generated" is reserved for future Grove-authored instruction files.
+export type ContextInstructionOwnership = "user" | "generated";
+export type ContextInstructionKind = "workspace" | InstructionFileName;
 
 export interface ContextWorkspaceInfo {
   name: string;
@@ -28,9 +32,14 @@ export interface ContextIndexEntry {
   scope: string;
   scopePath: string;
   sourcePath: string;
-  kind: InstructionFileName;
+  kind: ContextInstructionKind;
+  layer: ContextInstructionLayer;
+  ownership: ContextInstructionOwnership;
+  selectionReason: string;
+  contentHash: string;
   contextKey: string;
   loadCommand: string;
+  /** Compatibility alias for contentHash; keep this stable for existing JSON and porcelain consumers. */
   hash: string;
 }
 
@@ -43,7 +52,9 @@ export interface WorkspaceContext {
   mode: "workspace";
   workspace: ContextWorkspaceInfo;
   worktrees: ContextWorktreeInfo[];
+  workspaceInstructions?: ContextInstructionSource;
   index: ContextIndexEntry[];
+  graph: ContextGraph;
   skipped: ContextSkippedEntry[];
 }
 
@@ -63,10 +74,27 @@ export interface TargetContext {
   contextKey: string;
   contextHash: string;
   sources: ContextInstructionSource[];
+  graph: ContextGraph;
   skipped: ContextSkippedEntry[];
 }
 
 export type GroveContext = WorkspaceContext | TargetContext;
+
+export interface ContextGraphNode {
+  id: string;
+  kind: "workspace" | "target" | "instruction" | "context";
+  path?: string;
+  scope?: string;
+  layer?: ContextInstructionLayer;
+  ownership?: ContextInstructionOwnership;
+  selectionReason: string;
+  contentHash?: string;
+}
+
+export interface ContextGraph {
+  root: string;
+  nodes: ContextGraphNode[];
+}
 
 const INSTRUCTION_FILES: InstructionFileName[] = ["AGENTS.override.md", "AGENTS.md", "CLAUDE.md"];
 
@@ -78,7 +106,7 @@ function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
-function hashContext(parts: unknown[]): string {
+function hashNode(parts: unknown): string {
   return `sha256:${createHash("sha256").update(JSON.stringify(parts)).digest("hex")}`;
 }
 
@@ -113,6 +141,121 @@ function hasSkippedPath(skipped: ContextSkippedEntry[], path: string): boolean {
   return skipped.some((entry) => entry.path === path);
 }
 
+interface BuildInstructionEntryArgs {
+  workspace: string;
+  repo: string;
+  slug: string;
+  scope: string;
+  scopePath: string;
+  sourcePath: string;
+  kind: ContextInstructionKind;
+  layer: ContextInstructionLayer;
+  ownership: ContextInstructionOwnership;
+  selectionReason: string;
+  content: string;
+  loadCommand: string;
+}
+
+function buildInstructionEntry(args: BuildInstructionEntryArgs): ContextIndexEntry {
+  const contentHash = hashContent(args.content);
+
+  return {
+    repo: args.repo,
+    slug: args.slug,
+    scope: args.scope,
+    scopePath: args.scopePath,
+    sourcePath: args.sourcePath,
+    kind: args.kind,
+    layer: args.layer,
+    ownership: args.ownership,
+    selectionReason: args.selectionReason,
+    contentHash,
+    contextKey: `${args.workspace}/${args.scope}`,
+    loadCommand: args.loadCommand,
+    hash: contentHash,
+  };
+}
+
+function buildInstructionSource(
+  args: BuildInstructionEntryArgs & { path?: string },
+): ContextInstructionSource {
+  return {
+    ...buildInstructionEntry(args),
+    path: args.path ?? args.sourcePath,
+    content: args.content,
+  };
+}
+
+function sourceToGraphNode(source: ContextIndexEntry): ContextGraphNode {
+  return {
+    id: `instruction:${source.sourcePath}`,
+    kind: "instruction",
+    path: source.sourcePath,
+    scope: source.scope,
+    layer: source.layer,
+    ownership: source.ownership,
+    selectionReason: source.selectionReason,
+    contentHash: source.contentHash,
+  };
+}
+
+function contextHashSource(source: ContextIndexEntry): unknown {
+  return {
+    repo: source.repo,
+    slug: source.slug,
+    scope: source.scope,
+    scopePath: source.scopePath,
+    sourcePath: source.sourcePath,
+    kind: source.kind,
+    layer: source.layer,
+    ownership: source.ownership,
+    selectionReason: source.selectionReason,
+    contentHash: source.contentHash,
+  };
+}
+
+function buildContextGraph(args: {
+  workspace: ContextWorkspaceInfo;
+  target?: { repo: string; slug: string; loadedScope: string; worktreePath: string };
+  sources: ContextIndexEntry[];
+}): ContextGraph {
+  const sourceNodes = args.sources.map(sourceToGraphNode);
+  const workspaceNode: ContextGraphNode = {
+    id: `workspace:${args.workspace.name}`,
+    kind: "workspace",
+    path: args.workspace.path,
+    selectionReason: "active workspace",
+  };
+
+  const nodes: ContextGraphNode[] = [workspaceNode, ...sourceNodes];
+
+  if (args.target) {
+    nodes.push({
+      id: `target:${args.target.repo}/${args.target.slug}:${args.target.loadedScope}`,
+      kind: "target",
+      scope: args.target.loadedScope,
+      selectionReason: "resolved context target",
+    });
+  }
+
+  const root = hashNode({
+    kind: "context",
+    workspace: args.workspace.name,
+    target: args.target ?? null,
+    sources: args.sources.map(contextHashSource),
+  });
+  nodes.push({
+    id: args.target
+      ? `context:${args.workspace.name}/${args.target.loadedScope}`
+      : `context:${args.workspace.name}`,
+    kind: "context",
+    scope: args.target?.loadedScope ?? args.workspace.name,
+    selectionReason: "effective context root",
+  });
+
+  return { root, nodes };
+}
+
 async function addInstructionEntry(
   workspace: string,
   workspaceRoot: string,
@@ -139,17 +282,22 @@ async function addInstructionEntry(
 
     try {
       const content = await readFile(source, "utf-8");
-      index.push({
-        repo,
-        slug,
-        scope,
-        scopePath,
-        sourcePath,
-        kind: file,
-        contextKey: `${workspace}/${scope}`,
-        loadCommand: `grove ws context ${workspace} ${scopePath}`,
-        hash: hashContent(content),
-      });
+      index.push(
+        buildInstructionEntry({
+          workspace,
+          repo,
+          slug,
+          scope,
+          scopePath,
+          sourcePath,
+          kind: file,
+          layer: "target",
+          ownership: "user",
+          selectionReason: "selected by worktree instruction priority",
+          content,
+          loadCommand: `grove ws context ${workspace} ${scopePath}`,
+        }),
+      );
       return;
     } catch (e) {
       skipped.push({ path: sourcePath, reason: String(e) });
@@ -183,8 +331,8 @@ async function readInstructionSource(
 
     try {
       const content = await readFile(source, "utf-8");
-      const hash = hashContent(content);
-      return {
+      return buildInstructionSource({
+        workspace,
         repo,
         slug,
         scope,
@@ -192,11 +340,12 @@ async function readInstructionSource(
         sourcePath,
         path: sourcePath,
         kind: file,
-        contextKey: `${workspace}/${scope}`,
-        loadCommand: `grove ws context ${workspace} ${scopePath}`,
-        hash,
+        layer: "target",
+        ownership: "user",
+        selectionReason: "selected by worktree instruction priority",
         content,
-      };
+        loadCommand: `grove ws context ${workspace} ${scopePath}`,
+      });
     } catch (e) {
       skipped.push({ path: sourcePath, reason: String(e) });
       return null;
@@ -204,6 +353,47 @@ async function readInstructionSource(
   }
 
   return null;
+}
+
+async function readWorkspaceInstructionSource(
+  workspace: string,
+  paths: Paths,
+  skipped: ContextSkippedEntry[],
+): Promise<ContextInstructionSource | null> {
+  const workspaceRoot = paths.workspace(workspace);
+  const source = paths.workspaceInstructions(workspace);
+  const sourcePath = toWorkspaceRelative(source, workspaceRoot);
+
+  try {
+    await lstat(source);
+  } catch (e) {
+    if (!isNotFoundError(e)) {
+      skipped.push({ path: sourcePath, reason: String(e) });
+    }
+    return null;
+  }
+
+  try {
+    const content = await readFile(source, "utf-8");
+    return buildInstructionSource({
+      workspace,
+      repo: "",
+      slug: "",
+      scope: "workspace",
+      scopePath: ".grove",
+      sourcePath,
+      path: sourcePath,
+      kind: "workspace",
+      layer: "workspace",
+      ownership: "user",
+      selectionReason: "workspace instruction file",
+      content,
+      loadCommand: `grove ws context ${workspace}`,
+    });
+  } catch (e) {
+    skipped.push({ path: sourcePath, reason: String(e) });
+    return null;
+  }
 }
 
 function ancestorDirs(worktreeRoot: string, targetDir: string): string[] {
@@ -468,6 +658,7 @@ export async function getWorkspaceContext(
   const index: ContextIndexEntry[] = [];
   const skipped: ContextSkippedEntry[] = [];
   const knownWorktrees = new Set<string>();
+  const workspaceInstructions = await readWorkspaceInstructionSource(workspace, paths, skipped);
 
   for (const repo of statusResult.value.repos) {
     for (const worktree of repo.worktrees) {
@@ -503,15 +694,23 @@ export async function getWorkspaceContext(
   );
 
   index.sort((a, b) => a.scope.localeCompare(b.scope));
+  const workspaceInfo = {
+    name: statusResult.value.name,
+    path: statusResult.value.path,
+  };
+  const graphSources = workspaceInstructions ? [workspaceInstructions, ...index] : index;
+  const graph = buildContextGraph({
+    workspace: workspaceInfo,
+    sources: graphSources,
+  });
 
   return ok({
     mode: "workspace",
-    workspace: {
-      name: statusResult.value.name,
-      path: statusResult.value.path,
-    },
+    workspace: workspaceInfo,
     worktrees,
+    ...(workspaceInstructions ? { workspaceInstructions } : {}),
     index,
+    graph,
     skipped,
   });
 }
@@ -564,6 +763,11 @@ export async function getTargetContext(
 
   const skipped: ContextSkippedEntry[] = [];
   const sources: ContextInstructionSource[] = [];
+  const workspaceInstructions = await readWorkspaceInstructionSource(workspace, paths, skipped);
+  if (workspaceInstructions) {
+    sources.push(workspaceInstructions);
+  }
+
   for (const dir of ancestorDirs(resolved.worktreeRoot, targetDir)) {
     const source = await readInstructionSource(
       workspace,
@@ -578,31 +782,39 @@ export async function getTargetContext(
     }
   }
 
+  const targetSources = sources.filter((source) => source.layer === "target");
   const loadedScope =
-    sources.length > 0 ? sources[sources.length - 1].scopePath : resolved.worktreePath;
+    targetSources.length > 0
+      ? targetSources[targetSources.length - 1].scopePath
+      : resolved.worktreePath;
   const contextKey = contextKeyForScope(workspace, loadedScope);
-  const contextHash = hashContext([
-    { name: statusResult.value.name, path: statusResult.value.path },
-    resolved.repo,
-    resolved.slug,
-    loadedScope,
-    sources.map((source) => ({ path: source.path, hash: source.hash })),
-  ]);
+  const workspaceInfo = {
+    name: statusResult.value.name,
+    path: statusResult.value.path,
+  };
+  const graph = buildContextGraph({
+    workspace: workspaceInfo,
+    target: {
+      repo: resolved.repo,
+      slug: resolved.slug,
+      loadedScope,
+      worktreePath: resolved.worktreePath,
+    },
+    sources,
+  });
 
   return ok({
     mode: "target",
-    workspace: {
-      name: statusResult.value.name,
-      path: statusResult.value.path,
-    },
+    workspace: workspaceInfo,
     target,
     repo: resolved.repo,
     slug: resolved.slug,
     worktreePath: resolved.worktreePath,
     loadedScope,
     contextKey,
-    contextHash,
+    contextHash: graph.root,
     sources,
+    graph,
     skipped,
   });
 }
