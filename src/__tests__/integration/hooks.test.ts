@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { cleanup, createTestDir } from "../helpers";
 
-const HOOK_SCRIPT = path.resolve(
-  import.meta.dir,
-  "../../../plugins/grove/hooks/reject-git-worktree.ts",
-);
+const PLUGIN_ROOT = path.resolve(import.meta.dir, "../../../plugins/grove");
+const CODEX_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".codex-plugin/plugin.json");
+const CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks/hooks.json");
+const LEGACY_CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks.json");
+const HOOK_SCRIPT = path.join(PLUGIN_ROOT, "hooks/reject-git-worktree.ts");
 
 let tempDir: string;
 let groveRoot: string;
@@ -41,6 +42,15 @@ function cmdInCwd(command: string, cwd: string) {
 
 function withCwd(input: unknown, cwd: string): unknown {
   return input !== null && typeof input === "object" ? { ...input, cwd } : input;
+}
+
+async function exists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const DENY_CASES: [string, unknown][] = [
@@ -153,6 +163,35 @@ const ALLOW_CASES: [string, unknown][] = [
     cmd("git --exec-path worktree list"),
   ],
 ];
+
+describe("Codex plugin hook layout", () => {
+  it("uses default bundled hook discovery with PLUGIN_ROOT", async () => {
+    const manifest = JSON.parse(await readFile(CODEX_PLUGIN_MANIFEST, "utf8")) as {
+      hooks?: unknown;
+    };
+    expect(manifest.hooks).toBeUndefined();
+    expect(await exists(CODEX_HOOKS_JSON)).toBe(true);
+    expect(await exists(LEGACY_CODEX_HOOKS_JSON)).toBe(false);
+
+    const hookConfig = JSON.parse(await readFile(CODEX_HOOKS_JSON, "utf8")) as {
+      hooks: {
+        PreToolUse: [
+          {
+            hooks: [
+              {
+                command: string;
+              },
+            ];
+          },
+        ];
+      };
+    };
+    const command = hookConfig.hooks.PreToolUse[0].hooks[0].command;
+    const pluginRootVar = "$" + "{PLUGIN_ROOT}";
+    expect(command).toBe(`bun run ${pluginRootVar}/hooks/reject-git-worktree.ts`);
+    expect(JSON.stringify(hookConfig)).not.toContain("CODEX_PLUGIN_ROOT");
+  });
+});
 
 describe("reject-git-worktree hook script", () => {
   beforeEach(async () => {
