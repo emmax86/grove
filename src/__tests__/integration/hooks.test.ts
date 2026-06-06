@@ -11,6 +11,7 @@ const CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks/hooks.json");
 const LEGACY_CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks.json");
 const HOOK_SCRIPT = path.join(PLUGIN_ROOT, "hooks/reject-git-worktree.ts");
 const SHARED_POLICY = path.join(PLUGIN_ROOT, "hooks/lib/git-worktree-policy.ts");
+const DENY_REASON = "Direct git worktree commands are not allowed in grove workspaces.";
 
 type HookSpecificOutput = {
   hookEventName: string;
@@ -438,9 +439,9 @@ describe("Claude reject-git-worktree hook adapter", () => {
     const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", groveCwd));
 
     expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(0);
-    expect(requireHookOutput(result).permissionDecision).toBe("deny");
-    expect(result.stderr).toBe("");
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(DENY_REASON);
   });
 
   it("allows Claude Bash payloads outside Grove workspaces", async () => {
