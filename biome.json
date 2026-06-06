@@ -1,5 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.5/schema.json",
+  "plugins": ["./biome/no-sync-calls.grit"],
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
