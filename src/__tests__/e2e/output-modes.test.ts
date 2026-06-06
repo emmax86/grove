@@ -149,6 +149,37 @@ describe("CLI output modes (smoke)", () => {
     expect(json.data.workspace.name).toBe("myws");
   });
 
+  it("ws context workspace text and porcelain include workspace instructions", async () => {
+    await runCLI(["ws", "add", "myws"], { root });
+    await mkdir(join(root, "myws", ".grove"), { recursive: true });
+    await writeFile(join(root, "myws", ".grove", "instructions.md"), "# workspace\n");
+
+    const text = await runCLI(["ws", "context", "myws"], { root });
+
+    expect(text.exitCode).toBe(0);
+    expect(text.stdout).toContain("## Workspace Instructions");
+    expect(text.stdout).toContain("### .grove/instructions.md");
+    expect(text.stdout).toContain("Layer: workspace");
+    expect(text.stdout).toContain("# workspace");
+
+    const porcelain = await runCLI(["ws", "context", "myws", "--porcelain"], { root });
+
+    expect(porcelain.exitCode).toBe(0);
+    const rows = porcelain.stdout.split("\n").map((row) => row.split("\t"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].slice(0, 7)).toEqual([
+      "source",
+      "myws",
+      "",
+      "",
+      "workspace",
+      ".grove/instructions.md",
+      "workspace",
+    ]);
+    expect(rows[0][9]).toBe("workspace");
+    expect(rows[0]).toHaveLength(13);
+  });
+
   it("ws context explicit workspace positional overrides inferred workspace", async () => {
     await runCLI(["ws", "add", "myws"], { root });
     await runCLI(["ws", "add", "other"], { root });
@@ -382,6 +413,83 @@ describe("CLI output modes (smoke)", () => {
     expect(r.stdout).toContain("### trees/api/main/AGENTS.md");
     expect(r.stdout).toContain("### trees/api/main/packages/auth/AGENTS.md");
     expect(r.stdout).toContain("# auth scope");
+  });
+
+  it("ws context target JSON and porcelain include workspace instructions first", async () => {
+    const repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+
+    await mkdir(join(root, "myws", ".grove"), { recursive: true });
+    await writeFile(join(root, "myws", ".grove", "instructions.md"), "# workspace\n");
+    const worktreeRoot = join(root, "myws", "trees", "api", "main");
+    await writeFile(join(worktreeRoot, "AGENTS.md"), "# target\n");
+
+    const jsonResult = await runCLI(["ws", "context", "trees/api/main", "--json"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+
+    expect(jsonResult.exitCode).toBe(0);
+    const json = JSON.parse(jsonResult.stdout);
+    expect(json.ok).toBe(true);
+    expect(json.data.mode).toBe("target");
+    expect(json.data.contextHash).toBe(json.data.graph.root);
+    expect(json.data.sources.map((source: { path: string }) => source.path)).toEqual([
+      ".grove/instructions.md",
+      "trees/api/main/AGENTS.md",
+    ]);
+    expect(json.data.sources.map((source: { layer: string }) => source.layer)).toEqual([
+      "workspace",
+      "target",
+    ]);
+    expect(json.data.sources[0]).toMatchObject({
+      kind: "workspace",
+      ownership: "user",
+      selectionReason: "workspace instruction file",
+      content: "# workspace\n",
+    });
+    expect(
+      json.data.graph.nodes.some(
+        (node: { kind: string; path?: string }) =>
+          node.kind === "instruction" && node.path === ".grove/instructions.md",
+      ),
+    ).toBe(true);
+
+    const porcelainResult = await runCLI(["ws", "context", "trees/api/main", "--porcelain"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+
+    expect(porcelainResult.exitCode).toBe(0);
+    const rows = porcelainResult.stdout.split("\n");
+    expect(rows[0].split("\t")).toEqual([
+      "target",
+      "myws",
+      "api",
+      "main",
+      "api/main",
+      "trees/api/main",
+      "myws/api/main",
+      json.data.contextHash,
+    ]);
+
+    const sourceRows = rows.slice(1).map((row) => row.split("\t"));
+    expect(sourceRows.map((row) => row[5])).toEqual([
+      ".grove/instructions.md",
+      "trees/api/main/AGENTS.md",
+    ]);
+    expect(sourceRows.map((row) => row[9])).toEqual(["workspace", "target"]);
+    expect(sourceRows[0].slice(0, 7)).toEqual([
+      "source",
+      "myws",
+      "",
+      "",
+      "workspace",
+      ".grove/instructions.md",
+      "workspace",
+    ]);
+    expect(sourceRows.every((row) => row.length === 13)).toBe(true);
   });
 
   it("ws context path-like single positional without workspace returns missing workspace", async () => {

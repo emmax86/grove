@@ -126,6 +126,64 @@ describe("context command", () => {
     );
   });
 
+  it("exposes workspace instructions with graph provenance when present", async () => {
+    await mkdir(paths.workspaceGroveDir("myws"), { recursive: true });
+    await writeFile(paths.workspaceInstructions("myws"), "# workspace\n");
+
+    const result = await getWorkspaceContext("myws", paths);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.workspaceInstructions?.sourcePath).toBe(".grove/instructions.md");
+    expect(result.value.workspaceInstructions?.path).toBe(".grove/instructions.md");
+    expect(result.value.workspaceInstructions?.kind).toBe("workspace");
+    expect(result.value.workspaceInstructions?.layer).toBe("workspace");
+    expect(result.value.workspaceInstructions?.ownership).toBe("user");
+    expect(result.value.workspaceInstructions?.selectionReason).toBe("workspace instruction file");
+    expect(result.value.workspaceInstructions?.contentHash).toBe(
+      result.value.workspaceInstructions?.hash,
+    );
+    expect(result.value.workspaceInstructions).not.toHaveProperty("provenanceHash");
+    expect(result.value.graph.root).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(result.value.graph.nodes.some((node) => node.id === "workspace:myws")).toBe(true);
+    const instructionNode = result.value.graph.nodes.find(
+      (node) =>
+        node.kind === "instruction" &&
+        node.path === ".grove/instructions.md" &&
+        node.scope === "workspace",
+    );
+    expect(instructionNode).toBeDefined();
+    expect(instructionNode).not.toHaveProperty("inputHashes");
+    expect(instructionNode).not.toHaveProperty("dependencies");
+  });
+
+  it("records unreadable workspace instructions as skipped without blocking target instructions", async () => {
+    await mkdir(paths.workspaceGroveDir("myws"), { recursive: true });
+    await symlink("missing.md", paths.workspaceInstructions("myws"));
+    const featureRoot = paths.worktreeDir("myws", "api", "feature-auth");
+    await writeFile(join(featureRoot, "AGENTS.md"), "# target\n");
+
+    const result = await getTargetContext(
+      "myws",
+      "trees/api/feature-auth",
+      paths.workspace("myws"),
+      paths,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.sources.map((source) => source.path)).toEqual([
+      "trees/api/feature-auth/AGENTS.md",
+    ]);
+    expect(result.value.skipped.find((entry) => entry.path === ".grove/instructions.md")).toEqual(
+      expect.objectContaining({ reason: expect.stringContaining("ENOENT") }),
+    );
+  });
+
   it("indexes symlinked instruction files that point to real files", async () => {
     const root = paths.worktreeDir("myws", "api", "feature-auth");
     await writeFile(join(root, "shared-instructions.md"), "# shared\n");
@@ -240,6 +298,63 @@ describe("context command", () => {
       "# feature root\n",
       "# auth package\n",
     ]);
+  });
+
+  it("loads workspace instructions before target worktree instructions", async () => {
+    await mkdir(paths.workspaceGroveDir("myws"), { recursive: true });
+    await writeFile(paths.workspaceInstructions("myws"), "# workspace\n");
+    const featureRoot = paths.worktreeDir("myws", "api", "feature-auth");
+    await writeFile(join(featureRoot, "AGENTS.md"), "# target\n");
+
+    const result = await getTargetContext(
+      "myws",
+      "trees/api/feature-auth",
+      paths.workspace("myws"),
+      paths,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.sources.map((source) => source.path)).toEqual([
+      ".grove/instructions.md",
+      "trees/api/feature-auth/AGENTS.md",
+    ]);
+    expect(result.value.sources.map((source) => source.layer)).toEqual(["workspace", "target"]);
+    expect(result.value.sources.map((source) => source.ownership)).toEqual(["user", "user"]);
+    expect(result.value.sources[0].kind).toBe("workspace");
+    expect(result.value.sources[1].kind).toBe("AGENTS.md");
+    expect(result.value.graph.root).toBe(result.value.contextHash);
+    expect(result.value.graph.nodes.every((node) => !("provenanceHash" in node))).toBe(true);
+    expect(
+      result.value.graph.nodes.some(
+        (node) =>
+          node.kind === "instruction" &&
+          node.path === "trees/api/feature-auth/AGENTS.md" &&
+          node.scope === "api/feature-auth",
+      ),
+    ).toBe(true);
+  });
+
+  it("uses the worktree root loaded scope when only workspace instructions are loaded", async () => {
+    await mkdir(paths.workspaceGroveDir("myws"), { recursive: true });
+    await writeFile(paths.workspaceInstructions("myws"), "# workspace\n");
+
+    const result = await getTargetContext(
+      "myws",
+      "trees/api/feature-auth",
+      paths.workspace("myws"),
+      paths,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.sources.map((source) => source.path)).toEqual([".grove/instructions.md"]);
+    expect(result.value.loadedScope).toBe("trees/api/feature-auth");
+    expect(result.value.contextKey).toBe("myws/api/feature-auth");
   });
 
   it("uses CLAUDE.md as same-directory fallback only", async () => {
@@ -413,6 +528,36 @@ describe("context command", () => {
       return;
     }
     expect(first.value.contextHash).not.toBe(second.value.contextHash);
+  });
+
+  it("changes only workspace source hashes when workspace instructions change", async () => {
+    await mkdir(paths.workspaceGroveDir("myws"), { recursive: true });
+    await writeFile(paths.workspaceInstructions("myws"), "# workspace one\n");
+    const featureRoot = paths.worktreeDir("myws", "api", "feature-auth");
+    await writeFile(join(featureRoot, "AGENTS.md"), "# target\n");
+
+    const first = await getTargetContext(
+      "myws",
+      "trees/api/feature-auth",
+      paths.workspace("myws"),
+      paths,
+    );
+    await writeFile(paths.workspaceInstructions("myws"), "# workspace two\n");
+    const second = await getTargetContext(
+      "myws",
+      "trees/api/feature-auth",
+      paths.workspace("myws"),
+      paths,
+    );
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) {
+      return;
+    }
+    expect(first.value.contextHash).not.toBe(second.value.contextHash);
+    expect(first.value.sources[0].hash).not.toBe(second.value.sources[0].hash);
+    expect(first.value.sources[1].hash).toBe(second.value.sources[1].hash);
   });
 
   it("changes contextHash when deepest effective scope changes", async () => {

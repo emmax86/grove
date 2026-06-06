@@ -19,6 +19,10 @@ function indexLabel(entry: ContextIndexEntry): string {
     `- ${entry.scope}`,
     `  source: ${entry.sourcePath}`,
     `  kind: ${entry.kind}`,
+    `  layer: ${entry.layer}`,
+    `  ownership: ${entry.ownership}`,
+    `  selection reason: ${entry.selectionReason}`,
+    `  source/content hash: ${entry.contentHash}`,
     `  context key: ${entry.contextKey}`,
     `  load: ${entry.loadCommand}`,
   ].join("\n");
@@ -37,12 +41,17 @@ function workspaceText(value: WorkspaceContext): string {
     "",
     `Workspace: ${value.workspace.name}`,
     `Path: ${value.workspace.path}`,
+    `Context hash: ${value.graph.root}`,
     "",
     "## Agent Protocol",
     "Use `grove ws context <target>` to load instructions for a specific workspace path.",
-    "",
-    "## Worktrees",
   ];
+
+  if (value.workspaceInstructions) {
+    lines.push("", "## Workspace Instructions", sourceSection(value.workspaceInstructions));
+  }
+
+  lines.push("", "## Worktrees");
 
   if (value.worktrees.length === 0) {
     lines.push("No worktrees found.");
@@ -69,7 +78,10 @@ function sourceSection(source: ContextInstructionSource): string {
   return [
     `### ${source.path}`,
     `Kind: ${source.kind}`,
-    `Source hash: ${source.hash}`,
+    `Layer: ${source.layer}`,
+    `Ownership: ${source.ownership}`,
+    `Selection reason: ${source.selectionReason}`,
+    `Source/content hash: ${source.contentHash}`,
     "",
     source.content,
   ].join("\n");
@@ -110,23 +122,38 @@ export function contextText(value: GroveContextValue, _ctx: FormatCtx): string {
   return value.mode === "workspace" ? workspaceText(value) : targetText(value);
 }
 
+function instructionRow(
+  rowType: "index" | "source",
+  workspace: string,
+  entry: ContextIndexEntry,
+): string {
+  // Keep hash before contentHash for existing porcelain consumers; today it is a compat alias.
+  return [
+    rowType,
+    workspace,
+    entry.repo,
+    entry.slug,
+    entry.scope,
+    entry.sourcePath,
+    entry.kind,
+    entry.hash,
+    entry.contextKey,
+    entry.layer,
+    entry.ownership,
+    entry.selectionReason,
+    entry.contentHash,
+  ].join("\t");
+}
+
 export function contextPorcelain(value: GroveContextValue): string {
   if (value.mode === "workspace") {
-    return value.index
-      .map((entry) =>
-        [
-          "index",
-          value.workspace.name,
-          entry.repo,
-          entry.slug,
-          entry.scope,
-          entry.sourcePath,
-          entry.kind,
-          entry.hash,
-          entry.contextKey,
-        ].join("\t"),
-      )
-      .join("\n");
+    const rows = [
+      ...(value.workspaceInstructions
+        ? [instructionRow("source", value.workspace.name, value.workspaceInstructions)]
+        : []),
+      ...value.index.map((entry) => instructionRow("index", value.workspace.name, entry)),
+    ];
+    return rows.join("\n");
   }
 
   const targetRow = [
@@ -140,17 +167,7 @@ export function contextPorcelain(value: GroveContextValue): string {
     value.contextHash,
   ].join("\t");
   const sourceRows = value.sources.map((source) =>
-    [
-      "source",
-      value.workspace.name,
-      source.repo,
-      source.slug,
-      source.scope,
-      source.sourcePath,
-      source.kind,
-      source.hash,
-      source.contextKey,
-    ].join("\t"),
+    instructionRow("source", value.workspace.name, source),
   );
 
   return [targetRow, ...sourceRows].join("\n");

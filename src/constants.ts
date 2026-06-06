@@ -5,6 +5,8 @@ export interface Paths {
   repos: string;
   workspace: (name: string) => string;
   workspaceConfig: (name: string) => string;
+  workspaceGroveDir: (name: string) => string;
+  workspaceInstructions: (name: string) => string;
   workspaceClaudeDir: (name: string) => string;
   vscodeWorkspace: (name: string) => string;
   repoEntry: (repoName: string) => string;
@@ -26,6 +28,8 @@ export function createPaths(root: string): Paths {
     repos: join(root, "repos"),
     workspace: (name) => join(root, name),
     workspaceConfig: (name) => join(root, name, "workspace.json"),
+    workspaceGroveDir: (name) => join(root, name, ".grove"),
+    workspaceInstructions: (name) => join(root, name, ".grove", "instructions.md"),
     workspaceClaudeDir: (name) => join(root, name, ".claude"),
     vscodeWorkspace: (name) => join(root, name, `${name}.code-workspace`),
     repoEntry: (repoName) => join(root, "repos", repoName),

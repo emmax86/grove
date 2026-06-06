@@ -160,6 +160,7 @@ describe("render — context kind", () => {
       contextKey: "myws/api/main",
       contextHash: "sha256:abc123",
       sources: [],
+      graph: { root: "sha256:abc123", nodes: [] },
       skipped: [],
     };
 
