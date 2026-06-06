@@ -9,9 +9,7 @@ const CODEX_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".codex-plugin/plugin.json"
 const CLAUDE_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".claude-plugin/plugin.json");
 const CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks/hooks.json");
 const LEGACY_CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks.json");
-const CODEX_HOOK_SCRIPT = path.join(PLUGIN_ROOT, "hooks/codex-reject-git-worktree.ts");
-const CLAUDE_HOOK_SCRIPT = path.join(PLUGIN_ROOT, "hooks/claude-reject-git-worktree.ts");
-const LEGACY_HOOK_SCRIPT = path.join(PLUGIN_ROOT, "hooks/reject-git-worktree.ts");
+const HOOK_SCRIPT = path.join(PLUGIN_ROOT, "hooks/reject-git-worktree.ts");
 const SHARED_POLICY = path.join(PLUGIN_ROOT, "hooks/lib/git-worktree-policy.ts");
 
 type HookSpecificOutput = {
@@ -29,6 +27,7 @@ let nonGroveCwd: string;
 async function invokeScript(
   script: string,
   input: unknown,
+  args: string[] = [],
 ): Promise<{
   denied: boolean;
   exitCode: number;
@@ -36,7 +35,7 @@ async function invokeScript(
   stderr: string;
   hookSpecificOutput?: HookSpecificOutput;
 }> {
-  const proc = Bun.spawn(["bun", "run", script], {
+  const proc = Bun.spawn(["bun", "run", script, ...args], {
     env: { ...process.env, GROVE_ROOT: groveRoot },
     stdin: new Blob([JSON.stringify(input)]),
     stdout: "pipe",
@@ -66,6 +65,18 @@ async function invokeScript(
     throw new Error(`Hook exited with unexpected code ${exitCode}: ${stderr}`);
   }
   return { denied: decision === "deny", exitCode, stdout, stderr, ...output };
+}
+
+function invokeCodex(input: unknown) {
+  return invokeScript(HOOK_SCRIPT, input, ["codex"]);
+}
+
+function invokeClaude(input: unknown) {
+  return invokeScript(HOOK_SCRIPT, input, ["claude"]);
+}
+
+function invokeLegacy(input: unknown) {
+  return invokeScript(HOOK_SCRIPT, input);
 }
 
 function requireHookOutput(result: {
@@ -249,7 +260,7 @@ describe("plugin hook layout", () => {
     expect(hookConfig.hooks.PreToolUse[0].hooks).toHaveLength(1);
     const command = hookConfig.hooks.PreToolUse[0].hooks[0].command;
     const pluginRootVar = "$" + "{PLUGIN_ROOT}";
-    expect(command).toBe(`bun run ${pluginRootVar}/hooks/codex-reject-git-worktree.ts`);
+    expect(command).toBe(`bun run ${pluginRootVar}/hooks/reject-git-worktree.ts codex`);
     expect(JSON.stringify(hookConfig)).not.toContain("CODEX_PLUGIN_ROOT");
   });
 
@@ -269,7 +280,7 @@ describe("plugin hook layout", () => {
     };
     const command = manifest.hooks.PreToolUse[0].hooks[0].command;
     const pluginRootVar = "$" + "{CLAUDE_PLUGIN_ROOT}";
-    expect(command).toBe(`bun run ${pluginRootVar}/hooks/claude-reject-git-worktree.ts`);
+    expect(command).toBe(`bun run ${pluginRootVar}/hooks/reject-git-worktree.ts claude`);
   });
 });
 
@@ -300,20 +311,17 @@ describe("Codex reject-git-worktree hook adapter", () => {
   afterEach(() => cleanup(tempDir));
 
   it.each(DENY_CASES)("denies: %s", async (_, input) => {
-    const result = await invokeScript(CODEX_HOOK_SCRIPT, withCwd(input, groveCwd));
+    const result = await invokeCodex(withCwd(input, groveCwd));
     expect(result.denied).toBe(true);
   });
 
   it.each(ALLOW_CASES)("allows: %s", async (_, input) => {
-    const result = await invokeScript(CODEX_HOOK_SCRIPT, withCwd(input, groveCwd));
+    const result = await invokeCodex(withCwd(input, groveCwd));
     expect(result.denied).toBe(false);
   });
 
   it("allows direct git worktree outside a grove workspace", async () => {
-    const result = await invokeScript(
-      CODEX_HOOK_SCRIPT,
-      cmdInCwd("git worktree list", nonGroveCwd),
-    );
+    const result = await invokeCodex(cmdInCwd("git worktree list", nonGroveCwd));
 
     expect(result.denied).toBe(false);
   });
@@ -323,7 +331,7 @@ describe("Codex reject-git-worktree hook adapter", () => {
     await mkdir(foreignCwd, { recursive: true });
     await writeFile(path.join(foreignCwd, "workspace.json"), JSON.stringify({ name: "foreign" }));
 
-    const result = await invokeScript(CODEX_HOOK_SCRIPT, cmdInCwd("git worktree list", foreignCwd));
+    const result = await invokeCodex(cmdInCwd("git worktree list", foreignCwd));
 
     expect(result.denied).toBe(false);
   });
@@ -332,7 +340,7 @@ describe("Codex reject-git-worktree hook adapter", () => {
     const nestedCwd = path.join(groveRoot, "scratch", "nested");
     await mkdir(nestedCwd, { recursive: true });
 
-    const result = await invokeScript(CODEX_HOOK_SCRIPT, cmdInCwd("git worktree list", nestedCwd));
+    const result = await invokeCodex(cmdInCwd("git worktree list", nestedCwd));
 
     expect(result.denied).toBe(true);
   });
@@ -345,16 +353,13 @@ describe("Codex reject-git-worktree hook adapter", () => {
     await symlink(realRoot, linkedRoot, "dir");
     groveRoot = linkedRoot;
 
-    const result = await invokeScript(
-      CODEX_HOOK_SCRIPT,
-      cmdInCwd("git worktree list", canonicalCwd),
-    );
+    const result = await invokeCodex(cmdInCwd("git worktree list", canonicalCwd));
 
     expect(result.denied).toBe(true);
   });
 
   it("allows direct git worktree when cwd is missing", async () => {
-    const result = await invokeScript(CODEX_HOOK_SCRIPT, cmd("git worktree list"));
+    const result = await invokeCodex(cmd("git worktree list"));
 
     expect(result.denied).toBe(false);
   });
@@ -362,17 +367,13 @@ describe("Codex reject-git-worktree hook adapter", () => {
   it("allows direct git worktree when GROVE_ROOT does not exist", async () => {
     groveRoot = path.join(tempDir, "missing-grove-root");
 
-    const result = await invokeScript(
-      CODEX_HOOK_SCRIPT,
-      cmdInCwd("git worktree list", nonGroveCwd),
-    );
+    const result = await invokeCodex(cmdInCwd("git worktree list", nonGroveCwd));
 
     expect(result.denied).toBe(false);
   });
 
   it("allows direct git worktree when cwd does not exist on disk", async () => {
-    const result = await invokeScript(
-      CODEX_HOOK_SCRIPT,
+    const result = await invokeCodex(
       cmdInCwd("git worktree list", path.join(groveRoot, "nonexistent-dir")),
     );
 
@@ -380,7 +381,7 @@ describe("Codex reject-git-worktree hook adapter", () => {
   });
 
   it("allows direct git worktree when cwd is only nested under tool_input", async () => {
-    const result = await invokeScript(CODEX_HOOK_SCRIPT, {
+    const result = await invokeCodex({
       tool_input: { command: "git worktree list", cwd: groveCwd },
     });
 
@@ -388,19 +389,13 @@ describe("Codex reject-git-worktree hook adapter", () => {
   });
 
   it("withCwd overrides an existing top-level cwd", async () => {
-    const result = await invokeScript(
-      CODEX_HOOK_SCRIPT,
-      withCwd(cmdInCwd("git worktree list", nonGroveCwd), groveCwd),
-    );
+    const result = await invokeCodex(withCwd(cmdInCwd("git worktree list", nonGroveCwd), groveCwd));
 
     expect(result.denied).toBe(true);
   });
 
   it("denies documented Codex PreToolUse Bash payloads", async () => {
-    const result = await invokeScript(
-      CODEX_HOOK_SCRIPT,
-      preToolUseBashCmdInCwd("git worktree list", groveCwd),
-    );
+    const result = await invokeCodex(preToolUseBashCmdInCwd("git worktree list", groveCwd));
 
     expect(result.denied).toBe(true);
     expect(result.exitCode).toBe(0);
@@ -409,8 +404,7 @@ describe("Codex reject-git-worktree hook adapter", () => {
   });
 
   it("allows Codex PreToolUse payloads for non-Bash tools", async () => {
-    const result = await invokeScript(
-      CODEX_HOOK_SCRIPT,
+    const result = await invokeCodex(
       preToolUseCmdInCwd("git worktree list", groveCwd, "mcp__fs__read"),
     );
 
@@ -418,7 +412,7 @@ describe("Codex reject-git-worktree hook adapter", () => {
   });
 
   it("deny output has correct JSON structure", async () => {
-    const result = await invokeScript(CODEX_HOOK_SCRIPT, cmdInCwd("git worktree list", groveCwd));
+    const result = await invokeCodex(cmdInCwd("git worktree list", groveCwd));
     const output = requireHookOutput(result);
 
     expect(output.permissionDecision).toBe("deny");
@@ -441,10 +435,7 @@ describe("Claude reject-git-worktree hook adapter", () => {
   afterEach(() => cleanup(tempDir));
 
   it("denies Claude Bash payloads inside Grove workspaces", async () => {
-    const result = await invokeScript(
-      CLAUDE_HOOK_SCRIPT,
-      preToolUseBashCmdInCwd("git worktree list", groveCwd),
-    );
+    const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", groveCwd));
 
     expect(result.denied).toBe(true);
     expect(result.exitCode).toBe(0);
@@ -453,10 +444,7 @@ describe("Claude reject-git-worktree hook adapter", () => {
   });
 
   it("allows Claude Bash payloads outside Grove workspaces", async () => {
-    const result = await invokeScript(
-      CLAUDE_HOOK_SCRIPT,
-      preToolUseBashCmdInCwd("git worktree list", nonGroveCwd),
-    );
+    const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", nonGroveCwd));
 
     expect(result.denied).toBe(false);
   });
@@ -474,7 +462,7 @@ describe("legacy reject-git-worktree hook wrapper", () => {
   afterEach(() => cleanup(tempDir));
 
   it("continues to deny the existing generic payload shape", async () => {
-    const result = await invokeScript(LEGACY_HOOK_SCRIPT, cmdInCwd("git worktree list", groveCwd));
+    const result = await invokeLegacy(cmdInCwd("git worktree list", groveCwd));
 
     expect(result.denied).toBe(true);
     expect(result.exitCode).toBe(2);
