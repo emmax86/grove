@@ -133,6 +133,6 @@ export async function shouldDenyGitWorktree(input: {
 }): Promise<boolean> {
   return (
     isGitWorktreeCommand(input.command) &&
-    (await isInsideGroveWorkspace(input.cwd, input.groveRoot ?? defaultGroveRoot()))
+    (await isInsideGroveWorkspace(input.cwd, input.groveRoot))
   );
 }

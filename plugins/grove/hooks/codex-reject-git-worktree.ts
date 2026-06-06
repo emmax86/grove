@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
 import { DENY_OUTPUT, shouldDenyGitWorktree } from "./lib/git-worktree-policy";
-import { extractPreToolUseBashCommand, parseHookInput } from "./lib/hook-payload";
+import { extractCodexPreToolUseBashCommand, parseHookInput } from "./lib/hook-payload";
 
-const payload = extractPreToolUseBashCommand(parseHookInput(await Bun.stdin.text()));
+const payload = extractCodexPreToolUseBashCommand(parseHookInput(await Bun.stdin.text()));
 
 if (payload !== null && (await shouldDenyGitWorktree(payload))) {
   process.stdout.write(`${JSON.stringify(DENY_OUTPUT)}\n`);

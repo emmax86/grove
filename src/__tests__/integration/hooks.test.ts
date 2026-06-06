@@ -86,7 +86,7 @@ function cmdInCwd(command: string, cwd: string) {
   return { cwd, tool_input: { command } };
 }
 
-function codexCmdInCwd(command: string, cwd: string, toolName = "Bash") {
+function preToolUseCmdInCwd(command: string, cwd: string, toolName = "Bash") {
   return {
     cwd,
     hook_event_name: "PreToolUse",
@@ -95,13 +95,8 @@ function codexCmdInCwd(command: string, cwd: string, toolName = "Bash") {
   };
 }
 
-function claudeCmdInCwd(command: string, cwd: string) {
-  return {
-    cwd,
-    hook_event_name: "PreToolUse",
-    tool_name: "Bash",
-    tool_input: { command },
-  };
+function preToolUseBashCmdInCwd(command: string, cwd: string) {
+  return preToolUseCmdInCwd(command, cwd);
 }
 
 function withCwd(input: unknown, cwd: string): unknown {
@@ -404,7 +399,7 @@ describe("Codex reject-git-worktree hook adapter", () => {
   it("denies documented Codex PreToolUse Bash payloads", async () => {
     const result = await invokeScript(
       CODEX_HOOK_SCRIPT,
-      codexCmdInCwd("git worktree list", groveCwd),
+      preToolUseBashCmdInCwd("git worktree list", groveCwd),
     );
 
     expect(result.denied).toBe(true);
@@ -416,7 +411,7 @@ describe("Codex reject-git-worktree hook adapter", () => {
   it("allows Codex PreToolUse payloads for non-Bash tools", async () => {
     const result = await invokeScript(
       CODEX_HOOK_SCRIPT,
-      codexCmdInCwd("git worktree list", groveCwd, "mcp__fs__read"),
+      preToolUseCmdInCwd("git worktree list", groveCwd, "mcp__fs__read"),
     );
 
     expect(result.denied).toBe(false);
@@ -448,7 +443,7 @@ describe("Claude reject-git-worktree hook adapter", () => {
   it("denies Claude Bash payloads inside Grove workspaces", async () => {
     const result = await invokeScript(
       CLAUDE_HOOK_SCRIPT,
-      claudeCmdInCwd("git worktree list", groveCwd),
+      preToolUseBashCmdInCwd("git worktree list", groveCwd),
     );
 
     expect(result.denied).toBe(true);
@@ -460,7 +455,7 @@ describe("Claude reject-git-worktree hook adapter", () => {
   it("allows Claude Bash payloads outside Grove workspaces", async () => {
     const result = await invokeScript(
       CLAUDE_HOOK_SCRIPT,
-      claudeCmdInCwd("git worktree list", nonGroveCwd),
+      preToolUseBashCmdInCwd("git worktree list", nonGroveCwd),
     );
 
     expect(result.denied).toBe(false);
@@ -482,5 +477,7 @@ describe("legacy reject-git-worktree hook wrapper", () => {
     const result = await invokeScript(LEGACY_HOOK_SCRIPT, cmdInCwd("git worktree list", groveCwd));
 
     expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(2);
+    expect(requireHookOutput(result).permissionDecision).toBe("deny");
   });
 });

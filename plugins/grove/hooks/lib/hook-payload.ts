@@ -41,3 +41,11 @@ export function extractPreToolUseBashCommand(input: unknown): HookCommandPayload
     cwd: input.cwd,
   };
 }
+
+export function extractCodexPreToolUseBashCommand(input: unknown): HookCommandPayload | null {
+  return extractPreToolUseBashCommand(input);
+}
+
+export function extractClaudePreToolUseBashCommand(input: unknown): HookCommandPayload | null {
+  return extractPreToolUseBashCommand(input);
+}

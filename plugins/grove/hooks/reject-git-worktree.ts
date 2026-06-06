@@ -7,7 +7,7 @@ const payload = extractPreToolUseBashCommand(parseHookInput(await Bun.stdin.text
 
 if (payload !== null && (await shouldDenyGitWorktree(payload))) {
   process.stdout.write(`${JSON.stringify(DENY_OUTPUT)}\n`);
-  process.exit(0);
+  process.exit(2);
 }
 
 process.exit(0);
