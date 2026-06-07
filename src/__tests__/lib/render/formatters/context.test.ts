@@ -211,6 +211,20 @@ describe("contextText", () => {
 
     expect(out).toContain("No instruction files found for this target.");
   });
+
+  it("renders target skipped section with the markdown heading", () => {
+    const out = contextText(
+      {
+        ...targetValue,
+        skipped: [{ path: "trees/api/feature-auth/AGENTS.md", reason: "permission denied" }],
+      },
+      baseCtx,
+    );
+
+    expect(out).toContain("## Skipped");
+    expect(out).not.toContain("Skipped (1)");
+    expect(out).toContain("- trees/api/feature-auth/AGENTS.md - permission denied");
+  });
 });
 
 describe("contextPorcelain", () => {

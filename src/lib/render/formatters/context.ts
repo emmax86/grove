@@ -56,7 +56,7 @@ function compactIndexLabel(group: ReturnType<typeof groupedIndexEntries>[number]
   return lines.join("\n");
 }
 
-function skippedSection(skipped: GroveContext["skipped"]): string[] {
+function compactSkippedSection(skipped: GroveContext["skipped"]): string[] {
   if (skipped.length === 0) {
     return [];
   }
@@ -64,6 +64,13 @@ function skippedSection(skipped: GroveContext["skipped"]): string[] {
     `Skipped (${skipped.length})`,
     ...skipped.map((entry) => `- ${entry.path} - ${entry.reason}`),
   ];
+}
+
+function markdownSkippedSection(skipped: GroveContext["skipped"]): string[] {
+  if (skipped.length === 0) {
+    return [];
+  }
+  return ["## Skipped", ...skipped.map((entry) => `- ${entry.path} - ${entry.reason}`)];
 }
 
 function workspaceText(value: WorkspaceContext): string {
@@ -104,7 +111,7 @@ function workspaceText(value: WorkspaceContext): string {
     lines.push(...groupedIndex.map(compactIndexLabel));
   }
 
-  const skipped = skippedSection(value.skipped);
+  const skipped = compactSkippedSection(value.skipped);
   if (skipped.length > 0) {
     lines.push("", ...skipped);
   }
@@ -148,7 +155,7 @@ function targetText(value: TargetContext): string {
     lines.push(...value.sources.map(sourceSection));
   }
 
-  const skipped = skippedSection(value.skipped);
+  const skipped = markdownSkippedSection(value.skipped);
   if (skipped.length > 0) {
     lines.push("", ...skipped);
   }
