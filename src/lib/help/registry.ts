@@ -29,6 +29,8 @@ export interface HelpArg {
   summary?: string;
   /** Documentation only — what the optional arg falls back to when omitted. */
   defaultFrom?: "context-workspace" | "context-repo";
+  /** Allowed values for an enum-style positional arg (e.g. exec's command). */
+  values?: readonly string[];
 }
 
 export interface HelpFlag {
@@ -206,7 +208,12 @@ const WS_GROUP: HelpGroup = {
           name: "add",
           summary: "create a worktree in the shared pool",
           args: [
-            { name: "repo", required: false, defaultFrom: "context-repo" },
+            {
+              name: "repo",
+              required: false,
+              defaultFrom: "context-repo",
+              summary: "registered repo name",
+            },
             { name: "branch", required: true, summary: "branch name to check out" },
           ],
           flags: [
@@ -234,7 +241,14 @@ const WS_GROUP: HelpGroup = {
           kind: "leaf",
           name: "list",
           summary: "list worktrees for a repo",
-          args: [{ name: "repo", required: false, defaultFrom: "context-repo" }],
+          args: [
+            {
+              name: "repo",
+              required: false,
+              defaultFrom: "context-repo",
+              summary: "registered repo name",
+            },
+          ],
           flags: [WORKSPACE_FLAG],
         },
         {
@@ -242,7 +256,12 @@ const WS_GROUP: HelpGroup = {
           name: "remove",
           summary: "remove a worktree",
           args: [
-            { name: "repo", required: false, defaultFrom: "context-repo" },
+            {
+              name: "repo",
+              required: false,
+              defaultFrom: "context-repo",
+              summary: "registered repo name",
+            },
             { name: "slug", required: true, summary: "worktree slug" },
           ],
           flags: [
@@ -267,6 +286,7 @@ const WS_GROUP: HelpGroup = {
           name: "command",
           required: true,
           summary: "one of: setup, format, test, check, test:file, test:match",
+          values: ["setup", "format", "test", "check", "test:file", "test:match"],
         },
         { name: "file", required: false, summary: "file path (required for test:file)" },
       ],
