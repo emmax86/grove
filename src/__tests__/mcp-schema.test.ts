@@ -6,6 +6,7 @@ import {
   buildToolInputSchema,
   EXEC_BINDING,
   findLeaf,
+  MCP_TOOL_BINDINGS,
   WORKTREE_ADD_BINDING,
   WORKTREE_REMOVE_BINDING,
 } from "../lib/help/mcp-schema";
@@ -49,6 +50,40 @@ describe("registry enum/summary data for MCP", () => {
     expect(remove?.summary).toBe("registered repo name");
   });
 });
+
+describe("MCP binding drift guard", () => {
+  it("every bound leaf's args/flags are either mapped or explicitly omitted", () => {
+    for (const binding of MCP_TOOL_BINDINGS) {
+      const leaf = findLeaf(binding.path);
+      const registryNames = [
+        ...(leaf.args ?? []).map((a) => a.name),
+        ...(leaf.flags ?? []).map((f) => f.name),
+      ];
+      const omitted = new Set(binding.omit ?? []);
+      const overridden = new Set((binding.overrides ?? []).map((o) => o.name));
+      // A name is "covered" if it's omitted, overridden, or present in the registry leaf
+      // (all leaf names flow into the shape unless omitted). The guard's job is to fail
+      // when a NEW name appears that the binding author hasn't consciously handled.
+      const uncovered = registryNames.filter(
+        (n) =>
+          !omitted.has(n) && !overridden.has(n) && !KNOWN_PASSTHROUGH[binding.toolName]?.has(n),
+      );
+      expect({ tool: binding.toolName, uncovered }).toEqual({
+        tool: binding.toolName,
+        uncovered: [],
+      });
+    }
+  });
+});
+
+// Registry names a binding passes through verbatim (no override, not omitted).
+// Updating a binding's surface? Update this set in the same change — that is the
+// conscious decision the guard is forcing.
+const KNOWN_PASSTHROUGH: Record<string, Set<string>> = {
+  workspace_add_worktree: new Set(["branch", "from", "no-setup"]),
+  workspace_remove_worktree: new Set(["slug", "force"]),
+  workspace_exec: new Set(["command", "file", "match", "repo", "dry-run"]),
+};
 
 describe("findLeaf", () => {
   it("throws when a path continues past a leaf", () => {
