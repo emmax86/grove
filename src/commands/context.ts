@@ -97,6 +97,7 @@ export interface ContextGraph {
 }
 
 const INSTRUCTION_FILES: InstructionFileName[] = ["AGENTS.override.md", "AGENTS.md", "CLAUDE.md"];
+const IGNORED_INDEX_DIRS = new Set([".git", ".worktrees", "node_modules"]);
 
 function toWorkspaceRelative(path: string, workspaceRoot: string): string {
   return relative(workspaceRoot, path).split(sep).join("/");
@@ -560,7 +561,7 @@ async function indexInstructionScopes(
   }
 
   for (const entry of entries) {
-    if (entry === ".git" || entry === "node_modules") {
+    if (IGNORED_INDEX_DIRS.has(entry)) {
       continue;
     }
 

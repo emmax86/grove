@@ -10,60 +10,98 @@ import type { FormatCtx } from "./workspace";
 export type GroveContextValue = GroveContext;
 
 function worktreeLabel(worktree: WorkspaceContext["worktrees"][number]): string {
-  const details = worktree.branch ? `${worktree.type}, branch: ${worktree.branch}` : worktree.type;
-  return `- ${worktree.repo}/${worktree.slug} (${details}) - ${worktree.path}`;
+  const branch = worktree.branch ? ` ${worktree.branch}` : "";
+  return `- ${worktree.repo}/${worktree.slug} ${worktree.type}${branch} ${worktree.path}`;
 }
 
-function indexLabel(entry: ContextIndexEntry): string {
-  return [
-    `- ${entry.scope}`,
-    `  source: ${entry.sourcePath}`,
-    `  kind: ${entry.kind}`,
-    `  layer: ${entry.layer}`,
-    `  ownership: ${entry.ownership}`,
-    `  selection reason: ${entry.selectionReason}`,
-    `  source/content hash: ${entry.contentHash}`,
-    `  context key: ${entry.contextKey}`,
-    `  load: ${entry.loadCommand}`,
-  ].join("\n");
+function shortHash(hash: string): string {
+  return hash.replace(/^sha256:/, "").slice(0, 8);
+}
+
+function groupedIndexEntries(
+  index: ContextIndexEntry[],
+): { primary: ContextIndexEntry; duplicates: ContextIndexEntry[] }[] {
+  const groups: { primary: ContextIndexEntry; duplicates: ContextIndexEntry[] }[] = [];
+  const byHash = new Map<string, (typeof groups)[number]>();
+
+  for (const entry of index) {
+    const existing = byHash.get(entry.contentHash);
+    if (existing) {
+      existing.duplicates.push(entry);
+      continue;
+    }
+
+    const group = { primary: entry, duplicates: [] };
+    groups.push(group);
+    byHash.set(entry.contentHash, group);
+  }
+
+  return groups;
+}
+
+function duplicateCount(groups: ReturnType<typeof groupedIndexEntries>): number {
+  return groups.reduce((count, group) => count + group.duplicates.length, 0);
+}
+
+function compactIndexLabel(group: ReturnType<typeof groupedIndexEntries>[number]): string {
+  const entry = group.primary;
+  const lines = [
+    `- ${entry.scope} ${entry.kind} h:${shortHash(entry.contentHash)} load: ${entry.scopePath}`,
+  ];
+
+  if (group.duplicates.length > 0) {
+    lines.push(`  same: ${group.duplicates.map((duplicate) => duplicate.scope).join(", ")}`);
+  }
+
+  return lines.join("\n");
 }
 
 function skippedSection(skipped: GroveContext["skipped"]): string[] {
   if (skipped.length === 0) {
     return [];
   }
-  return ["## Skipped", ...skipped.map((entry) => `- ${entry.path} - ${entry.reason}`)];
+  return [
+    `Skipped (${skipped.length})`,
+    ...skipped.map((entry) => `- ${entry.path} - ${entry.reason}`),
+  ];
 }
 
 function workspaceText(value: WorkspaceContext): string {
+  const groupedIndex = groupedIndexEntries(value.index);
+  const duplicates = duplicateCount(groupedIndex);
   const lines = [
     "# Grove Context",
     "",
-    `Workspace: ${value.workspace.name}`,
-    `Path: ${value.workspace.path}`,
-    `Context hash: ${value.graph.root}`,
+    `workspace ${value.workspace.name} ${value.workspace.path}`,
+    `hash ${shortHash(value.graph.root)}`,
     "",
-    "## Agent Protocol",
-    "Use `grove ws context <target>` to load instructions for a specific workspace path.",
+    "Protocol: run `grove ws context <target>` before working in a repo/worktree.",
   ];
 
   if (value.workspaceInstructions) {
-    lines.push("", "## Workspace Instructions", sourceSection(value.workspaceInstructions));
+    lines.push(
+      "",
+      "Workspace instruction",
+      `- ${value.workspaceInstructions.path} h:${shortHash(value.workspaceInstructions.contentHash)}`,
+    );
   }
 
-  lines.push("", "## Worktrees");
+  lines.push("", `Worktrees (${value.worktrees.length})`);
 
   if (value.worktrees.length === 0) {
-    lines.push("No worktrees found.");
+    lines.push("none");
   } else {
     lines.push(...value.worktrees.map(worktreeLabel));
   }
 
-  lines.push("", "## Instruction Index");
-  if (value.index.length === 0) {
-    lines.push("No instruction files were found under workspace worktrees.");
+  lines.push(
+    "",
+    `Instructions (${groupedIndex.length} unique, ${duplicates} duplicate${duplicates === 1 ? "" : "s"})`,
+  );
+  if (groupedIndex.length === 0) {
+    lines.push("none");
   } else {
-    lines.push(...value.index.map(indexLabel));
+    lines.push(...groupedIndex.map(compactIndexLabel));
   }
 
   const skipped = skippedSection(value.skipped);

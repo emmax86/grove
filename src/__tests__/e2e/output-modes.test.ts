@@ -149,7 +149,7 @@ describe("CLI output modes (smoke)", () => {
     expect(json.data.workspace.name).toBe("myws");
   });
 
-  it("ws context workspace text and porcelain include workspace instructions", async () => {
+  it("ws context workspace text references workspace instructions and porcelain includes full row", async () => {
     await runCLI(["ws", "add", "myws"], { root });
     await mkdir(join(root, "myws", ".grove"), { recursive: true });
     await writeFile(join(root, "myws", ".grove", "instructions.md"), "# workspace\n");
@@ -157,10 +157,9 @@ describe("CLI output modes (smoke)", () => {
     const text = await runCLI(["ws", "context", "myws"], { root });
 
     expect(text.exitCode).toBe(0);
-    expect(text.stdout).toContain("## Workspace Instructions");
-    expect(text.stdout).toContain("### .grove/instructions.md");
-    expect(text.stdout).toContain("Layer: workspace");
-    expect(text.stdout).toContain("# workspace");
+    expect(text.stdout).toContain("Workspace instruction");
+    expect(text.stdout).toContain("- .grove/instructions.md h:");
+    expect(text.stdout).not.toContain("# workspace");
 
     const porcelain = await runCLI(["ws", "context", "myws", "--porcelain"], { root });
 
