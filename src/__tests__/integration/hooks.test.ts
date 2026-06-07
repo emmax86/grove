@@ -76,8 +76,8 @@ function invokeClaude(input: unknown) {
   return invokeScript(HOOK_SCRIPT, input, ["claude"]);
 }
 
-function invokeLegacy(input: unknown) {
-  return invokeScript(HOOK_SCRIPT, input);
+function invokeLegacy(input: unknown, args: string[] = []) {
+  return invokeScript(HOOK_SCRIPT, input, args);
 }
 
 function requireHookOutput(result: {
@@ -298,118 +298,135 @@ describe("shared git worktree policy", () => {
   });
 });
 
-describe("Codex reject-git-worktree hook adapter", () => {
-  beforeEach(async () => {
-    tempDir = await createTestDir();
-    groveRoot = path.join(tempDir, "grove-root");
-    groveCwd = path.join(groveRoot, "workspace");
-    nonGroveCwd = path.join(tempDir, "plain");
+async function setupAdapterDirs() {
+  tempDir = await createTestDir();
+  groveRoot = path.join(tempDir, "grove-root");
+  groveCwd = path.join(groveRoot, "workspace");
+  nonGroveCwd = path.join(tempDir, "plain");
 
-    await mkdir(groveCwd, { recursive: true });
-    await mkdir(nonGroveCwd, { recursive: true });
-  });
+  await mkdir(groveCwd, { recursive: true });
+  await mkdir(nonGroveCwd, { recursive: true });
+}
 
-  afterEach(() => cleanup(tempDir));
+// The deny/allow matrix, cwd resolution, and payload parsing all live in the
+// shared git-worktree-policy and hook-payload modules, so every adapter must
+// behave identically here. Run the full shared-policy suite through each
+// adapter so a future adapter that stops routing through the shared modules is
+// caught. Adapter-specific behavior (exit code, output channel) is asserted in
+// the per-adapter describe blocks below.
+function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
+  describe(`shared git worktree policy via the ${label} adapter`, () => {
+    beforeEach(setupAdapterDirs);
+    afterEach(() => cleanup(tempDir));
 
-  it.each(DENY_CASES)("denies: %s", async (_, input) => {
-    const result = await invokeCodex(withCwd(input, groveCwd));
-    expect(result.denied).toBe(true);
-  });
-
-  it.each(ALLOW_CASES)("allows: %s", async (_, input) => {
-    const result = await invokeCodex(withCwd(input, groveCwd));
-    expect(result.denied).toBe(false);
-  });
-
-  it("allows direct git worktree outside a grove workspace", async () => {
-    const result = await invokeCodex(cmdInCwd("git worktree list", nonGroveCwd));
-
-    expect(result.denied).toBe(false);
-  });
-
-  it("allows direct git worktree in a workspace.json directory outside GROVE_ROOT", async () => {
-    const foreignCwd = path.join(tempDir, "foreign-workspace");
-    await mkdir(foreignCwd, { recursive: true });
-    await writeFile(path.join(foreignCwd, "workspace.json"), JSON.stringify({ name: "foreign" }));
-
-    const result = await invokeCodex(cmdInCwd("git worktree list", foreignCwd));
-
-    expect(result.denied).toBe(false);
-  });
-
-  it("denies direct git worktree for any path under GROVE_ROOT", async () => {
-    const nestedCwd = path.join(groveRoot, "scratch", "nested");
-    await mkdir(nestedCwd, { recursive: true });
-
-    const result = await invokeCodex(cmdInCwd("git worktree list", nestedCwd));
-
-    expect(result.denied).toBe(true);
-  });
-
-  it("denies direct git worktree when GROVE_ROOT is a symlink and cwd is canonical", async () => {
-    const realRoot = path.join(tempDir, "real-grove-root");
-    const linkedRoot = path.join(tempDir, "linked-grove-root");
-    const canonicalCwd = path.join(realRoot, "workspace");
-    await mkdir(canonicalCwd, { recursive: true });
-    await symlink(realRoot, linkedRoot, "dir");
-    groveRoot = linkedRoot;
-
-    const result = await invokeCodex(cmdInCwd("git worktree list", canonicalCwd));
-
-    expect(result.denied).toBe(true);
-  });
-
-  it("allows direct git worktree when cwd is missing", async () => {
-    const result = await invokeCodex(cmd("git worktree list"));
-
-    expect(result.denied).toBe(false);
-  });
-
-  it("allows direct git worktree when GROVE_ROOT does not exist", async () => {
-    groveRoot = path.join(tempDir, "missing-grove-root");
-
-    const result = await invokeCodex(cmdInCwd("git worktree list", nonGroveCwd));
-
-    expect(result.denied).toBe(false);
-  });
-
-  it("allows direct git worktree when cwd does not exist on disk", async () => {
-    const result = await invokeCodex(
-      cmdInCwd("git worktree list", path.join(groveRoot, "nonexistent-dir")),
-    );
-
-    expect(result.denied).toBe(false);
-  });
-
-  it("allows direct git worktree when cwd is only nested under tool_input", async () => {
-    const result = await invokeCodex({
-      tool_input: { command: "git worktree list", cwd: groveCwd },
+    it.each(DENY_CASES)("denies: %s", async (_, input) => {
+      const result = await invoke(withCwd(input, groveCwd));
+      expect(result.denied).toBe(true);
     });
 
-    expect(result.denied).toBe(false);
+    it.each(ALLOW_CASES)("allows: %s", async (_, input) => {
+      const result = await invoke(withCwd(input, groveCwd));
+      expect(result.denied).toBe(false);
+    });
+
+    it("allows direct git worktree outside a grove workspace", async () => {
+      const result = await invoke(cmdInCwd("git worktree list", nonGroveCwd));
+
+      expect(result.denied).toBe(false);
+    });
+
+    it("allows direct git worktree in a workspace.json directory outside GROVE_ROOT", async () => {
+      const foreignCwd = path.join(tempDir, "foreign-workspace");
+      await mkdir(foreignCwd, { recursive: true });
+      await writeFile(path.join(foreignCwd, "workspace.json"), JSON.stringify({ name: "foreign" }));
+
+      const result = await invoke(cmdInCwd("git worktree list", foreignCwd));
+
+      expect(result.denied).toBe(false);
+    });
+
+    it("denies direct git worktree for any path under GROVE_ROOT", async () => {
+      const nestedCwd = path.join(groveRoot, "scratch", "nested");
+      await mkdir(nestedCwd, { recursive: true });
+
+      const result = await invoke(cmdInCwd("git worktree list", nestedCwd));
+
+      expect(result.denied).toBe(true);
+    });
+
+    it("denies direct git worktree when GROVE_ROOT is a symlink and cwd is canonical", async () => {
+      const realRoot = path.join(tempDir, "real-grove-root");
+      const linkedRoot = path.join(tempDir, "linked-grove-root");
+      const canonicalCwd = path.join(realRoot, "workspace");
+      await mkdir(canonicalCwd, { recursive: true });
+      await symlink(realRoot, linkedRoot, "dir");
+      groveRoot = linkedRoot;
+
+      const result = await invoke(cmdInCwd("git worktree list", canonicalCwd));
+
+      expect(result.denied).toBe(true);
+    });
+
+    it("allows direct git worktree when cwd is missing", async () => {
+      const result = await invoke(cmd("git worktree list"));
+
+      expect(result.denied).toBe(false);
+    });
+
+    it("allows direct git worktree when GROVE_ROOT does not exist", async () => {
+      groveRoot = path.join(tempDir, "missing-grove-root");
+
+      const result = await invoke(cmdInCwd("git worktree list", nonGroveCwd));
+
+      expect(result.denied).toBe(false);
+    });
+
+    it("allows direct git worktree when cwd does not exist on disk", async () => {
+      const result = await invoke(
+        cmdInCwd("git worktree list", path.join(groveRoot, "nonexistent-dir")),
+      );
+
+      expect(result.denied).toBe(false);
+    });
+
+    it("allows direct git worktree when cwd is only nested under tool_input", async () => {
+      const result = await invoke({
+        tool_input: { command: "git worktree list", cwd: groveCwd },
+      });
+
+      expect(result.denied).toBe(false);
+    });
+
+    it("withCwd overrides an existing top-level cwd", async () => {
+      const result = await invoke(withCwd(cmdInCwd("git worktree list", nonGroveCwd), groveCwd));
+
+      expect(result.denied).toBe(true);
+    });
+
+    it("allows PreToolUse payloads for non-Bash tools", async () => {
+      const result = await invoke(
+        preToolUseCmdInCwd("git worktree list", groveCwd, "mcp__fs__read"),
+      );
+
+      expect(result.denied).toBe(false);
+    });
   });
+}
 
-  it("withCwd overrides an existing top-level cwd", async () => {
-    const result = await invokeCodex(withCwd(cmdInCwd("git worktree list", nonGroveCwd), groveCwd));
+describeSharedPolicy("Codex", invokeCodex);
+describeSharedPolicy("Claude", invokeClaude);
 
-    expect(result.denied).toBe(true);
-  });
+describe("Codex reject-git-worktree hook adapter", () => {
+  beforeEach(setupAdapterDirs);
+  afterEach(() => cleanup(tempDir));
 
-  it("denies documented Codex PreToolUse Bash payloads", async () => {
+  it("denies with exit 0 and a permissionDecision deny payload on stdout", async () => {
     const result = await invokeCodex(preToolUseBashCmdInCwd("git worktree list", groveCwd));
 
     expect(result.denied).toBe(true);
     expect(result.exitCode).toBe(0);
     expect(requireHookOutput(result).permissionDecision).toBe("deny");
     expect(result.stderr).toBe("");
-  });
-
-  it("allows Codex PreToolUse payloads for non-Bash tools", async () => {
-    const result = await invokeCodex(
-      preToolUseCmdInCwd("git worktree list", groveCwd, "mcp__fs__read"),
-    );
-
-    expect(result.denied).toBe(false);
   });
 
   it("deny output has correct JSON structure", async () => {
@@ -424,29 +441,10 @@ describe("Codex reject-git-worktree hook adapter", () => {
 });
 
 describe("Claude reject-git-worktree hook adapter", () => {
-  beforeEach(async () => {
-    tempDir = await createTestDir();
-    groveRoot = path.join(tempDir, "grove-root");
-    groveCwd = path.join(groveRoot, "workspace");
-    nonGroveCwd = path.join(tempDir, "plain");
-
-    await mkdir(groveCwd, { recursive: true });
-    await mkdir(nonGroveCwd, { recursive: true });
-  });
-
+  beforeEach(setupAdapterDirs);
   afterEach(() => cleanup(tempDir));
 
-  it.each(DENY_CASES)("denies: %s", async (_, input) => {
-    const result = await invokeClaude(withCwd(input, groveCwd));
-    expect(result.denied).toBe(true);
-  });
-
-  it.each(ALLOW_CASES)("allows: %s", async (_, input) => {
-    const result = await invokeClaude(withCwd(input, groveCwd));
-    expect(result.denied).toBe(false);
-  });
-
-  it("denies Claude Bash payloads inside Grove workspaces", async () => {
+  it("denies with exit 2 and the reason on stderr, leaving stdout empty", async () => {
     const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", groveCwd));
 
     expect(result.denied).toBe(true);
@@ -454,35 +452,37 @@ describe("Claude reject-git-worktree hook adapter", () => {
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain(DENY_REASON);
   });
+});
 
-  it("allows Claude Bash payloads outside Grove workspaces", async () => {
-    const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", nonGroveCwd));
+describe("unknown reject-git-worktree hook mode", () => {
+  beforeEach(setupAdapterDirs);
+  afterEach(() => cleanup(tempDir));
+
+  it("fails open and warns on an unrecognized mode argument", async () => {
+    const result = await invokeScript(HOOK_SCRIPT, cmdInCwd("git worktree list", groveCwd), [
+      "bogus",
+    ]);
 
     expect(result.denied).toBe(false);
-  });
-
-  it("allows Claude PreToolUse payloads for non-Bash tools", async () => {
-    const result = await invokeClaude(
-      preToolUseCmdInCwd("git worktree list", groveCwd, "mcp__fs__read"),
-    );
-
-    expect(result.denied).toBe(false);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain("unknown hook mode");
   });
 });
 
 describe("legacy reject-git-worktree hook wrapper", () => {
-  beforeEach(async () => {
-    tempDir = await createTestDir();
-    groveRoot = path.join(tempDir, "grove-root");
-    groveCwd = path.join(groveRoot, "workspace");
-
-    await mkdir(groveCwd, { recursive: true });
-  });
-
+  beforeEach(setupAdapterDirs);
   afterEach(() => cleanup(tempDir));
 
-  it("continues to deny the existing generic payload shape", async () => {
+  it("continues to deny the existing no-argument generic payload shape", async () => {
     const result = await invokeLegacy(cmdInCwd("git worktree list", groveCwd));
+
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(2);
+    expect(requireHookOutput(result).permissionDecision).toBe("deny");
+  });
+
+  it("continues to deny when explicitly invoked in legacy mode", async () => {
+    const result = await invokeLegacy(cmdInCwd("git worktree list", groveCwd), ["legacy"]);
 
     expect(result.denied).toBe(true);
     expect(result.exitCode).toBe(2);
