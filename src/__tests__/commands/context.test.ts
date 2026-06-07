@@ -233,6 +233,21 @@ describe("context command", () => {
     expect(result.value.skipped).toEqual([]);
   });
 
+  it("does not descend into nested .worktrees directories when indexing workspace context", async () => {
+    const root = paths.worktreeDir("myws", "api", "feature-auth");
+    await mkdir(join(root, ".worktrees", "nested"), { recursive: true });
+    await writeFile(join(root, ".worktrees", "nested", "AGENTS.md"), "# nested worktree\n");
+
+    const result = await getWorkspaceContext("myws", paths);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.index).toEqual([]);
+    expect(result.value.skipped).toEqual([]);
+  });
+
   it("records symlinked subdirectories as skipped when indexing workspace context", async () => {
     const root = paths.worktreeDir("myws", "api", "feature-auth");
     const shared = join(tempDir, "shared");
