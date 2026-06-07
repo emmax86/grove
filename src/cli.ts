@@ -321,11 +321,10 @@ async function main() {
           );
           if (repoAddResult.ok) {
             const wsDir = paths.workspace(workspace);
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             const wtDir = paths.worktreeDir(
               workspace,
               repoAddResult.value.name,
-              repoAddResult.value.defaultBranchSlug!,
+              repoAddResult.value.defaultBranchSlug,
             );
             const worktreePath = relative(wsDir, wtDir);
             emit(ok({ ...repoAddResult.value, workspace, worktreePath }), "repo-add", renderCtx);

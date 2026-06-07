@@ -21,13 +21,19 @@ export interface RepoInfo extends RepoEntry {
   defaultBranchSlug?: string;
 }
 
+export interface AddedRepoInfo extends RepoInfo {
+  status: "ok";
+  defaultBranch: string;
+  defaultBranchSlug: string;
+}
+
 export async function addRepo(
   workspace: string,
   repoPath: string,
   nameOverride: string | undefined,
   paths: Paths,
   env?: GitEnv,
-): Promise<Result<RepoInfo>> {
+): Promise<Result<AddedRepoInfo>> {
   const absPath = resolve(repoPath);
 
   if (!(await isGitRepo(absPath))) {
