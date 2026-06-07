@@ -50,7 +50,7 @@ function compactIndexLabel(group: ReturnType<typeof groupedIndexEntries>[number]
   ];
 
   if (group.duplicates.length > 0) {
-    lines.push(`  same: ${group.duplicates.map((duplicate) => duplicate.scope).join(", ")}`);
+    lines.push(`  same: ${group.duplicates.map((duplicate) => duplicate.scopePath).join(", ")}`);
   }
 
   return lines.join("\n");

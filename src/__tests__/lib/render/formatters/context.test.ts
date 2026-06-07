@@ -173,7 +173,8 @@ describe("contextText", () => {
 
     expect(out).toContain("Instructions (1 unique, 1 duplicate)");
     expect(out.match(/h:abc123/g)).toHaveLength(1);
-    expect(out).toContain("  same: api/other/packages/auth");
+    expect(out).toContain("  same: trees/api/other/packages/auth");
+    expect(out).not.toContain("  same: api/other/packages/auth");
     expect(out).not.toContain("trees/api/other/packages/auth/AGENTS.md");
     expect(out).not.toContain("grove ws context myws trees/api/other/packages/auth");
   });
