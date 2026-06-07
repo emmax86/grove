@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -194,6 +195,37 @@ describe("MCP server", () => {
 
       expect(Array.isArray(data.repos)).toBe(true);
       expect(Array.isArray(data.pruned)).toBe(true);
+
+      await client.close();
+      await server.close();
+    });
+
+    it("workspace_exec dry-runs a configured command", async () => {
+      const repoPath = await setupWorkspaceWithRepo();
+      await mkdir(join(repoPath, ".grove"), { recursive: true });
+      await writeFile(
+        join(repoPath, ".grove", "commands.json"),
+        JSON.stringify({ "test:match": ["bun", "test", "--filter", "{match}"] }),
+      );
+      const { client, server } = await connectClient("ws");
+
+      const result = await client.callTool({
+        name: "workspace_exec",
+        arguments: {
+          command: "test:match",
+          repo: "myrepo",
+          match: "schema",
+          dryRun: true,
+        },
+      });
+      expect(result.isError).toBeFalsy();
+      const text = (result.content as Array<{ text: string }>)[0].text;
+      const data = JSON.parse(text);
+
+      expect(data.repo).toBe("myrepo");
+      expect(data.command).toEqual(["bun", "test", "--filter", "schema"]);
+      expect(data.exitCode).toBe(0);
+      expect(data.stdout).toBe("");
 
       await client.close();
       await server.close();
