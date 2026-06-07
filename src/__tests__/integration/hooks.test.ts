@@ -444,6 +444,9 @@ describe("Claude reject-git-worktree hook adapter", () => {
   beforeEach(setupAdapterDirs);
   afterEach(() => cleanup(tempDir));
 
+  // The full deny/allow matrix, cwd edge cases, and payload parsing are exercised
+  // via describeSharedPolicy("Claude", invokeClaude) above. This block asserts
+  // only Claude-specific protocol behavior: exit codes and output channels.
   it("denies with exit 2 and the reason on stderr, leaving stdout empty", async () => {
     const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", groveCwd));
 
@@ -451,6 +454,16 @@ describe("Claude reject-git-worktree hook adapter", () => {
     expect(result.exitCode).toBe(2);
     expect(result.stdout).toBe("");
     expect(result.stderr).toContain(DENY_REASON);
+    expect(result.stderr).toContain("/worktree add");
+  });
+
+  it("allows with exit 0 and empty output", async () => {
+    const result = await invokeClaude(preToolUseBashCmdInCwd("git status", groveCwd));
+
+    expect(result.denied).toBe(false);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.trim()).toBe("");
+    expect(result.stderr).toBe("");
   });
 });
 
