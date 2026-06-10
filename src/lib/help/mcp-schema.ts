@@ -126,6 +126,9 @@ function camelCase(name: string): string {
 
 /** Walk REGISTRY.children to the leaf at `path`. Throws if missing or not a leaf. */
 export function findLeaf(path: readonly string[]): HelpLeaf {
+  if (path.length === 0) {
+    throw new Error("registry path must not be empty");
+  }
   let nodes: readonly HelpNode[] = REGISTRY.children;
   let node: HelpNode | undefined;
   for (let i = 0; i < path.length; i++) {

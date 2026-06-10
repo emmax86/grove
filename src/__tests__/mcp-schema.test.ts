@@ -34,7 +34,8 @@ type ExecArgs = ToolArgs<typeof execInputSchema>;
 type _ExecCommandIsStandardCommand = Assert<IsEqual<ExecArgs["command"], StandardCommand>>;
 type _ExecDryRunIsOptionalBoolean = Assert<IsEqual<ExecArgs["dryRun"], boolean | undefined>>;
 
-// Registry names a binding passes through verbatim (no override, not omitted).
+// Registry names a binding passes through verbatim (no override, not omitted),
+// before MCP camelCase conversion (e.g. "dry-run" becomes "dryRun").
 // Updating a binding's surface? Update this set in the same change — that is the
 // conscious decision the guard is forcing.
 const KNOWN_PASSTHROUGH: Record<string, Set<string>> = {
@@ -92,7 +93,7 @@ describe("MCP binding drift guard", () => {
 
 describe("findLeaf", () => {
   it("throws for an empty path", () => {
-    expect(() => findLeaf([])).toThrow();
+    expect(() => findLeaf([])).toThrow("registry path must not be empty");
   });
 
   it("throws when a path continues past a leaf", () => {
