@@ -1,12 +1,21 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
 
 import { execCommand } from "./commands/exec";
 import { getStatus } from "./commands/status";
 import { syncWorkspace } from "./commands/workspace";
 import { addWorktree, removeWorktree } from "./commands/worktree";
 import type { Paths } from "./constants";
+import {
+  buildToolInputSchema,
+  EXEC_BINDING,
+  WORKTREE_ADD_BINDING,
+  WORKTREE_REMOVE_BINDING,
+} from "./lib/help/mcp-schema";
 import type { AsyncMutex } from "./lib/mutex";
+
+const WORKTREE_ADD_INPUT_SCHEMA = buildToolInputSchema(WORKTREE_ADD_BINDING);
+const WORKTREE_REMOVE_INPUT_SCHEMA = buildToolInputSchema(WORKTREE_REMOVE_BINDING);
+const EXEC_INPUT_SCHEMA = buildToolInputSchema(EXEC_BINDING);
 
 interface McpServerOptions {
   writeLock?: AsyncMutex;
@@ -93,17 +102,21 @@ export function createMcpServer(
     "workspace_add_worktree",
     {
       description: "Create a git worktree for a repo",
-      inputSchema: {
-        repo: z.string().describe("Repo name"),
-        branch: z.string().describe("Branch name"),
-        newBranch: z.boolean().optional().describe("Create a new branch"),
-        from: z.string().optional().describe("Base branch to create from"),
-        noSetup: z.boolean().optional().describe("Skip automatic setup after checkout"),
-      },
+      inputSchema: WORKTREE_ADD_INPUT_SCHEMA,
     },
     async ({ repo, branch, newBranch, from, noSetup }) => {
       const run = async () =>
-        addWorktree(workspace, repo, branch, { newBranch, from, noSetup }, paths);
+        addWorktree(
+          workspace,
+          repo,
+          branch,
+          {
+            newBranch,
+            from,
+            noSetup,
+          },
+          paths,
+        );
       const result = await (writeLock ? writeLock.run(run) : run());
       if (!result.ok) {
         return toErrorContent(result.error);
@@ -121,11 +134,7 @@ export function createMcpServer(
     "workspace_remove_worktree",
     {
       description: "Remove a git worktree",
-      inputSchema: {
-        repo: z.string().describe("Repo name"),
-        slug: z.string().describe("Worktree slug (branch name slugified)"),
-        force: z.boolean().optional().describe("Force removal even if branch has changes"),
-      },
+      inputSchema: WORKTREE_REMOVE_INPUT_SCHEMA,
     },
     async ({ repo, slug, force }) => {
       const run = async () => removeWorktree(workspace, repo, slug, { force }, paths);
@@ -146,19 +155,21 @@ export function createMcpServer(
     "workspace_exec",
     {
       description:
-        "Run a standard command (setup, format, test, check) in a repo. Auto-detects the tool from lockfiles; per-repo .grove/commands.json overrides take precedence.",
-      inputSchema: {
-        command: z
-          .enum(["setup", "format", "test", "test:file", "test:match", "check"])
-          .describe("Standard command to run"),
-        repo: z.string().optional().describe("Repo name (overrides file-based resolution)"),
-        file: z.string().optional().describe("Target file path (triggers repo resolution)"),
-        match: z.string().optional().describe("Test pattern filter for test:match"),
-        dryRun: z.boolean().optional().describe("Return resolved command without executing"),
-      },
+        "Run a standard command (setup, format, test, test:file, test:match, check) in a repo. Auto-detects the tool from lockfiles; per-repo .grove/commands.json overrides take precedence.",
+      inputSchema: EXEC_INPUT_SCHEMA,
     },
     async ({ command, repo, file, match, dryRun }) => {
-      const result = await execCommand(workspace, command, { repo, file, match, dryRun }, paths);
+      const result = await execCommand(
+        workspace,
+        command,
+        {
+          repo,
+          file,
+          match,
+          dryRun,
+        },
+        paths,
+      );
       if (!result.ok) {
         return toErrorContent(`${result.error} [${result.code}]`);
       }

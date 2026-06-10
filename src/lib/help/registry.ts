@@ -29,6 +29,8 @@ export interface HelpArg {
   summary?: string;
   /** Documentation only — what the optional arg falls back to when omitted. */
   defaultFrom?: "context-workspace" | "context-repo";
+  /** Allowed values for an enum-style positional arg (e.g. exec's command). */
+  values?: readonly string[];
 }
 
 export interface HelpFlag {
@@ -48,12 +50,12 @@ export interface HelpExample {
   description?: string;
 }
 
-const WORKSPACE_FLAG: HelpFlag = {
+const WORKSPACE_FLAG = {
   name: "workspace",
   valueLabel: "<name>",
   summary: "workspace name (defaults to inferred from CWD)",
   envVar: "GROVE_WORKSPACE",
-};
+} as const satisfies HelpFlag;
 
 export const GLOBAL_FLAGS: readonly HelpFlag[] = [
   { name: "json", summary: "JSON output ({ok, data} envelope)" },
@@ -64,7 +66,7 @@ export const GLOBAL_FLAGS: readonly HelpFlag[] = [
   { name: "version", summary: "show grove version (also -V)" },
 ];
 
-const WS_GROUP: HelpGroup = {
+const WS_GROUP = {
   kind: "group",
   name: "ws",
   aliases: ["workspaces"],
@@ -206,7 +208,12 @@ const WS_GROUP: HelpGroup = {
           name: "add",
           summary: "create a worktree in the shared pool",
           args: [
-            { name: "repo", required: false, defaultFrom: "context-repo" },
+            {
+              name: "repo",
+              required: false,
+              defaultFrom: "context-repo",
+              summary: "registered repo name",
+            },
             { name: "branch", required: true, summary: "branch name to check out" },
           ],
           flags: [
@@ -234,7 +241,14 @@ const WS_GROUP: HelpGroup = {
           kind: "leaf",
           name: "list",
           summary: "list worktrees for a repo",
-          args: [{ name: "repo", required: false, defaultFrom: "context-repo" }],
+          args: [
+            {
+              name: "repo",
+              required: false,
+              defaultFrom: "context-repo",
+              summary: "registered repo name",
+            },
+          ],
           flags: [WORKSPACE_FLAG],
         },
         {
@@ -242,7 +256,12 @@ const WS_GROUP: HelpGroup = {
           name: "remove",
           summary: "remove a worktree",
           args: [
-            { name: "repo", required: false, defaultFrom: "context-repo" },
+            {
+              name: "repo",
+              required: false,
+              defaultFrom: "context-repo",
+              summary: "registered repo name",
+            },
             { name: "slug", required: true, summary: "worktree slug" },
           ],
           flags: [
@@ -266,7 +285,8 @@ const WS_GROUP: HelpGroup = {
         {
           name: "command",
           required: true,
-          summary: "one of: setup, format, test, check, test:file, test:match",
+          summary: "one of: setup, format, test, test:file, test:match, check",
+          values: ["setup", "format", "test", "test:file", "test:match", "check"],
         },
         { name: "file", required: false, summary: "file path (required for test:file)" },
       ],
@@ -292,9 +312,9 @@ const WS_GROUP: HelpGroup = {
       ],
     },
   ],
-};
+} as const satisfies HelpGroup;
 
-const MCP_SERVER_LEAF: HelpLeaf = {
+const MCP_SERVER_LEAF = {
   kind: "leaf",
   name: "mcp-server",
   summary: "run the MCP server for a workspace",
@@ -306,11 +326,11 @@ const MCP_SERVER_LEAF: HelpLeaf = {
       summary: "port to listen on (default: random free port)",
     },
   ],
-};
+} as const satisfies HelpLeaf;
 
-export const REGISTRY: HelpGroup = {
+export const REGISTRY = {
   kind: "group",
   name: "grove",
   summary: "manage named workspaces of git repos and worktrees",
   children: [WS_GROUP, MCP_SERVER_LEAF],
-};
+} as const satisfies HelpGroup;
