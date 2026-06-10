@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { execCommand, type StandardCommand } from "./commands/exec";
+import { execCommand } from "./commands/exec";
 import { getStatus } from "./commands/status";
 import { syncWorkspace } from "./commands/workspace";
 import { addWorktree, removeWorktree } from "./commands/worktree";
@@ -12,6 +12,10 @@ import {
   WORKTREE_REMOVE_BINDING,
 } from "./lib/help/mcp-schema";
 import type { AsyncMutex } from "./lib/mutex";
+
+const WORKTREE_ADD_INPUT_SCHEMA = buildToolInputSchema(WORKTREE_ADD_BINDING);
+const WORKTREE_REMOVE_INPUT_SCHEMA = buildToolInputSchema(WORKTREE_REMOVE_BINDING);
+const EXEC_INPUT_SCHEMA = buildToolInputSchema(EXEC_BINDING);
 
 interface McpServerOptions {
   writeLock?: AsyncMutex;
@@ -98,18 +102,18 @@ export function createMcpServer(
     "workspace_add_worktree",
     {
       description: "Create a git worktree for a repo",
-      inputSchema: buildToolInputSchema(WORKTREE_ADD_BINDING),
+      inputSchema: WORKTREE_ADD_INPUT_SCHEMA,
     },
     async ({ repo, branch, newBranch, from, noSetup }) => {
       const run = async () =>
         addWorktree(
           workspace,
-          repo as string,
-          branch as string,
+          repo,
+          branch,
           {
-            newBranch: newBranch as boolean | undefined,
-            from: from as string | undefined,
-            noSetup: noSetup as boolean | undefined,
+            newBranch,
+            from,
+            noSetup,
           },
           paths,
         );
@@ -130,17 +134,10 @@ export function createMcpServer(
     "workspace_remove_worktree",
     {
       description: "Remove a git worktree",
-      inputSchema: buildToolInputSchema(WORKTREE_REMOVE_BINDING),
+      inputSchema: WORKTREE_REMOVE_INPUT_SCHEMA,
     },
     async ({ repo, slug, force }) => {
-      const run = async () =>
-        removeWorktree(
-          workspace,
-          repo as string,
-          slug as string,
-          { force: force as boolean | undefined },
-          paths,
-        );
+      const run = async () => removeWorktree(workspace, repo, slug, { force }, paths);
       const result = await (writeLock ? writeLock.run(run) : run());
       if (!result.ok) {
         return toErrorContent(result.error);
@@ -158,18 +155,18 @@ export function createMcpServer(
     "workspace_exec",
     {
       description:
-        "Run a standard command (setup, format, test, check, test:file, test:match) in a repo. Auto-detects the tool from lockfiles; per-repo .grove/commands.json overrides take precedence.",
-      inputSchema: buildToolInputSchema(EXEC_BINDING),
+        "Run a standard command (setup, format, test, test:file, test:match, check) in a repo. Auto-detects the tool from lockfiles; per-repo .grove/commands.json overrides take precedence.",
+      inputSchema: EXEC_INPUT_SCHEMA,
     },
     async ({ command, repo, file, match, dryRun }) => {
       const result = await execCommand(
         workspace,
-        command as StandardCommand,
+        command,
         {
-          repo: repo as string | undefined,
-          file: file as string | undefined,
-          match: match as string | undefined,
-          dryRun: dryRun as boolean | undefined,
+          repo,
+          file,
+          match,
+          dryRun,
         },
         paths,
       );

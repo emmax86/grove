@@ -50,12 +50,12 @@ export interface HelpExample {
   description?: string;
 }
 
-const WORKSPACE_FLAG: HelpFlag = {
+const WORKSPACE_FLAG = {
   name: "workspace",
   valueLabel: "<name>",
   summary: "workspace name (defaults to inferred from CWD)",
   envVar: "GROVE_WORKSPACE",
-};
+} as const satisfies HelpFlag;
 
 export const GLOBAL_FLAGS: readonly HelpFlag[] = [
   { name: "json", summary: "JSON output ({ok, data} envelope)" },
@@ -66,7 +66,7 @@ export const GLOBAL_FLAGS: readonly HelpFlag[] = [
   { name: "version", summary: "show grove version (also -V)" },
 ];
 
-const WS_GROUP: HelpGroup = {
+const WS_GROUP = {
   kind: "group",
   name: "ws",
   aliases: ["workspaces"],
@@ -312,9 +312,9 @@ const WS_GROUP: HelpGroup = {
       ],
     },
   ],
-};
+} as const satisfies HelpGroup;
 
-const MCP_SERVER_LEAF: HelpLeaf = {
+const MCP_SERVER_LEAF = {
   kind: "leaf",
   name: "mcp-server",
   summary: "run the MCP server for a workspace",
@@ -326,11 +326,11 @@ const MCP_SERVER_LEAF: HelpLeaf = {
       summary: "port to listen on (default: random free port)",
     },
   ],
-};
+} as const satisfies HelpLeaf;
 
-export const REGISTRY: HelpGroup = {
+export const REGISTRY = {
   kind: "group",
   name: "grove",
   summary: "manage named workspaces of git repos and worktrees",
   children: [WS_GROUP, MCP_SERVER_LEAF],
-};
+} as const satisfies HelpGroup;

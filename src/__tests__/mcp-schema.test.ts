@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
+import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
+import type { StandardCommand } from "../commands/exec";
 import {
   buildToolInputSchema,
   EXEC_BINDING,
@@ -10,6 +12,27 @@ import {
   WORKTREE_ADD_BINDING,
   WORKTREE_REMOVE_BINDING,
 } from "../lib/help/mcp-schema";
+import type { HelpArg } from "../lib/help/registry";
+
+type ToolArgs<Shape extends z.ZodRawShape> = Parameters<ToolCallback<Shape>>[0];
+type IsEqual<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Assert<T extends true> = T;
+
+const workspaceAddInputSchema = buildToolInputSchema(WORKTREE_ADD_BINDING);
+type WorkspaceAddArgs = ToolArgs<typeof workspaceAddInputSchema>;
+type _WorkspaceAddRepoIsString = Assert<IsEqual<WorkspaceAddArgs["repo"], string>>;
+type _WorkspaceAddNewBranchIsOptionalBoolean = Assert<
+  IsEqual<WorkspaceAddArgs["newBranch"], boolean | undefined>
+>;
+type _WorkspaceAddDoesNotExposeStaleField = Assert<
+  IsEqual<"repoName" extends keyof WorkspaceAddArgs ? true : false, false>
+>;
+
+const execInputSchema = buildToolInputSchema(EXEC_BINDING);
+type ExecArgs = ToolArgs<typeof execInputSchema>;
+type _ExecCommandIsStandardCommand = Assert<IsEqual<ExecArgs["command"], StandardCommand>>;
+type _ExecDryRunIsOptionalBoolean = Assert<IsEqual<ExecArgs["dryRun"], boolean | undefined>>;
 
 // Registry names a binding passes through verbatim (no override, not omitted).
 // Updating a binding's surface? Update this set in the same change — that is the
@@ -53,6 +76,8 @@ describe("MCP binding drift guard", () => {
       const overridden = new Set((binding.overrides ?? []).map((o) => o.name));
       // A name is covered only if the binding omits it, overrides it, or records
       // a conscious pass-through decision in KNOWN_PASSTHROUGH.
+      // This guards schema shape only; handler destructuring correctness relies
+      // on buildToolInputSchema's typed return in mcp-server.ts.
       const uncovered = registryNames.filter(
         (n) =>
           !omitted.has(n) && !overridden.has(n) && !KNOWN_PASSTHROUGH[binding.toolName]?.has(n),
@@ -114,5 +139,21 @@ describe("buildToolInputSchema", () => {
     expect(schema.parse({ command: "test" }).command).toBe("test");
     expect(() => schema.parse({ command: "bogus" })).toThrow();
     expect(() => schema.parse({})).toThrow();
+  });
+
+  it("falls back to string for an empty enum values array", () => {
+    const command = findLeaf(["ws", "exec"]).args?.find((a) => a.name === "command");
+    expect(command).toBeDefined();
+    const mutableCommand = command as HelpArg;
+    const originalValues = mutableCommand.values;
+    try {
+      mutableCommand.values = [];
+      const shape = buildToolInputSchema(EXEC_BINDING);
+      const schema = z.object(shape);
+      const parsed = schema.parse({ command: "custom" }) as { command: string };
+      expect(parsed.command).toBe("custom");
+    } finally {
+      mutableCommand.values = originalValues;
+    }
   });
 });
