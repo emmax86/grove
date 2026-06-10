@@ -285,8 +285,8 @@ const WS_GROUP: HelpGroup = {
         {
           name: "command",
           required: true,
-          summary: "one of: setup, format, test, check, test:file, test:match",
-          values: ["setup", "format", "test", "check", "test:file", "test:match"],
+          summary: "one of: setup, format, test, test:file, test:match, check",
+          values: ["setup", "format", "test", "test:file", "test:match", "check"],
         },
         { name: "file", required: false, summary: "file path (required for test:file)" },
       ],

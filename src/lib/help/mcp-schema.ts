@@ -42,7 +42,7 @@ export function findLeaf(path: readonly string[]): HelpLeaf {
       throw new Error(`registry path is not a leaf: ${path.join(" ")}`);
     }
   }
-  if (!node || node.kind !== "leaf") {
+  if (node?.kind !== "leaf") {
     throw new Error(`registry path is not a leaf: ${path.join(" ")}`);
   }
   return node;

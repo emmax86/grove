@@ -10,42 +10,32 @@ import {
   WORKTREE_ADD_BINDING,
   WORKTREE_REMOVE_BINDING,
 } from "../lib/help/mcp-schema";
-import { type HelpLeaf, type HelpNode, REGISTRY } from "../lib/help/registry";
 
-function leaf(...path: string[]): HelpLeaf {
-  let nodes: readonly HelpNode[] = REGISTRY.children;
-  let node: HelpNode | undefined;
-  for (const segment of path) {
-    node = nodes.find((n) => n.name === segment);
-    if (!node) {
-      throw new Error(`not found: ${path.join(" ")}`);
-    }
-    if (node.kind === "group") {
-      nodes = node.children;
-    }
-  }
-  if (!node || node.kind !== "leaf") {
-    throw new Error(`not a leaf: ${path.join(" ")}`);
-  }
-  return node;
-}
+// Registry names a binding passes through verbatim (no override, not omitted).
+// Updating a binding's surface? Update this set in the same change — that is the
+// conscious decision the guard is forcing.
+const KNOWN_PASSTHROUGH: Record<string, Set<string>> = {
+  workspace_add_worktree: new Set(["branch", "from", "no-setup"]),
+  workspace_remove_worktree: new Set(["slug", "force"]),
+  workspace_exec: new Set(["command", "file", "match", "repo", "dry-run"]),
+};
 
 describe("registry enum/summary data for MCP", () => {
   it("ws exec command arg carries structured enum values", () => {
-    const command = leaf("ws", "exec").args?.find((a) => a.name === "command");
+    const command = findLeaf(["ws", "exec"]).args?.find((a) => a.name === "command");
     expect(command?.values).toEqual([
       "setup",
       "format",
       "test",
-      "check",
       "test:file",
       "test:match",
+      "check",
     ]);
   });
 
   it("worktree add/remove repo args have a summary (for the MCP field description)", () => {
-    const add = leaf("ws", "worktree", "add").args?.find((a) => a.name === "repo");
-    const remove = leaf("ws", "worktree", "remove").args?.find((a) => a.name === "repo");
+    const add = findLeaf(["ws", "worktree", "add"]).args?.find((a) => a.name === "repo");
+    const remove = findLeaf(["ws", "worktree", "remove"]).args?.find((a) => a.name === "repo");
     expect(add?.summary).toBe("registered repo name");
     expect(remove?.summary).toBe("registered repo name");
   });
@@ -61,9 +51,8 @@ describe("MCP binding drift guard", () => {
       ];
       const omitted = new Set(binding.omit ?? []);
       const overridden = new Set((binding.overrides ?? []).map((o) => o.name));
-      // A name is "covered" if it's omitted, overridden, or present in the registry leaf
-      // (all leaf names flow into the shape unless omitted). The guard's job is to fail
-      // when a NEW name appears that the binding author hasn't consciously handled.
+      // A name is covered only if the binding omits it, overrides it, or records
+      // a conscious pass-through decision in KNOWN_PASSTHROUGH.
       const uncovered = registryNames.filter(
         (n) =>
           !omitted.has(n) && !overridden.has(n) && !KNOWN_PASSTHROUGH[binding.toolName]?.has(n),
@@ -76,16 +65,11 @@ describe("MCP binding drift guard", () => {
   });
 });
 
-// Registry names a binding passes through verbatim (no override, not omitted).
-// Updating a binding's surface? Update this set in the same change — that is the
-// conscious decision the guard is forcing.
-const KNOWN_PASSTHROUGH: Record<string, Set<string>> = {
-  workspace_add_worktree: new Set(["branch", "from", "no-setup"]),
-  workspace_remove_worktree: new Set(["slug", "force"]),
-  workspace_exec: new Set(["command", "file", "match", "repo", "dry-run"]),
-};
-
 describe("findLeaf", () => {
+  it("throws for an empty path", () => {
+    expect(() => findLeaf([])).toThrow();
+  });
+
   it("throws when a path continues past a leaf", () => {
     expect(() => findLeaf(["ws", "exec", "worktree", "add"])).toThrow();
   });

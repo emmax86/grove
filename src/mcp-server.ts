@@ -158,7 +158,7 @@ export function createMcpServer(
     "workspace_exec",
     {
       description:
-        "Run a standard command (setup, format, test, check) in a repo. Auto-detects the tool from lockfiles; per-repo .grove/commands.json overrides take precedence.",
+        "Run a standard command (setup, format, test, check, test:file, test:match) in a repo. Auto-detects the tool from lockfiles; per-repo .grove/commands.json overrides take precedence.",
       inputSchema: buildToolInputSchema(EXEC_BINDING),
     },
     async ({ command, repo, file, match, dryRun }) => {
