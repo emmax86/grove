@@ -29,6 +29,7 @@ async function invokeScript(
   script: string,
   input: unknown,
   args: string[] = [],
+  envOverrides: Record<string, string> = {},
 ): Promise<{
   denied: boolean;
   exitCode: number;
@@ -36,8 +37,15 @@ async function invokeScript(
   stderr: string;
   hookSpecificOutput?: HookSpecificOutput;
 }> {
+  // Strip the host plugin-root vars from the inherited env so environment-based
+  // host detection is hermetic: a test only sees the vars it sets explicitly,
+  // regardless of whether the surrounding session was itself launched by a host
+  // that exported CLAUDE_PLUGIN_ROOT / PLUGIN_ROOT.
+  const baseEnv = { ...process.env };
+  baseEnv.CLAUDE_PLUGIN_ROOT = undefined;
+  baseEnv.PLUGIN_ROOT = undefined;
   const proc = Bun.spawn(["bun", "run", script, ...args], {
-    env: { ...process.env, GROVE_ROOT: groveRoot },
+    env: { ...baseEnv, GROVE_ROOT: groveRoot, ...envOverrides },
     stdin: new Blob([JSON.stringify(input)]),
     stdout: "pipe",
     stderr: "pipe",
@@ -74,10 +82,6 @@ function invokeCodex(input: unknown) {
 
 function invokeClaude(input: unknown) {
   return invokeScript(HOOK_SCRIPT, input, ["claude"]);
-}
-
-function invokeLegacy(input: unknown, args: string[] = []) {
-  return invokeScript(HOOK_SCRIPT, input, args);
 }
 
 function requireHookOutput(result: {
@@ -236,11 +240,24 @@ const ALLOW_CASES: [string, unknown][] = [
 ];
 
 describe("plugin hook layout", () => {
-  it("uses a Codex adapter from default bundled hook discovery with PLUGIN_ROOT", async () => {
-    const manifest = JSON.parse(await readFile(CODEX_PLUGIN_MANIFEST, "utf8")) as {
+  // Both Claude Code and Codex auto-discover hooks/hooks.json from the plugin
+  // root. An inline `hooks` field in either host manifest would therefore
+  // double-register the guard under Claude (manifest hook + auto-discovered
+  // hooks.json). So neither manifest declares hooks inline; the single bundled
+  // hooks/hooks.json is the only source, and the script detects the host at
+  // runtime from the plugin-root env var each runner sets.
+  it("declares no inline hooks field in either host manifest", async () => {
+    const codexManifest = JSON.parse(await readFile(CODEX_PLUGIN_MANIFEST, "utf8")) as {
       hooks?: unknown;
     };
-    expect(manifest.hooks).toBeUndefined();
+    const claudeManifest = JSON.parse(await readFile(CLAUDE_PLUGIN_MANIFEST, "utf8")) as {
+      hooks?: unknown;
+    };
+    expect(codexManifest.hooks).toBeUndefined();
+    expect(claudeManifest.hooks).toBeUndefined();
+  });
+
+  it("resolves the script via CLAUDE_PLUGIN_ROOT or PLUGIN_ROOT with no host mode arg", async () => {
     expect(await exists(CODEX_HOOKS_JSON)).toBe(true);
     expect(await exists(LEGACY_CODEX_HOOKS_JSON)).toBe(false);
 
@@ -260,28 +277,91 @@ describe("plugin hook layout", () => {
     expect(hookConfig.hooks.PreToolUse).toHaveLength(1);
     expect(hookConfig.hooks.PreToolUse[0].hooks).toHaveLength(1);
     const command = hookConfig.hooks.PreToolUse[0].hooks[0].command;
-    const pluginRootVar = "$" + "{PLUGIN_ROOT}";
-    expect(command).toBe(`bun run ${pluginRootVar}/hooks/reject-git-worktree.ts codex`);
+    // Single command for both hosts: Claude sets CLAUDE_PLUGIN_ROOT, Codex sets
+    // PLUGIN_ROOT; the unset one falls back to the other. No static host arg —
+    // the script detects the host from the environment at runtime.
+    // Built via concatenation so the literal ${...} does not read as an unfilled
+    // template placeholder to the linter.
+    const dollar = "$";
+    const expectedCommand =
+      `bun run "${dollar}{CLAUDE_PLUGIN_ROOT:-${dollar}{PLUGIN_ROOT}}` +
+      `/hooks/reject-git-worktree.ts"`;
+    expect(command).toBe(expectedCommand);
+    expect(command).not.toContain(" codex");
+    expect(command).not.toContain(" claude");
     expect(JSON.stringify(hookConfig)).not.toContain("CODEX_PLUGIN_ROOT");
   });
+});
 
-  it("uses a Claude adapter with CLAUDE_PLUGIN_ROOT", async () => {
-    const manifest = JSON.parse(await readFile(CLAUDE_PLUGIN_MANIFEST, "utf8")) as {
-      hooks: {
-        PreToolUse: [
-          {
-            hooks: [
-              {
-                command: string;
-              },
-            ];
-          },
-        ];
-      };
-    };
-    const command = manifest.hooks.PreToolUse[0].hooks[0].command;
-    const pluginRootVar = "$" + "{CLAUDE_PLUGIN_ROOT}";
-    expect(command).toBe(`bun run ${pluginRootVar}/hooks/reject-git-worktree.ts claude`);
+describe("reject-git-worktree host detection from environment", () => {
+  beforeEach(setupAdapterDirs);
+  afterEach(() => cleanup(tempDir));
+
+  it("uses the Claude protocol when only CLAUDE_PLUGIN_ROOT is set and no mode arg is given", async () => {
+    const result = await invokeScript(
+      HOOK_SCRIPT,
+      preToolUseBashCmdInCwd("git worktree list", groveCwd),
+      [],
+      { CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT },
+    );
+
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(DENY_REASON);
+  });
+
+  it("uses the Codex protocol when only PLUGIN_ROOT is set and no mode arg is given", async () => {
+    const result = await invokeScript(
+      HOOK_SCRIPT,
+      preToolUseBashCmdInCwd("git worktree list", groveCwd),
+      [],
+      { PLUGIN_ROOT },
+    );
+
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(requireHookOutput(result).permissionDecision).toBe("deny");
+    expect(result.stderr).toBe("");
+  });
+
+  it("prefers the Claude protocol when both plugin-root vars are set", async () => {
+    const result = await invokeScript(
+      HOOK_SCRIPT,
+      preToolUseBashCmdInCwd("git worktree list", groveCwd),
+      [],
+      { CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT, PLUGIN_ROOT },
+    );
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe("");
+  });
+
+  it("lets an explicit mode arg override environment detection", async () => {
+    const result = await invokeScript(
+      HOOK_SCRIPT,
+      preToolUseBashCmdInCwd("git worktree list", groveCwd),
+      ["codex"],
+      { CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT },
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(requireHookOutput(result).permissionDecision).toBe("deny");
+  });
+
+  it("falls back to the Claude protocol when no mode arg and neither plugin-root var is set", async () => {
+    // A real hook invocation always has one plugin-root var set, so this is the
+    // anomalous/manual path. It must still deny — via the strongest signal.
+    const result = await invokeScript(
+      HOOK_SCRIPT,
+      preToolUseBashCmdInCwd("git worktree list", groveCwd),
+      [],
+    );
+
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain(DENY_REASON);
   });
 });
 
@@ -480,25 +560,14 @@ describe("unknown reject-git-worktree hook mode", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toContain("unknown hook mode");
   });
-});
 
-describe("legacy reject-git-worktree hook wrapper", () => {
-  beforeEach(setupAdapterDirs);
-  afterEach(() => cleanup(tempDir));
+  it("treats the removed legacy mode as an unrecognized argument", async () => {
+    const result = await invokeScript(HOOK_SCRIPT, cmdInCwd("git worktree list", groveCwd), [
+      "legacy",
+    ]);
 
-  it("continues to deny the existing no-argument generic payload shape", async () => {
-    const result = await invokeLegacy(cmdInCwd("git worktree list", groveCwd));
-
-    expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(2);
-    expect(requireHookOutput(result).permissionDecision).toBe("deny");
-  });
-
-  it("continues to deny when explicitly invoked in legacy mode", async () => {
-    const result = await invokeLegacy(cmdInCwd("git worktree list", groveCwd), ["legacy"]);
-
-    expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(2);
-    expect(requireHookOutput(result).permissionDecision).toBe("deny");
+    expect(result.denied).toBe(false);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toContain("unknown hook mode");
   });
 });
