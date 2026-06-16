@@ -2,7 +2,11 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    # Only events that introduce a new/changed commit. Draft<->ready and
+    # reopen transitions fire on the same HEAD SHA as the prior run, so
+    # reviewing them again just re-reviews an identical diff. Drafts are
+    # still reviewed (on open and on each push).
+    types: [opened, synchronize]
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.ts"
