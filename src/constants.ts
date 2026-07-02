@@ -20,6 +20,10 @@ export interface Paths {
   claudeMd: (name: string) => string;
   agentsMd: (name: string) => string;
   daemonConfig: (name: string) => string;
+  contextStateDir: (name: string) => string;
+  contextJournal: (name: string) => string;
+  contextObjects: (name: string) => string;
+  mcpJson: (name: string) => string;
 }
 
 export function createPaths(root: string): Paths {
@@ -43,6 +47,10 @@ export function createPaths(root: string): Paths {
     claudeMd: (name) => join(root, name, "CLAUDE.md"),
     agentsMd: (name) => join(root, name, "AGENTS.md"),
     daemonConfig: (name) => join(root, name, ".claude", "server.json"),
+    contextStateDir: (name) => join(root, name, ".grove", "state", "context"),
+    contextJournal: (name) => join(root, name, ".grove", "state", "context", "journal.jsonl"),
+    contextObjects: (name) => join(root, name, ".grove", "state", "context", "objects"),
+    mcpJson: (name) => join(root, name, ".mcp.json"),
   };
 }
 
