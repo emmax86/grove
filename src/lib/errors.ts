@@ -76,6 +76,9 @@ export const ERROR_CATALOG = {
   GIT_WORKTREE_REMOVE_ERROR: {
     description: "The underlying `git worktree remove` command failed for a single worktree.",
   },
+  GIT_LS_FILES_ERROR: {
+    description: "`git ls-files` failed while enumerating instruction files.",
+  },
 
   // Filesystem and symlinks
   DANGLING_SYMLINK: {

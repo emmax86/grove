@@ -52,6 +52,10 @@ An expected file does not exist on disk.
 
 Failed to read the current branch name via `git symbolic-ref --short HEAD`.
 
+## GIT_LS_FILES_ERROR
+
+`git ls-files` failed while enumerating instruction files.
+
 ## GIT_WORKTREE_ADD_ERROR
 
 `git worktree add` failed.

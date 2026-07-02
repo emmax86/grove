@@ -170,3 +170,40 @@ export async function findMainWorktreePath(
   }
   return ok(result.value[0].path);
 }
+
+export const INSTRUCTION_FILE_NAMES = ["AGENTS.override.md", "AGENTS.md", "CLAUDE.md"] as const;
+
+/**
+ * Enumerate instruction files via git: tracked plus untracked-but-not-ignored.
+ * The repo's own ignore rules govern — vendored dirs (.venv, node_modules,
+ * target/, …) are excluded with zero grove-side configuration.
+ */
+export async function listInstructionFiles(
+  worktreeRoot: string,
+  env?: GitEnv,
+): Promise<Result<string[]>> {
+  const result = await spawnGit(
+    ["ls-files", "--cached", "--others", "--exclude-standard"],
+    worktreeRoot,
+    env,
+  );
+  if (!result.success) {
+    return err(`git ls-files failed: ${result.stderr}`, "GIT_LS_FILES_ERROR");
+  }
+  const names = new Set<string>(INSTRUCTION_FILE_NAMES);
+  const files = result.stdout
+    .split("\n")
+    .filter(Boolean)
+    .filter((path) => names.has(path.split("/").pop() ?? ""));
+  return ok([...new Set(files)]);
+}
+
+/** `git check-ignore -q`. Returns false on any git failure — bias to serving. */
+export async function isPathIgnored(
+  path: string,
+  worktreeRoot: string,
+  env?: GitEnv,
+): Promise<boolean> {
+  const result = await spawnGit(["check-ignore", "-q", "--", path], worktreeRoot, env);
+  return result.success; // exit 0 = ignored; exit 1 = not ignored; exit 128 = error → false
+}
