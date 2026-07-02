@@ -61,19 +61,33 @@ describe("DisclosureRecorder", () => {
     await expect(readdir(join(dir, "ctx", "objects"))).resolves.toEqual([]);
   });
 
-  it("rotates the journal past the size threshold and prunes unreferenced blobs", async () => {
-    const recorder = new DisclosureRecorder(join(dir, "ctx"), { maxJournalBytes: 200 });
+  it("evicts the oldest segment's blobs once they fall past the ring", async () => {
+    const recorder = new DisclosureRecorder(join(dir, "ctx"), {
+      maxJournalBytes: 200,
+      maxSegments: 2,
+    });
     await recorder.record(event({ contentHash: "old1" }), "old content");
-    // Enough events to exceed 200 bytes and trigger rotation
     for (let i = 0; i < 5; i++) {
       await recorder.record(event({ contentHash: `new${i}`, ts: `2026-07-01T00:00:0${i}Z` }), "x");
     }
     const files = await readdir(join(dir, "ctx"));
-    expect(files).toContain("journal.1.jsonl");
-    // old1 referenced only by rotated-out segment may be pruned once its segment drops;
-    // with keep=2 both segments are retained, so old1 must still exist.
+    expect(files).toContain("journal.1.jsonl"); // rotation occurred
     const objects = await readdir(join(dir, "ctx", "objects"));
-    expect(objects).toContain("old1");
+    expect(objects).not.toContain("old1"); // evicted past the 2-segment ring
+    expect(objects.some((o) => o.startsWith("new"))).toBe(true); // a still-referenced blob survives
+  });
+
+  it("retains an old blob while its segment is still within the ring", async () => {
+    const recorder = new DisclosureRecorder(join(dir, "ctx2"), {
+      maxJournalBytes: 200,
+      maxSegments: 5,
+    });
+    await recorder.record(event({ contentHash: "old1" }), "old content");
+    for (let i = 0; i < 5; i++) {
+      await recorder.record(event({ contentHash: `new${i}`, ts: `2026-07-01T00:00:0${i}Z` }), "x");
+    }
+    const objects = await readdir(join(dir, "ctx2", "objects"));
+    expect(objects).toContain("old1"); // still within the 5-segment ring
   });
 
   it("never throws when the state dir is unwritable (observation must not break serving)", async () => {

@@ -1,4 +1,13 @@
-import { appendFile, mkdir, readdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import {
+  appendFile,
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
 
 export type TouchStatus = "served" | "current" | "updated" | "refreshed";
@@ -15,6 +24,8 @@ export interface DisclosureEvent {
 interface RecorderOptions {
   /** Rotate journal.jsonl when it exceeds this size. Default 5 MiB. */
   maxJournalBytes?: number;
+  /** Total retained journal segments (active + archives). The oldest is evicted past this. Default 2. */
+  maxSegments?: number;
 }
 
 /**
@@ -36,6 +47,11 @@ export class DisclosureRecorder {
 
   private get objectsDir(): string {
     return join(this.stateDir, "objects");
+  }
+
+  /** slot 0 -> journal.jsonl (active); slot i>=1 -> journal.<i>.jsonl (archive). */
+  private segmentPath(i: number): string {
+    return i === 0 ? this.journalPath : join(this.stateDir, `journal.${i}.jsonl`);
   }
 
   private async ensureStateDir(): Promise<void> {
@@ -79,28 +95,29 @@ export class DisclosureRecorder {
 
   private async maybeRotate(): Promise<void> {
     const max = this.options.maxJournalBytes ?? 5 * 1024 * 1024;
+    const maxSegments = this.options.maxSegments ?? 2;
     const info = await stat(this.journalPath).catch(() => null);
     if (!info || info.size <= max) {
       return;
     }
-    // Fold the active journal into the archive (journal.1.jsonl) rather than
-    // overwriting it, so a blob referenced only by an earlier rotation is
-    // never orphaned by a later one. This keeps exactly two files on disk
-    // (journal.jsonl + journal.1.jsonl) while never dropping history that
-    // pruneObjects still considers live.
-    const rotated = join(this.stateDir, "journal.1.jsonl");
-    const current = await readFile(this.journalPath, "utf-8");
-    const archive = await readFile(rotated, "utf-8").catch(() => "");
-    await writeFile(rotated, archive + current);
-    await unlink(this.journalPath);
-    await this.pruneObjects();
+    // Bounded segment ring, drop-oldest: evict the oldest archive, shift the
+    // remaining archives one slot older, then move the active journal into
+    // slot 1. The next append recreates journal.jsonl. This keeps at most
+    // maxSegments files on disk instead of growing the archive unboundedly.
+    const oldest = maxSegments - 1;
+    await unlink(this.segmentPath(oldest)).catch(() => {});
+    for (let i = oldest - 1; i >= 1; i--) {
+      await rename(this.segmentPath(i), this.segmentPath(i + 1)).catch(() => {});
+    }
+    await rename(this.journalPath, this.segmentPath(1));
+    await this.pruneObjects(maxSegments);
   }
 
   /** Delete blobs unreferenced by any retained journal segment. */
-  private async pruneObjects(): Promise<void> {
+  private async pruneObjects(maxSegments: number): Promise<void> {
     const referenced = new Set<string>();
-    for (const name of ["journal.jsonl", "journal.1.jsonl"]) {
-      const text = await readFile(join(this.stateDir, name), "utf-8").catch(() => "");
+    for (let i = 0; i < maxSegments; i++) {
+      const text = await readFile(this.segmentPath(i), "utf-8").catch(() => "");
       for (const line of text.split("\n")) {
         if (!line.trim()) {
           continue;
