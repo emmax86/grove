@@ -124,6 +124,13 @@ Run standard commands against a repo without needing to know its toolchain:
 
 Options: `--repo <name>` (required when no file is given, otherwise inferred from file path), `--match <pattern>` (filter pattern for `test:match`), `--dry-run` (print resolved command without running).
 
+### MCP — `grove mcp <command>`
+
+| Command                        | Description                                                          |
+| ------------------------------ | -------------------------------------------------------------------- |
+| `serve [--workspace W] [--port P]` | Run the MCP daemon for a workspace (alias: `grove mcp-server`)   |
+| `connect [--workspace W]`      | stdio bridge to the workspace daemon (auto-starts it); for `.mcp.json` |
+
 ### Other
 
 | Command                                 | Description                                  |

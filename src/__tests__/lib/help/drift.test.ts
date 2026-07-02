@@ -52,24 +52,22 @@ function extractDispatchPaths(source: string): Set<string> {
 
 /**
  * Registry paths that are intentionally not yet reachable through cli.ts
- * dispatch (or documented in the README command tables). The `mcp` group is
- * registered ahead of its CLI wiring — the registry/schema and the dispatch
- * implementation land in separate change sets, and `grove mcp-server` already
- * covers the "start the daemon" use case in the meantime. Remove entries here
- * as their dispatch (and README docs) land for real.
+ * dispatch (or documented in the README command tables). Empty: every
+ * registered command is now wired and documented. Add entries here only for a
+ * command whose registry/schema lands ahead of its dispatch, and remove them
+ * as the real dispatch (and README docs) land.
  */
-const PLANNED_UNDISPATCHED_PATHS: ReadonlySet<string> = new Set([
-  "mcp",
-  "mcp serve",
-  "mcp connect",
-]);
+const PLANNED_UNDISPATCHED_PATHS: ReadonlySet<string> = new Set([]);
 
 /**
  * Build the set of dispatch full paths reachable from cli.ts.
  *
  * Combines case-stack paths (prefixed with `ws ` since they live inside the ws
- * subcmd switch), top-level `cmd === "X"` checks (mcp-server, ws), and
- * `argv[N] === "X"` inline guards (e.g. `ws exec`, prefixed with `ws `).
+ * subcmd switch), top-level `cmd === "X"` checks (mcp-server, mcp, ws), and
+ * compound `cmd === "X" && argv[N] === "Y"` inline guards (e.g. `ws exec`,
+ * `mcp serve`, `mcp connect`) which resolve to the full path `X Y` — the
+ * command token supplies the prefix, so a guard under `cmd === "mcp"` yields
+ * `mcp <sub>`, not `ws <sub>`.
  */
 function buildReachablePaths(source: string): Set<string> {
   const out = new Set<string>();
@@ -82,11 +80,11 @@ function buildReachablePaths(source: string): Set<string> {
     out.add(m[1]);
     m = reCmd.exec(source);
   }
-  const reArgv = /argv\[\d+\] === "([^"]+)"/g;
-  m = reArgv.exec(source);
+  const reCompound = /cmd === "([^"]+)"\s*&&\s*argv\[\d+\] === "([^"]+)"/g;
+  m = reCompound.exec(source);
   while (m !== null) {
-    out.add(`ws ${m[1]}`);
-    m = reArgv.exec(source);
+    out.add(`${m[1]} ${m[2]}`);
+    m = reCompound.exec(source);
   }
   return out;
 }

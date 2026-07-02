@@ -6,6 +6,7 @@ import packageJson from "../package.json";
 import { getTargetContext, getWorkspaceContext } from "./commands/context";
 import { listContextSessions, runContextTouch } from "./commands/context-client";
 import { execCommand, type StandardCommand } from "./commands/exec";
+import { runMcpConnect } from "./commands/mcp-connect";
 import { addRepo, listRepos, removeRepo } from "./commands/repo";
 import { getStatus } from "./commands/status";
 import { addWorkspace, listWorkspaces, removeWorkspace, syncWorkspace } from "./commands/workspace";
@@ -177,9 +178,21 @@ async function main() {
     emit(ok({ version: packageJson.version }), "version", renderCtx);
   }
 
-  // ── mcp-server subcommand ────────────────────────────────────────
-  if (cmd === "mcp-server") {
-    const parsed = parseArgs(argv.slice(1));
+  // ── mcp connect subcommand (stdio bridge) ────────────────────────
+  if (cmd === "mcp" && argv[1] === "connect") {
+    const parsed = parseArgs(argv.slice(2));
+    const workspaceName = resolveWorkspace(parsed, ctx.workspace);
+    if (!workspaceName) {
+      emitMissingArg("workspace", ["mcp", "connect"], renderCtx);
+    }
+    await runMcpConnect(workspaceName, paths);
+    return;
+  }
+
+  // ── mcp serve / mcp-server subcommand ────────────────────────────
+  // `mcp serve` is the canonical name; `mcp-server` is a kept alias.
+  if (cmd === "mcp-server" || (cmd === "mcp" && argv[1] === "serve")) {
+    const parsed = parseArgs(argv.slice(cmd === "mcp" ? 2 : 1));
     const workspaceName = resolveWorkspace(parsed, ctx.workspace);
     const portArg = flagValue(parsed, "port");
     const port = portArg !== undefined ? parseInt(portArg, 10) : 0;
