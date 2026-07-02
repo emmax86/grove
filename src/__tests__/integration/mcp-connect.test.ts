@@ -63,4 +63,36 @@ describe("grove mcp connect (stdio bridge)", () => {
     // Daemon was auto-started: discovery file exists and health-checks OK.
     expect(await exists(paths.daemonConfig("ws"))).toBe(true);
   }, 30_000);
+
+  it("bridge process exits when its stdin closes (harness gone)", async () => {
+    const proc = Bun.spawn(["bun", CLI_PATH, "mcp", "connect", "--workspace", "ws"], {
+      stdin: "pipe",
+      stdout: "ignore",
+      stderr: "ignore",
+      env: { ...(process.env as Record<string, string>), GROVE_ROOT: fixtureRoot },
+    });
+
+    // Wait for the auto-started daemon to come up — proves the bridge cleared
+    // ensureDaemon and is now pumping stdio (stdin flowing).
+    for (let i = 0; i < 150; i++) {
+      if (await exists(paths.daemonConfig("ws"))) {
+        break;
+      }
+      await Bun.sleep(100);
+    }
+    expect(await exists(paths.daemonConfig("ws"))).toBe(true);
+    await Bun.sleep(500);
+
+    // Simulate an ungraceful harness death: the bridge's stdin goes away.
+    proc.stdin.end();
+
+    const outcome = await Promise.race([
+      proc.exited,
+      Bun.sleep(10_000).then(() => "timeout" as const),
+    ]);
+    if (outcome === "timeout") {
+      proc.kill();
+    }
+    expect(outcome).toBe(0);
+  }, 30_000);
 });

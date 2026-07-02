@@ -155,7 +155,7 @@ describe("startDaemon", () => {
     const info = await startDaemon({
       workspace: "ws",
       paths,
-      gracePeriodMs: 500,
+      gracePeriodMs: 5000,
     });
     const configPath = paths.daemonConfig("ws");
 
@@ -163,6 +163,41 @@ describe("startDaemon", () => {
     await info.stop();
     stopFn = null;
     expect(await exists(configPath)).toBe(false);
+  });
+
+  it("closed resolves after stop() is called", async () => {
+    await addWorkspace("ws", paths);
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 5000,
+    });
+
+    let resolved = false;
+    void info.closed.then(() => {
+      resolved = true;
+    });
+    expect(resolved).toBe(false);
+
+    await info.stop();
+    stopFn = null;
+    await info.closed;
+    expect(resolved).toBe(true);
+  });
+
+  it("closed resolves when the grace timer fires with no sessions", async () => {
+    await addWorkspace("ws", paths);
+    const info = await startDaemon({
+      workspace: "ws",
+      paths,
+      gracePeriodMs: 100,
+    });
+
+    // No MCP session ever connects, so the grace timer started at boot fires
+    // and shuts the daemon down on its own — closed must resolve.
+    await info.closed;
+    stopFn = null;
+    expect(await exists(paths.daemonConfig("ws"))).toBe(false);
   });
 });
 

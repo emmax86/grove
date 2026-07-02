@@ -21,6 +21,13 @@ export interface DaemonInfo {
   url: string;
   pid: number;
   stop: () => Promise<void>;
+  /**
+   * Resolves exactly once when the daemon has fully shut down — whether
+   * triggered by the grace timer, a SIGINT/SIGTERM signal, or an explicit
+   * {@link DaemonInfo.stop} call. The standalone CLI awaits this to know when
+   * it may `process.exit`; in-process test callers ignore it and use `stop()`.
+   */
+  closed: Promise<void>;
 }
 
 interface Session {
@@ -51,6 +58,14 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
   const cliLedgers = new Map<string, ContextLedger>();
   let graceTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Resolves once shutdown() completes. The CLI awaits this and then exits;
+  // guarded so double shutdown (e.g. grace timer + signal) resolves exactly once.
+  let didShutdown = false;
+  let resolveClosed!: () => void;
+  const closed = new Promise<void>((resolve) => {
+    resolveClosed = resolve;
+  });
+
   function startGraceTimer() {
     if (graceTimer) {
       clearTimeout(graceTimer);
@@ -73,9 +88,14 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
   }
 
   async function shutdown() {
+    if (didShutdown) {
+      return;
+    }
+    didShutdown = true;
     cancelGraceTimer();
     await removeDiscoveryFile();
     await httpServer.stop(true);
+    resolveClosed();
   }
 
   function onSessionClosed(sessionId: string) {
@@ -231,6 +251,7 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
   return {
     url: mcpUrl,
     pid: process.pid,
+    closed,
     stop: async () => {
       process.off("SIGINT", sigHandler);
       process.off("SIGTERM", sigHandler);
@@ -290,5 +311,8 @@ export async function discoverDaemon(workspace: string, paths: Paths): Promise<D
     url: data.url,
     pid: data.pid,
     stop: async () => {}, // discovery doesn't own the daemon
+    // The discoverer doesn't own the daemon's lifecycle and can't observe its
+    // shutdown, so this never resolves.
+    closed: new Promise<void>(() => {}),
   };
 }

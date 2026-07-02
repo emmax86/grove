@@ -61,6 +61,15 @@ export async function runMcpConnect(workspace: string, paths: Paths): Promise<vo
   const stdio = new StdioServerTransport();
   const http = new StreamableHTTPClientTransport(new URL(url));
 
+  // The SDK stdio transport only listens for stdin 'data'/'error' — it never
+  // detects stdin EOF/close, so an ungraceful harness (parent) death would
+  // orphan this bridge AND leave its MCP session open on the daemon forever
+  // (the daemon's grace timer only starts once sessions hit 0). Exit as soon
+  // as our stdin goes away; dropping the HTTP connection closes the daemon's
+  // session transport, which lets the daemon grace-shutdown normally.
+  process.stdin.on("end", () => process.exit(0));
+  process.stdin.on("close", () => process.exit(0));
+
   stdio.onmessage = (message) => {
     http
       .send(message)
@@ -74,7 +83,13 @@ export async function runMcpConnect(workspace: string, paths: Paths): Promise<vo
   stdio.onclose = () => void http.close();
   http.onclose = () => process.exit(0);
   stdio.onerror = (e) => process.stderr.write(`[mcp-connect] stdio error: ${e}\n`);
-  http.onerror = (e) => process.stderr.write(`[mcp-connect] http error: ${e}\n`);
+  http.onerror = (e) => {
+    // A fatal HTTP transport error means the daemon link is dead; tear down the
+    // stdio side and exit non-zero rather than lingering as a half-open bridge.
+    process.stderr.write(`[mcp-connect] http error: ${e}\n`);
+    void stdio.close();
+    process.exit(1);
+  };
 
   // start() on the HTTP client only sets up its AbortController; it is safe to
   // call before the first send() and does not itself open the session.

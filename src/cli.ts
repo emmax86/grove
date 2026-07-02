@@ -215,9 +215,11 @@ async function main() {
     const info = await startDaemon({ workspace: workspaceName, paths, port });
     process.stderr.write(`[mcp-server] listening at ${info.url}\n`);
 
-    // Keep process alive — daemon runs until shutdown signal
-    await new Promise<void>(() => {});
-    return;
+    // Block until the daemon shuts itself down (grace timer or signal), then
+    // exit so the process does not linger idle. Signals are also handled inside
+    // startDaemon, but awaiting `closed` covers the grace-timer path too.
+    await info.closed;
+    process.exit(0);
   }
 
   // ── ws exec subcommand ───────────────────────────────────────────
