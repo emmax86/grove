@@ -8,6 +8,8 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { addRepo } from "../commands/repo";
 import { addWorkspace } from "../commands/workspace";
 import { createPaths } from "../constants";
+import { ContextLedger } from "../lib/context-ledger";
+import { DisclosureRecorder } from "../lib/context-state";
 import { createMcpServer } from "../mcp-server";
 import { cleanup, createTestDir, createTestGitRepo, GIT_ENV } from "./helpers";
 
@@ -115,12 +117,12 @@ describe("MCP server", () => {
   // ── tool listing ────────────────────────────────────────────────
 
   describe("tools", () => {
-    it("lists 6 tools", async () => {
+    it("lists 7 tools", async () => {
       await addWorkspace("ws", paths);
       const { client, server } = await connectClient("ws");
 
       const { tools } = await client.listTools();
-      expect(tools).toHaveLength(6);
+      expect(tools).toHaveLength(7);
 
       await client.close();
       await server.close();
@@ -139,6 +141,7 @@ describe("MCP server", () => {
       expect(names).toContain("workspace_sync");
       expect(names).toContain("workspace_path");
       expect(names).toContain("workspace_exec");
+      expect(names).toContain("context_touch");
 
       await client.close();
       await server.close();
@@ -385,6 +388,83 @@ describe("MCP server", () => {
         arguments: { repo: "ghost", slug: "nope" },
       });
       expect(result.isError).toBe(true);
+
+      await client.close();
+      await server.close();
+    });
+
+    describe("context_touch", () => {
+      it("serves full content on first call and current markers on second", async () => {
+        const repoPath = await setupWorkspaceWithRepo();
+        await writeFile(join(repoPath, "AGENTS.md"), "# myrepo instructions\n");
+        const ledger = new ContextLedger("session-1");
+        const recorder = new DisclosureRecorder(join(tempDir, "context-state"));
+        const { client, server } = await connectClient("ws", {
+          contextLedger: ledger,
+          recorder,
+        });
+
+        const first = await client.callTool({
+          name: "context_touch",
+          arguments: { paths: ["trees/myrepo/main"] },
+        });
+        expect(first.isError).toBeFalsy();
+        const firstText = (first.content as Array<{ text: string }>)[0].text;
+        expect(firstText).toContain("myrepo instructions");
+
+        const second = await client.callTool({
+          name: "context_touch",
+          arguments: { paths: ["trees/myrepo/main"] },
+        });
+        expect(second.isError).toBeFalsy();
+        const secondText = (second.content as Array<{ text: string }>)[0].text;
+        expect(secondText).toContain("current");
+        expect(secondText).not.toContain("myrepo instructions");
+
+        await client.close();
+        await server.close();
+      });
+
+      it("keeps served-state isolated across two different session ledgers", async () => {
+        const repoPath = await setupWorkspaceWithRepo();
+        await writeFile(join(repoPath, "AGENTS.md"), "# myrepo instructions\n");
+        const recorder = new DisclosureRecorder(join(tempDir, "context-state"));
+
+        const ledgerA = new ContextLedger("session-a");
+        const sessionA = await connectClient("ws", { contextLedger: ledgerA, recorder });
+        const servedA = await sessionA.client.callTool({
+          name: "context_touch",
+          arguments: { paths: ["trees/myrepo/main"] },
+        });
+        expect(servedA.isError).toBeFalsy();
+        const servedAText = (servedA.content as Array<{ text: string }>)[0].text;
+        expect(servedAText).toContain("myrepo instructions");
+        await sessionA.client.close();
+        await sessionA.server.close();
+
+        const ledgerB = new ContextLedger("session-b");
+        const sessionB = await connectClient("ws", { contextLedger: ledgerB, recorder });
+        const servedB = await sessionB.client.callTool({
+          name: "context_touch",
+          arguments: { paths: ["trees/myrepo/main"] },
+        });
+        expect(servedB.isError).toBeFalsy();
+        const servedBText = (servedB.content as Array<{ text: string }>)[0].text;
+        // A fresh ledger (simulating a new MCP session) must not see session A's
+        // served-state — it serves full content again, not "current" markers.
+        expect(servedBText).toContain("myrepo instructions");
+        await sessionB.client.close();
+        await sessionB.server.close();
+      });
+    });
+  });
+
+  describe("server instructions", () => {
+    it("advertises the touch protocol", async () => {
+      await addWorkspace("ws", paths);
+      const { client, server } = await connectClient("ws");
+
+      expect(client.getInstructions()).toContain("context_touch");
 
       await client.close();
       await server.close();

@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import { touchContext } from "./commands/context";
 import { execCommand } from "./commands/exec";
 import { getStatus } from "./commands/status";
 import { syncWorkspace } from "./commands/workspace";
@@ -9,15 +10,29 @@ import type { ContextLedger } from "./lib/context-ledger";
 import type { DisclosureRecorder } from "./lib/context-state";
 import {
   buildToolInputSchema,
+  CONTEXT_TOUCH_BINDING,
   EXEC_BINDING,
   WORKTREE_ADD_BINDING,
   WORKTREE_REMOVE_BINDING,
 } from "./lib/help/mcp-schema";
 import type { AsyncMutex } from "./lib/mutex";
+import { contextText } from "./lib/render/formatters/context";
+import type { FormatCtx } from "./lib/render/formatters/workspace";
 
 const WORKTREE_ADD_INPUT_SCHEMA = buildToolInputSchema(WORKTREE_ADD_BINDING);
 const WORKTREE_REMOVE_INPUT_SCHEMA = buildToolInputSchema(WORKTREE_REMOVE_BINDING);
 const EXEC_INPUT_SCHEMA = buildToolInputSchema(EXEC_BINDING);
+const CONTEXT_TOUCH_INPUT_SCHEMA = buildToolInputSchema(CONTEXT_TOUCH_BINDING);
+
+// Minimal rendering context for agent-facing text: MCP responses are consumed
+// by a model, not a terminal, so color/unicode/TTY affordances are irrelevant.
+const TEXT_CTX: FormatCtx = { colorEnabled: false, unicodeEnabled: false, isTTY: false };
+
+const SERVER_INSTRUCTIONS = `Grove manages this workspace's instruction context.
+Call context_touch with the file or directory paths you are about to work on,
+whenever you start working somewhere you have not touched this session. It is
+idempotent and cheap to over-call: already-served scopes return one-line
+"current" markers; only new or changed instruction content is returned in full.`;
 
 interface McpServerOptions {
   writeLock?: AsyncMutex;
@@ -43,8 +58,11 @@ export function createMcpServer(
   paths: Paths,
   options?: McpServerOptions,
 ): McpServer {
-  const { writeLock, onStateChange } = options ?? {};
-  const server = new McpServer({ name: "grove", version: "1.0.0" });
+  const { writeLock, onStateChange, contextLedger, recorder } = options ?? {};
+  const server = new McpServer(
+    { name: "grove", version: "1.0.0" },
+    { instructions: SERVER_INSTRUCTIONS },
+  );
 
   // ── Resources ────────────────────────────────────────────────────
 
@@ -180,6 +198,34 @@ export function createMcpServer(
         return toErrorContent(`${result.error} [${result.code}]`);
       }
       return toJsonContent(result.value);
+    },
+  );
+
+  server.registerTool(
+    "context_touch",
+    {
+      description:
+        "Serve instruction context for paths you are about to work on. Call when you begin working under a directory you haven't touched this session. Idempotent and cheap to over-call — repeats cost one line. Pass refresh=true to re-serve everything (e.g. after context loss).",
+      inputSchema: CONTEXT_TOUCH_INPUT_SCHEMA,
+    },
+    async ({ paths: touchPaths, refresh }) => {
+      const result = await touchContext(
+        workspace,
+        touchPaths,
+        {
+          cwd: paths.workspace(workspace),
+          refresh,
+          ledger: contextLedger,
+          recorder,
+          trigger: "mcp",
+        },
+        paths,
+      );
+      if (!result.ok) {
+        return toErrorContent(`${result.error} [${result.code}]`);
+      }
+      // Agent-facing text rendering, not raw JSON: the consumer is a model.
+      return { content: [{ type: "text" as const, text: contextText(result.value, TEXT_CTX) }] };
     },
   );
 

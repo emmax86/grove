@@ -226,8 +226,15 @@ export const EXEC_BINDING = {
   omit: ["workspace"],
 } as const satisfies McpToolBinding;
 
+export const CONTEXT_TOUCH_BINDING = {
+  toolName: "context_touch",
+  path: ["ws", "context", "touch"],
+  omit: ["workspace", "session"], // session identity is the MCP session itself
+} as const satisfies McpToolBinding;
+
 export const MCP_TOOL_BINDINGS: readonly McpToolBinding[] = [
   WORKTREE_ADD_BINDING,
   WORKTREE_REMOVE_BINDING,
   EXEC_BINDING,
+  CONTEXT_TOUCH_BINDING,
 ];

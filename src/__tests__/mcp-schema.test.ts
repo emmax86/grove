@@ -6,6 +6,7 @@ import { z } from "zod";
 import type { StandardCommand } from "../commands/exec";
 import {
   buildToolInputSchema,
+  CONTEXT_TOUCH_BINDING,
   EXEC_BINDING,
   findLeaf,
   MCP_TOOL_BINDINGS,
@@ -43,6 +44,7 @@ const KNOWN_PASSTHROUGH: Record<string, Set<string>> = {
   workspace_add_worktree: new Set(["branch", "from", "no-setup"]),
   workspace_remove_worktree: new Set(["slug", "force"]),
   workspace_exec: new Set(["command", "file", "match", "repo", "dry-run"]),
+  context_touch: new Set(["paths", "refresh"]),
 };
 
 describe("registry enum/summary data for MCP", () => {
@@ -144,14 +146,23 @@ describe("buildToolInputSchema", () => {
   });
 
   it("maps a variadic arg to a required z.ZodArray of strings", () => {
-    // CONTEXT_TOUCH_BINDING doesn't exist until Task 8 — the touch leaf itself
-    // (registry.ts) does exist as of this task, so a local binding literal is
-    // enough to exercise argSpec's variadic mapping end-to-end.
+    // A local binding literal (rather than CONTEXT_TOUCH_BINDING) exercises
+    // argSpec's variadic mapping without omitting session/workspace.
     const binding = {
       toolName: "test_context_touch",
       path: ["ws", "context", "touch"],
     } as const satisfies McpToolBinding;
     const shape = buildToolInputSchema(binding);
+    expect(shape.paths).toBeInstanceOf(z.ZodArray);
+
+    const schema = z.object(shape);
+    expect(schema.parse({ paths: ["a", "b"] })).toEqual({ paths: ["a", "b"] });
+    expect(() => schema.parse({})).toThrow();
+  });
+
+  it("context_touch binding derives array paths and boolean refresh", () => {
+    const shape = buildToolInputSchema(CONTEXT_TOUCH_BINDING);
+    expect(Object.keys(shape).sort()).toEqual(["paths", "refresh"]);
     expect(shape.paths).toBeInstanceOf(z.ZodArray);
 
     const schema = z.object(shape);
