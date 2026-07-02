@@ -951,5 +951,44 @@ describe("context command", () => {
 
       await cleanup(journalDir);
     });
+
+    it("does not poison the session ledger when an earlier touch errors on a bad path", async () => {
+      await mkdir(paths.workspaceGroveDir("myws"), { recursive: true });
+      await writeFile(paths.workspaceInstructions("myws"), "# workspace\n");
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+      const outside = join(tempDir, "outside-workspace");
+      await mkdir(outside, { recursive: true });
+      const journalDir = await createTestDir();
+
+      const ledger = new ContextLedger("session-1");
+      const recorder = new DisclosureRecorder(journalDir);
+      const options = { cwd: paths.workspace("myws"), trigger: "cli" as const, ledger, recorder };
+
+      const errored = await touchContext("myws", [outside], options, paths);
+      expect(errored.ok).toBe(false);
+      if (errored.ok) {
+        return;
+      }
+      expect(errored.code).toBe("CONTEXT_TARGET_NOT_FOUND");
+
+      // The erroring call must have written NO journal events (nothing was delivered).
+      const afterError = await readFile(join(journalDir, "journal.jsonl"), "utf-8").catch(() => "");
+      expect(afterError.trim()).toBe("");
+
+      // A subsequent valid touch in the SAME session must still serve everything with
+      // content — the erroring call did not record the workspace scope as served.
+      const valid = await touchContext("myws", ["trees/api/feature-auth"], options, paths);
+      expect(valid.ok).toBe(true);
+      if (!valid.ok) {
+        return;
+      }
+      expect(valid.value.entries.every((e) => e.status === "served")).toBe(true);
+      expect(valid.value.entries.every((e) => e.content !== undefined)).toBe(true);
+      const workspaceEntry = valid.value.entries.find((e) => e.contextKey === "myws/workspace");
+      expect(workspaceEntry?.content).toBe("# workspace\n");
+
+      await cleanup(journalDir);
+    });
   });
 });

@@ -910,47 +910,25 @@ export async function touchContext(
   }
   const workspaceRoot = paths.workspace(workspace);
   const skipped: ContextSkippedEntry[] = [];
-  const entries: TouchEntry[] = [];
-  const seenKeys = new Set<string>();
   const session = options.ledger?.sessionKey ?? "stateless";
 
-  const classifyAndPush = async (source: ContextInstructionSource) => {
-    if (seenKeys.has(source.contextKey)) {
+  // Phase 1 — collect (no ledger/recorder mutation, no entry push). Resolve every
+  // target path, truncate gitignored chains, and read every instruction source into
+  // an ordered, deduped list. If ANY target fails to resolve we return the error
+  // here, before anything is classified/recorded/journaled — so an erroring touch
+  // never poisons the session ledger (spec: fail toward re-serving, never toward
+  // wrongly skipping).
+  const seenKeys = new Set<string>();
+  const collected: ContextInstructionSource[] = [];
+  const collect = (source: ContextInstructionSource | null) => {
+    if (!source || seenKeys.has(source.contextKey)) {
       return; // batch dedup: one decision per scope per call
     }
     seenKeys.add(source.contextKey);
-    const status: TouchStatus = options.ledger
-      ? options.ledger.classify(source.contextKey, source.contentHash, options.refresh ?? false)
-      : "served";
-    const withContent = status !== "current";
-    entries.push({
-      contextKey: source.contextKey,
-      scopePath: source.scopePath,
-      sourcePath: source.sourcePath,
-      contentHash: source.contentHash,
-      status,
-      ...(withContent ? { content: source.content } : {}),
-    });
-    if (withContent) {
-      options.ledger?.record(source.contextKey, source.contentHash);
-    }
-    await options.recorder?.record(
-      {
-        ts: new Date().toISOString(),
-        session,
-        trigger: options.trigger,
-        contextKey: source.contextKey,
-        contentHash: source.contentHash,
-        action: status,
-      },
-      withContent ? source.content : undefined,
-    );
+    collected.push(source);
   };
 
-  const workspaceSource = await readWorkspaceInstructionSource(workspace, paths, skipped);
-  if (workspaceSource) {
-    await classifyAndPush(workspaceSource);
-  }
+  collect(await readWorkspaceInstructionSource(workspace, paths, skipped));
 
   for (const target of targetPaths) {
     const resolvedTargetPath = resolveTargetPath(target, options.cwd);
@@ -983,18 +961,49 @@ export async function touchContext(
     }
 
     for (const dir of ancestorDirs(resolved.worktreeRoot, targetDir)) {
-      const source = await readInstructionSource(
-        workspace,
-        workspaceRoot,
-        resolved.repo,
-        resolved.slug,
-        dir,
-        skipped,
+      collect(
+        await readInstructionSource(
+          workspace,
+          workspaceRoot,
+          resolved.repo,
+          resolved.slug,
+          dir,
+          skipped,
+        ),
       );
-      if (source) {
-        await classifyAndPush(source);
-      }
     }
+  }
+
+  // Phase 2 — decide (mutation). The whole batch resolved, so classify each unique
+  // source, record served scopes in the ledger, and journal every decision.
+  const entries: TouchEntry[] = [];
+  for (const source of collected) {
+    const status: TouchStatus = options.ledger
+      ? options.ledger.classify(source.contextKey, source.contentHash, options.refresh ?? false)
+      : "served";
+    const withContent = status !== "current";
+    entries.push({
+      contextKey: source.contextKey,
+      scopePath: source.scopePath,
+      sourcePath: source.sourcePath,
+      contentHash: source.contentHash,
+      status,
+      ...(withContent ? { content: source.content } : {}),
+    });
+    if (withContent) {
+      options.ledger?.record(source.contextKey, source.contentHash);
+    }
+    await options.recorder?.record(
+      {
+        ts: new Date().toISOString(),
+        session,
+        trigger: options.trigger,
+        contextKey: source.contextKey,
+        contentHash: source.contentHash,
+        action: status,
+      },
+      withContent ? source.content : undefined,
+    );
   }
 
   return ok({
