@@ -94,8 +94,13 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
     didShutdown = true;
     cancelGraceTimer();
     await removeDiscoveryFile();
-    await httpServer.stop(true);
-    resolveClosed();
+    try {
+      await httpServer.stop(true);
+    } finally {
+      // Always resolve so the CLI's `await info.closed` can never hang, even if
+      // stopping the HTTP server rejects.
+      resolveClosed();
+    }
   }
 
   function onSessionClosed(sessionId: string) {

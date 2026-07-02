@@ -61,14 +61,30 @@ export async function runMcpConnect(workspace: string, paths: Paths): Promise<vo
   const stdio = new StdioServerTransport();
   const http = new StreamableHTTPClientTransport(new URL(url));
 
+  // Tear down the bridge, first releasing the daemon session. A dropped
+  // HTTP/SSE connection alone does NOT release the daemon's session: the SDK
+  // server transport only fires its session-closed callback on an explicit
+  // HTTP DELETE (StreamableHTTPClientTransport.terminateSession sends it;
+  // close() does not). Without the DELETE the daemon's sessions map never
+  // returns to 0, its grace timer never (re)starts, and it never shuts down.
+  // So on every teardown path we send terminateSession() before exiting.
+  let tearingDown = false;
+  const teardown = (code: number) => {
+    if (tearingDown) {
+      return;
+    }
+    tearingDown = true;
+    http
+      .terminateSession()
+      .catch(() => {})
+      .finally(() => process.exit(code));
+  };
+
   // The SDK stdio transport only listens for stdin 'data'/'error' — it never
-  // detects stdin EOF/close, so an ungraceful harness (parent) death would
-  // orphan this bridge AND leave its MCP session open on the daemon forever
-  // (the daemon's grace timer only starts once sessions hit 0). Exit as soon
-  // as our stdin goes away; dropping the HTTP connection closes the daemon's
-  // session transport, which lets the daemon grace-shutdown normally.
-  process.stdin.on("end", () => process.exit(0));
-  process.stdin.on("close", () => process.exit(0));
+  // detects stdin EOF/close, so an ungraceful harness (parent) death must be
+  // caught here or the bridge orphans and pins the daemon session open.
+  process.stdin.on("end", () => teardown(0));
+  process.stdin.on("close", () => teardown(0));
 
   stdio.onmessage = (message) => {
     http
@@ -80,15 +96,14 @@ export async function runMcpConnect(workspace: string, paths: Paths): Promise<vo
       .send(message)
       .catch((e) => process.stderr.write(`[mcp-connect] downstream send failed: ${e}\n`));
   };
-  stdio.onclose = () => void http.close();
+  stdio.onclose = () => teardown(0);
   http.onclose = () => process.exit(0);
   stdio.onerror = (e) => process.stderr.write(`[mcp-connect] stdio error: ${e}\n`);
   http.onerror = (e) => {
-    // A fatal HTTP transport error means the daemon link is dead; tear down the
-    // stdio side and exit non-zero rather than lingering as a half-open bridge.
+    // A fatal HTTP transport error means the daemon link is dead; tear down
+    // (best-effort DELETE) and exit non-zero rather than linger half-open.
     process.stderr.write(`[mcp-connect] http error: ${e}\n`);
-    void stdio.close();
-    process.exit(1);
+    teardown(1);
   };
 
   // start() on the HTTP client only sets up its AbortController; it is safe to
