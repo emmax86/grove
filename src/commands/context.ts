@@ -4,6 +4,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type { Paths } from "../constants";
 import { readWorkspaceConfig } from "../lib/config";
+import { listInstructionFiles } from "../lib/git";
 import { err, ok, type Result, type WorktreeEntry } from "../types";
 import { getStatus } from "./status";
 
@@ -539,6 +540,43 @@ async function resolveLogicalTarget(
   });
 }
 
+/**
+ * Index instruction scopes via git enumeration (tracked + untracked-but-not-ignored
+ * files). Returns false when git enumeration fails so the caller can fall back to
+ * the directory walk (e.g. the worktree directory is not a git repo).
+ */
+async function indexInstructionScopesGit(
+  workspace: string,
+  workspaceRoot: string,
+  repo: string,
+  slug: string,
+  worktreeRoot: string,
+  index: ContextIndexEntry[],
+  skipped: ContextSkippedEntry[],
+): Promise<boolean> {
+  const filesResult = await listInstructionFiles(worktreeRoot);
+  if (!filesResult.ok) {
+    skipped.push({
+      path: toWorkspaceRelative(worktreeRoot, workspaceRoot),
+      reason: `git enumeration failed, fell back to directory walk: ${filesResult.error}`,
+    });
+    return false;
+  }
+
+  // Instruction priority is per-directory: group files by dirname, then let the
+  // existing selector (addInstructionEntry) apply AGENTS.override.md > AGENTS.md > CLAUDE.md.
+  const dirs = new Set<string>(
+    filesResult.value.map((rel) => {
+      const idx = rel.lastIndexOf("/");
+      return idx === -1 ? worktreeRoot : join(worktreeRoot, rel.slice(0, idx));
+    }),
+  );
+  for (const dir of [...dirs].sort()) {
+    await addInstructionEntry(workspace, workspaceRoot, repo, slug, dir, index, skipped);
+  }
+  return true;
+}
+
 async function indexInstructionScopes(
   workspace: string,
   workspaceRoot: string,
@@ -673,7 +711,7 @@ export async function getWorkspaceContext(
         type: worktree.type,
         path: relativePath,
       });
-      await indexInstructionScopes(
+      const usedGit = await indexInstructionScopesGit(
         workspace,
         workspaceRoot,
         worktree.repo,
@@ -682,6 +720,17 @@ export async function getWorkspaceContext(
         index,
         skipped,
       );
+      if (!usedGit) {
+        await indexInstructionScopes(
+          workspace,
+          workspaceRoot,
+          worktree.repo,
+          worktree.slug,
+          worktreePath,
+          index,
+          skipped,
+        );
+      }
     }
   }
 

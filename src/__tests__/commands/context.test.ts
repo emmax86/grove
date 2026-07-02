@@ -218,6 +218,10 @@ describe("context command", () => {
 
   it("does not descend into .git or node_modules directories", async () => {
     const root = paths.worktreeDir("myws", "api", "feature-auth");
+    // git itself refuses to track paths under a nested ".git" directory; node_modules/
+    // is excluded here via .gitignore, matching real-world repo convention now that
+    // workspace indexing enumerates via git rather than a hardcoded directory-name walk.
+    await writeFile(join(root, ".gitignore"), "node_modules/\n");
     await mkdir(join(root, "packages", ".git", "hooks"), { recursive: true });
     await writeFile(join(root, "packages", ".git", "hooks", "AGENTS.md"), "# git hooks\n");
     await mkdir(join(root, "node_modules", "pkg"), { recursive: true });
@@ -235,6 +239,10 @@ describe("context command", () => {
 
   it("does not descend into nested .worktrees directories when indexing workspace context", async () => {
     const root = paths.worktreeDir("myws", "api", "feature-auth");
+    // .worktrees/ is excluded via .gitignore, matching real-world convention for a
+    // directory holding nested worktree checkouts, now that workspace indexing
+    // enumerates via git rather than a hardcoded directory-name walk.
+    await writeFile(join(root, ".gitignore"), ".worktrees/\n");
     await mkdir(join(root, ".worktrees", "nested"), { recursive: true });
     await writeFile(join(root, ".worktrees", "nested", "AGENTS.md"), "# nested worktree\n");
 
@@ -248,7 +256,55 @@ describe("context command", () => {
     expect(result.value.skipped).toEqual([]);
   });
 
-  it("records symlinked subdirectories as skipped when indexing workspace context", async () => {
+  it("workspace indexing excludes gitignored directories via git enumeration", async () => {
+    const featureRoot = paths.worktreeDir("myws", "api", "feature-auth");
+    await writeFile(join(featureRoot, ".gitignore"), ".venv/\n");
+    await writeFile(join(featureRoot, "AGENTS.md"), "# feature root\n");
+    await mkdir(join(featureRoot, "src", "lib"), { recursive: true });
+    await writeFile(join(featureRoot, "src", "lib", "AGENTS.md"), "# lib\n");
+    await mkdir(join(featureRoot, ".venv"), { recursive: true });
+    await writeFile(join(featureRoot, ".venv", "AGENTS.md"), "# venv\n");
+
+    const result = await getWorkspaceContext("myws", paths);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const scopes = result.value.index.map((entry) => entry.sourcePath);
+    expect(scopes).toContain("trees/api/feature-auth/AGENTS.md");
+    expect(scopes).toContain("trees/api/feature-auth/src/lib/AGENTS.md");
+    expect(scopes.some((s) => s.includes(".venv"))).toBe(false);
+  });
+
+  it("falls back to the directory walk for a non-git worktree directory", async () => {
+    const manualRoot = paths.worktreeDir("myws", "api", "manual");
+    await mkdir(manualRoot, { recursive: true });
+    await writeFile(join(manualRoot, "AGENTS.md"), "# manual\n");
+
+    const result = await getWorkspaceContext("myws", paths);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.index.map((entry) => entry.sourcePath)).toContain(
+      "trees/api/manual/AGENTS.md",
+    );
+    expect(result.value.skipped).toContainEqual(
+      expect.objectContaining({
+        path: "trees/api/manual",
+        reason: expect.stringContaining("git enumeration failed"),
+      }),
+    );
+  });
+
+  it("does not index or special-case symlinked subdirectories under git enumeration", async () => {
+    // Spec (Ignore rules): the symlinked-directory special-casing disappears for the
+    // git path — git does not traverse directory symlinks, so the escaping symlink is
+    // simply absent from the index and no "Symlinked directory not indexed" skip is
+    // produced. The security rationale (no traversal outside the worktree) is preserved
+    // structurally. The walk retains the special-case as a fallback (covered below).
     const root = paths.worktreeDir("myws", "api", "feature-auth");
     const shared = join(tempDir, "shared");
     await mkdir(shared, { recursive: true });
@@ -262,8 +318,31 @@ describe("context command", () => {
       return;
     }
     expect(result.value.index.map((entry) => entry.scope)).not.toContain("api/feature-auth/shared");
-    expect(result.value.skipped).toContainEqual({
+    expect(result.value.skipped).not.toContainEqual({
       path: "trees/api/feature-auth/shared",
+      reason: "Symlinked directory not indexed",
+    });
+  });
+
+  it("records symlinked subdirectories as skipped via the walk fallback for a non-git worktree", async () => {
+    // The walk fallback (used when git enumeration fails, e.g. a non-git worktree dir)
+    // keeps the symlinked-directory skip diagnostic per the spec.
+    const manualRoot = paths.worktreeDir("myws", "api", "manual");
+    await mkdir(manualRoot, { recursive: true });
+    const shared = join(tempDir, "shared-manual");
+    await mkdir(shared, { recursive: true });
+    await writeFile(join(shared, "AGENTS.md"), "# shared\n");
+    await symlink(shared, join(manualRoot, "shared"));
+
+    const result = await getWorkspaceContext("myws", paths);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.index.map((entry) => entry.scope)).not.toContain("api/manual/shared");
+    expect(result.value.skipped).toContainEqual({
+      path: "trees/api/manual/shared",
       reason: "Symlinked directory not indexed",
     });
   });
