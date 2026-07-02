@@ -3,8 +3,11 @@ import { access, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
+import { touchContext } from "../commands/context.js";
 import type { Paths } from "../constants.js";
 import { createMcpServer } from "../mcp-server.js";
+import { ContextLedger } from "./context-ledger.js";
+import { DisclosureRecorder } from "./context-state.js";
 import { AsyncMutex } from "./mutex.js";
 
 export interface DaemonOptions {
@@ -23,6 +26,13 @@ export interface DaemonInfo {
 interface Session {
   transport: WebStandardStreamableHTTPServerTransport;
   server: ReturnType<typeof createMcpServer>;
+  ledger: ContextLedger;
+}
+
+interface SessionListEntry {
+  key: string;
+  kind: "mcp" | "cli";
+  entries: { contextKey: string; contentHash: string }[];
 }
 
 export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
@@ -37,6 +47,8 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
 
   const writeLock = new AsyncMutex();
   const sessions = new Map<string, Session>();
+  const recorder = new DisclosureRecorder(paths.contextStateDir(workspace));
+  const cliLedgers = new Map<string, ContextLedger>();
   let graceTimer: ReturnType<typeof setTimeout> | null = null;
 
   function startGraceTimer() {
@@ -109,6 +121,47 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
         });
       }
 
+      // Serving-path purity: /touch and /sessions never read the journal or
+      // blob store — in-memory ledgers (session ledgers + cliLedgers) are the
+      // sole authority for disclosure decisions.
+      if (url.pathname === "/touch" && req.method === "POST") {
+        const body = (await req.json()) as {
+          paths: string[];
+          session?: string;
+          refresh?: boolean;
+          cwd: string;
+        };
+        let ledger: ContextLedger | undefined;
+        if (body.session) {
+          ledger = cliLedgers.get(body.session);
+          if (!ledger) {
+            ledger = new ContextLedger(body.session);
+            cliLedgers.set(body.session, ledger);
+          }
+        }
+        const result = await touchContext(
+          workspace,
+          body.paths,
+          { cwd: body.cwd, refresh: body.refresh, ledger, recorder, trigger: "cli" },
+          paths,
+        );
+        return Response.json(result);
+      }
+
+      if (url.pathname === "/sessions" && req.method === "GET") {
+        const mcpSessions: SessionListEntry[] = Array.from(sessions.entries(), ([key, s]) => ({
+          key,
+          kind: "mcp",
+          entries: s.ledger.entries(),
+        }));
+        const cliSessions: SessionListEntry[] = Array.from(cliLedgers.values(), (l) => ({
+          key: l.sessionKey,
+          kind: "cli",
+          entries: l.entries(),
+        }));
+        return Response.json({ sessions: [...mcpSessions, ...cliSessions] });
+      }
+
       if (url.pathname === "/mcp") {
         const sessionId = req.headers.get("mcp-session-id");
 
@@ -127,15 +180,19 @@ export async function startDaemon(options: DaemonOptions): Promise<DaemonInfo> {
           return session.transport.handleRequest(req);
         }
 
-        // New session — create server+transport pair
+        // New session — create server+transport+ledger triple
+        const ledger = new ContextLedger("pending");
         const server = createMcpServer(workspace, paths, {
           writeLock,
           onStateChange: broadcastResourceListChanged,
+          contextLedger: ledger,
+          recorder,
         });
         const transport = new WebStandardStreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (id) => {
-            sessions.set(id, { transport, server });
+            ledger.sessionKey = id;
+            sessions.set(id, { transport, server, ledger });
             cancelGraceTimer();
             process.stderr.write(`[daemon] session opened: ${id}\n`);
           },

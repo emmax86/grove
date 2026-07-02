@@ -5,10 +5,14 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
+import type { TouchContext } from "../../commands/context";
+import { addRepo } from "../../commands/repo";
 import { addWorkspace } from "../../commands/workspace";
+import { addWorktree } from "../../commands/worktree";
 import { createPaths } from "../../constants";
 import { discoverDaemon, startDaemon } from "../../lib/daemon";
-import { cleanup, createTestDir } from "../helpers";
+import type { Result } from "../../types";
+import { cleanup, createTestDir, createTestGitRepo, GIT_ENV } from "../helpers";
 
 // ── Layer 1: filesystem / discovery ─────────────────────────────────────────
 
@@ -239,5 +243,150 @@ describe("MCP over HTTP", () => {
 
     expect(resA.isError).toBeFalsy();
     expect(resB.isError).toBeFalsy();
+  });
+});
+
+// ── Layer 4: context disclosure endpoints ────────────────────────────────────
+
+describe("daemon context disclosure endpoints", () => {
+  let tempDir: string;
+  let paths: ReturnType<typeof createPaths>;
+  let stopFn: (() => Promise<void>) | null = null;
+
+  beforeEach(async () => {
+    tempDir = await createTestDir();
+    paths = createPaths(join(tempDir, "workspaces"));
+    const repoPath = await createTestGitRepo(tempDir, "api");
+    await addWorkspace("ws", paths);
+    await addRepo("ws", repoPath, undefined, paths, GIT_ENV);
+    await addWorktree("ws", "api", "feature/auth", { newBranch: true }, paths, GIT_ENV);
+    const featureRoot = paths.worktreeDir("ws", "api", "feature-auth");
+    await writeFile(join(featureRoot, "AGENTS.md"), "# feature root\n");
+  });
+
+  afterEach(async () => {
+    await stopFn?.();
+    stopFn = null;
+    await cleanup(tempDir);
+  });
+
+  async function startTestDaemon() {
+    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    stopFn = info.stop;
+    return info;
+  }
+
+  function touchUrl(info: { url: string }): string {
+    return info.url.replace("/mcp", "/touch");
+  }
+
+  function sessionsUrl(info: { url: string }): string {
+    return info.url.replace("/mcp", "/sessions");
+  }
+
+  async function postTouch(
+    info: { url: string },
+    body: { paths: string[]; session?: string; refresh?: boolean; cwd: string },
+  ): Promise<Result<TouchContext>> {
+    const res = await fetch(touchUrl(info), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return (await res.json()) as Result<TouchContext>;
+  }
+
+  it("POST /touch with a session key dedups across calls", async () => {
+    const info = await startTestDaemon();
+    const cwd = paths.workspace("ws");
+
+    const first = await postTouch(info, {
+      paths: ["trees/api/feature-auth"],
+      session: "hook-1",
+      cwd,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+    expect(first.value.entries.length).toBeGreaterThan(0);
+    expect(first.value.entries.every((e) => e.status === "served")).toBe(true);
+
+    const second = await postTouch(info, {
+      paths: ["trees/api/feature-auth"],
+      session: "hook-1",
+      cwd,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) {
+      return;
+    }
+    expect(second.value.entries.every((e) => e.status === "current")).toBe(true);
+  });
+
+  it("distinct session keys hold distinct ledgers", async () => {
+    const info = await startTestDaemon();
+    const cwd = paths.workspace("ws");
+
+    const a = await postTouch(info, {
+      paths: ["trees/api/feature-auth"],
+      session: "session-a",
+      cwd,
+    });
+    expect(a.ok).toBe(true);
+    if (!a.ok) {
+      return;
+    }
+    expect(a.value.entries.every((e) => e.status === "served")).toBe(true);
+
+    const b = await postTouch(info, {
+      paths: ["trees/api/feature-auth"],
+      session: "session-b",
+      cwd,
+    });
+    expect(b.ok).toBe(true);
+    if (!b.ok) {
+      return;
+    }
+    expect(b.value.entries.every((e) => e.status === "served")).toBe(true);
+  });
+
+  it("GET /sessions lists cli-keyed ledgers with served entries", async () => {
+    const info = await startTestDaemon();
+    const cwd = paths.workspace("ws");
+
+    await postTouch(info, { paths: ["trees/api/feature-auth"], session: "hook-1", cwd });
+
+    const res = await fetch(sessionsUrl(info));
+    expect(res.ok).toBe(true);
+    const body = (await res.json()) as {
+      sessions: {
+        key: string;
+        kind: "mcp" | "cli";
+        entries: { contextKey: string; contentHash: string }[];
+      }[];
+    };
+    const cliSession = body.sessions.find((s) => s.kind === "cli" && s.key === "hook-1");
+    expect(cliSession).toBeDefined();
+    expect(cliSession?.entries.length).toBeGreaterThan(0);
+  });
+
+  it("POST /touch without session is stateless (served both times)", async () => {
+    const info = await startTestDaemon();
+    const cwd = paths.workspace("ws");
+
+    const first = await postTouch(info, { paths: ["trees/api/feature-auth"], cwd });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+    expect(first.value.entries.every((e) => e.status === "served")).toBe(true);
+
+    const second = await postTouch(info, { paths: ["trees/api/feature-auth"], cwd });
+    expect(second.ok).toBe(true);
+    if (!second.ok) {
+      return;
+    }
+    expect(second.value.entries.every((e) => e.status === "served")).toBe(true);
   });
 });

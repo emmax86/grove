@@ -5,6 +5,8 @@ import { getStatus } from "./commands/status";
 import { syncWorkspace } from "./commands/workspace";
 import { addWorktree, removeWorktree } from "./commands/worktree";
 import type { Paths } from "./constants";
+import type { ContextLedger } from "./lib/context-ledger";
+import type { DisclosureRecorder } from "./lib/context-state";
 import {
   buildToolInputSchema,
   EXEC_BINDING,
@@ -20,6 +22,10 @@ const EXEC_INPUT_SCHEMA = buildToolInputSchema(EXEC_BINDING);
 interface McpServerOptions {
   writeLock?: AsyncMutex;
   onStateChange?: () => void | Promise<void>;
+  /** Per-session served-state for context disclosure. Consumed by Task 8's tool. */
+  contextLedger?: ContextLedger;
+  /** Shared observability sink for context disclosure. Consumed by Task 8's tool. */
+  recorder?: DisclosureRecorder;
 }
 
 function toErrorContent(error: string) {
