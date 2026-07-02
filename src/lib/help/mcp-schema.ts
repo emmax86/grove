@@ -76,9 +76,11 @@ type EnumValues<Arg> = Arg extends {
 }
   ? Values[number]
   : string;
-type ArgSchema<Arg> = Arg extends { readonly values: readonly [string, ...string[]] }
-  ? z.ZodType<EnumValues<Arg>>
-  : z.ZodString;
+type ArgSchema<Arg> = Arg extends { readonly variadic: true }
+  ? z.ZodArray<z.ZodString>
+  : Arg extends { readonly values: readonly [string, ...string[]] }
+    ? z.ZodType<EnumValues<Arg>>
+    : z.ZodString;
 type FlagSchema<Flag> = Flag extends { readonly valueLabel: string } ? z.ZodString : z.ZodBoolean;
 type TypedFieldSpec<Schema extends z.ZodTypeAny = z.ZodTypeAny> = {
   name: string;
@@ -157,10 +159,11 @@ interface FieldSpec {
 }
 
 function argSpec(arg: HelpArg): FieldSpec {
-  const base =
+  const scalar =
     arg.values && arg.values.length > 0
       ? z.enum([...arg.values] as [string, ...string[]])
       : z.string();
+  const base = arg.variadic ? z.array(z.string()) : scalar;
   return { name: arg.name, required: arg.required, description: arg.summary, base };
 }
 

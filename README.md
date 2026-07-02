@@ -74,13 +74,21 @@ grove ws status --json | jq '.data.repos[] | select(.status=="dangling") | .name
 | `list`                           | List workspaces                            |
 | `remove [name] [--force]`        | Remove a workspace                         |
 | `status [workspace]`             | Repos + worktrees overview                 |
-| `context [workspace] [target]`   | Agent context and lazy instruction scopes  |
+| `context <subcommand>`           | Agent instruction context (see below)      |
 | `path [workspace]`               | Print workspace path                       |
 | `sync [workspace]`               | Repair symlinks, prune dangling entries    |
 | `exec <command> [file]`          | Run standard commands against a repo       |
 
 See [docs/context-loading.md](docs/context-loading.md) for the `context`
 loading contract, instruction priority, and porcelain row schemas.
+
+### Context — `grove ws context <command>`
+
+| Command                                                | Description                                                    |
+| ------------------------------------------------------ | ---------------------------------------------------------------|
+| `show [workspace] [target]`                             | Show workspace context or load a target scope (default; `grove ws context [workspace] [target]` also routes here) |
+| `touch <paths...> [--session K] [--refresh]`            | Serve not-yet-seen instruction scopes for paths you're about to work on |
+| `sessions`                                              | List active disclosure sessions and their served scopes (daemon) |
 
 ### Repos — `grove ws repo <command>`
 

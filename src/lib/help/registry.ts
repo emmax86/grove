@@ -31,6 +31,8 @@ export interface HelpArg {
   defaultFrom?: "context-workspace" | "context-repo";
   /** Allowed values for an enum-style positional arg (e.g. exec's command). */
   values?: readonly string[];
+  /** Consumes all remaining positionals as a string array (e.g. touch's paths). */
+  variadic?: boolean;
 }
 
 export interface HelpFlag {
@@ -105,35 +107,81 @@ const WS_GROUP = {
       flags: [WORKSPACE_FLAG],
     },
     {
-      kind: "leaf",
+      kind: "group",
       name: "context",
-      summary: "show Grove agent context and lazy instruction scopes",
-      args: [
+      summary: "agent instruction context: orientation, lazy loading, session touch",
+      children: [
         {
-          name: "workspace",
-          required: false,
-          defaultFrom: "context-workspace",
-          summary: "workspace name (defaults to inferred)",
+          kind: "leaf",
+          name: "show",
+          summary: "show workspace context or load a target scope (default subcommand)",
+          description:
+            "Invoked implicitly: `grove ws context [workspace] [target]` routes here unless the first token is touch/sessions/show.",
+          args: [
+            {
+              name: "workspace",
+              required: false,
+              defaultFrom: "context-workspace",
+              summary: "workspace name (defaults to inferred)",
+            },
+            {
+              name: "target",
+              required: false,
+              summary: "worktree path, directory, or file target",
+            },
+          ],
+          flags: [WORKSPACE_FLAG],
+          examples: [
+            {
+              command: "grove ws context",
+              description:
+                "Show workspace context and instruction index for the inferred workspace",
+            },
+            {
+              command: "grove ws context trees/api/feature-auth/packages/auth",
+              description: "Load instructions for a nested target scope",
+            },
+            {
+              command: "grove ws context myproject trees/api/feature-auth",
+              description: "Load instructions for a target in an explicit workspace",
+            },
+          ],
         },
         {
-          name: "target",
-          required: false,
-          summary: "worktree path, directory, or file target",
+          kind: "leaf",
+          name: "touch",
+          summary: "serve not-yet-seen instruction scopes for the paths you are about to work on",
+          description:
+            "Idempotent and cheap to over-call. Returns full content only for scopes this session has not seen (or whose content changed); already-served scopes return one-line current markers.",
+          args: [
+            {
+              name: "paths",
+              required: true,
+              variadic: true,
+              summary: "file or directory paths to touch",
+            },
+          ],
+          flags: [
+            {
+              name: "session",
+              valueLabel: "<key>",
+              summary: "session key for the served-ledger (daemon mode)",
+            },
+            { name: "refresh", summary: "bypass the ledger and re-serve the full chain" },
+            WORKSPACE_FLAG,
+          ],
+          examples: [
+            {
+              command: "grove ws context touch src/lib/render/index.ts",
+              description: "Serve instruction scopes for a file you are about to edit",
+            },
+          ],
         },
-      ],
-      flags: [WORKSPACE_FLAG],
-      examples: [
         {
-          command: "grove ws context",
-          description: "Show workspace context and instruction index for the inferred workspace",
-        },
-        {
-          command: "grove ws context trees/api/feature-auth/packages/auth",
-          description: "Load instructions for a nested target scope",
-        },
-        {
-          command: "grove ws context myproject trees/api/feature-auth",
-          description: "Load instructions for a target in an explicit workspace",
+          kind: "leaf",
+          name: "sessions",
+          summary: "list active disclosure sessions and their served scopes (daemon)",
+          flags: [WORKSPACE_FLAG],
         },
       ],
     },
@@ -328,9 +376,36 @@ const MCP_SERVER_LEAF = {
   ],
 } as const satisfies HelpLeaf;
 
+const MCP_GROUP = {
+  kind: "group",
+  name: "mcp",
+  summary: "MCP server and harness bridge",
+  children: [
+    {
+      kind: "leaf",
+      name: "serve",
+      summary: "run the MCP daemon for a workspace (alias: grove mcp-server)",
+      flags: [
+        WORKSPACE_FLAG,
+        {
+          name: "port",
+          valueLabel: "<port>",
+          summary: "port to listen on (default: random free port)",
+        },
+      ],
+    },
+    {
+      kind: "leaf",
+      name: "connect",
+      summary: "stdio bridge to the workspace daemon (auto-starts it); for harness .mcp.json",
+      flags: [WORKSPACE_FLAG],
+    },
+  ],
+} as const satisfies HelpGroup;
+
 export const REGISTRY = {
   kind: "group",
   name: "grove",
   summary: "manage named workspaces of git repos and worktrees",
-  children: [WS_GROUP, MCP_SERVER_LEAF],
+  children: [WS_GROUP, MCP_GROUP, MCP_SERVER_LEAF],
 } as const satisfies HelpGroup;

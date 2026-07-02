@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { cleanupTempRoot, createGitRepo, createTempRoot, runCLI } from "./helpers";
@@ -70,5 +71,74 @@ describe("E2E: context inference via cwd", () => {
     // otherws has no repos
     const data = r.json?.data as Array<unknown>;
     expect(data).toHaveLength(0);
+  });
+});
+
+describe("E2E: ws context touch/sessions/show dispatch", () => {
+  let root: string;
+  let repoPath: string;
+
+  beforeEach(async () => {
+    root = await createTempRoot();
+    repoPath = await createGitRepo(root, "api");
+    await runCLI(["ws", "add", "myws"], { root });
+    await runCLI(["ws", "repo", "add", "myws", repoPath], { root });
+    await writeFile(join(root, "myws", "trees", "api", "main", "AGENTS.md"), "# api root\n");
+  });
+
+  afterEach(() => cleanupTempRoot(root));
+
+  it("ws context touch <path> serves instruction scopes for the path", async () => {
+    const r = await runCLI(["ws", "context", "touch", "trees/api/main"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("# Grove Context Touch");
+  });
+
+  it("ws context touch with no paths -> MISSING_ARG names paths", async () => {
+    const r = await runCLI(["ws", "context", "touch", "--json"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+
+    expect(r.exitCode).toBe(1);
+    const json = JSON.parse(r.stderr);
+    expect(json.ok).toBe(false);
+    expect(json.code).toBe("MISSING_ARG");
+  });
+
+  it("ws context sessions reports no daemon running", async () => {
+    const r = await runCLI(["ws", "context", "sessions", "--json"], {
+      root,
+      cwd: join(root, "myws"),
+    });
+
+    expect(r.exitCode).toBe(1);
+    const json = JSON.parse(r.stderr);
+    expect(json.ok).toBe(false);
+    expect(json.code).toBe("DAEMON_NOT_RUNNING");
+  });
+
+  it("ws context show <ws> <target> strips the explicit 'show' token and loads the target", async () => {
+    const r = await runCLI(["ws", "context", "show", "myws", "trees/api/main", "--json"], { root });
+
+    expect(r.exitCode).toBe(0);
+    expect(r.json?.ok).toBe(true);
+    const data = r.json?.data as { mode: string };
+    expect(data.mode).toBe("target");
+  });
+
+  it("ws context <ws> <target> (no subcommand) still works — backward compatibility", async () => {
+    const r = await runCLI(["ws", "context", "myws", "trees/api/main", "--json"], { root });
+
+    expect(r.exitCode).toBe(0);
+    expect(r.json?.ok).toBe(true);
+    const data = r.json?.data as { mode: string; repo: string; slug: string };
+    expect(data.mode).toBe("target");
+    expect(data.repo).toBe("api");
+    expect(data.slug).toBe("main");
   });
 });

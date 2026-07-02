@@ -9,6 +9,7 @@ import {
   EXEC_BINDING,
   findLeaf,
   MCP_TOOL_BINDINGS,
+  type McpToolBinding,
   WORKTREE_ADD_BINDING,
   WORKTREE_REMOVE_BINDING,
 } from "../lib/help/mcp-schema";
@@ -139,6 +140,22 @@ describe("buildToolInputSchema", () => {
     const schema = z.object(shape);
     expect(schema.parse({ command: "test" }).command).toBe("test");
     expect(() => schema.parse({ command: "bogus" })).toThrow();
+    expect(() => schema.parse({})).toThrow();
+  });
+
+  it("maps a variadic arg to a required z.ZodArray of strings", () => {
+    // CONTEXT_TOUCH_BINDING doesn't exist until Task 8 — the touch leaf itself
+    // (registry.ts) does exist as of this task, so a local binding literal is
+    // enough to exercise argSpec's variadic mapping end-to-end.
+    const binding = {
+      toolName: "test_context_touch",
+      path: ["ws", "context", "touch"],
+    } as const satisfies McpToolBinding;
+    const shape = buildToolInputSchema(binding);
+    expect(shape.paths).toBeInstanceOf(z.ZodArray);
+
+    const schema = z.object(shape);
+    expect(schema.parse({ paths: ["a", "b"] })).toEqual({ paths: ["a", "b"] });
     expect(() => schema.parse({})).toThrow();
   });
 

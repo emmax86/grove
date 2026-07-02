@@ -40,6 +40,12 @@ The supplied context target could not be resolved to a Grove worktree.
 
 **Hint:** Run `grove ws context` to see valid worktree targets.
 
+## DAEMON_NOT_RUNNING
+
+No MCP daemon is running for the workspace.
+
+**Hint:** Start it with `grove mcp-server --workspace <name>`.
+
 ## DANGLING_SYMLINK
 
 A symlink points at a path that does not exist.

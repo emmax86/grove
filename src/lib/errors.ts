@@ -127,6 +127,10 @@ export const ERROR_CATALOG = {
     description: "The supplied context target could not be resolved to a Grove worktree.",
     hint: "Run `grove ws context` to see valid worktree targets.",
   },
+  DAEMON_NOT_RUNNING: {
+    description: "No MCP daemon is running for the workspace.",
+    hint: "Start it with `grove mcp-server --workspace <name>`.",
+  },
 
   // Exec
   COMMAND_NOT_CONFIGURED: {

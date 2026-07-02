@@ -1,5 +1,10 @@
 import type { Result } from "../../types";
-import { contextPorcelain, contextText } from "./formatters/context";
+import {
+  contextPorcelain,
+  contextSessionsPorcelain,
+  contextSessionsText,
+  contextText,
+} from "./formatters/context";
 import { formatError } from "./formatters/errors";
 import { execDryRunPorcelain, execDryRunText } from "./formatters/exec";
 import { helpPorcelain, helpText } from "./formatters/help";
@@ -61,6 +66,7 @@ export type CommandKind =
   | "worktree-remove"
   | "worktree-prune"
   | "context"
+  | "context-sessions"
   | "status"
   | "exec-dry-run"
   | "help"
@@ -86,6 +92,7 @@ const KNOWN_KINDS: ReadonlySet<CommandKind> = new Set<CommandKind>([
   "worktree-remove",
   "worktree-prune",
   "context",
+  "context-sessions",
   "status",
   "exec-dry-run",
   "help",
@@ -213,6 +220,12 @@ function renderTextOrPorcelain<T>(value: T, kind: CommandKind, ctx: RenderContex
           contextText(value as any, ctx)
         : // biome-ignore lint/suspicious/noExplicitAny: same
           contextPorcelain(value as any);
+    case "context-sessions":
+      return ctx.mode === "text"
+        ? // biome-ignore lint/suspicious/noExplicitAny: dispatcher accepts the value typed by the kind
+          contextSessionsText(value as any)
+        : // biome-ignore lint/suspicious/noExplicitAny: same
+          contextSessionsPorcelain(value as any);
     case "status":
       return ctx.mode === "text"
         ? // biome-ignore lint/suspicious/noExplicitAny: dispatcher accepts the value typed by the kind

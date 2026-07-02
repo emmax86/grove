@@ -4,6 +4,7 @@ import { relative } from "node:path";
 
 import packageJson from "../package.json";
 import { getTargetContext, getWorkspaceContext } from "./commands/context";
+import { listContextSessions, runContextTouch } from "./commands/context-client";
 import { execCommand, type StandardCommand } from "./commands/exec";
 import { addRepo, listRepos, removeRepo } from "./commands/repo";
 import { getStatus } from "./commands/status";
@@ -492,6 +493,41 @@ async function main() {
     }
 
     case "context": {
+      const sub = parsed.positional[0];
+      if (sub === "touch") {
+        const touchPaths = parsed.positional.slice(1);
+        const workspace = resolveWorkspace(parsed, ctx.workspace);
+        if (!workspace) {
+          emitMissingArg("workspace", ["ws", "context", "touch"], renderCtx);
+        }
+        if (touchPaths.length === 0) {
+          emitMissingArg("paths", ["ws", "context", "touch"], renderCtx);
+        }
+        const result = await runContextTouch(
+          workspace,
+          touchPaths,
+          {
+            cwd: process.env.PWD ?? process.cwd(),
+            refresh: flag(parsed, "refresh"),
+            session: flagValue(parsed, "session"),
+          },
+          paths,
+        );
+        emit(result, "context", renderCtx);
+        break;
+      }
+      if (sub === "sessions") {
+        const workspace = resolveWorkspace(parsed, ctx.workspace);
+        if (!workspace) {
+          emitMissingArg("workspace", ["ws", "context", "sessions"], renderCtx);
+        }
+        emit(await listContextSessions(workspace, paths), "context-sessions", renderCtx);
+        break;
+      }
+      if (sub === "show") {
+        parsed.positional.shift(); // explicit show: strip and fall through
+      }
+
       const [first, second] = parsed.positional;
       const workspaceFlag = flagValue(parsed, "workspace");
       const hasWorkspaceFlag = flag(parsed, "workspace");

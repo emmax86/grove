@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import type { GroveContext } from "../../../../commands/context";
+import type { GroveContext, TouchContext } from "../../../../commands/context";
 import { contextPorcelain, contextText } from "../../../../lib/render/formatters/context";
 
 const baseCtx = { colorEnabled: false, unicodeEnabled: true, isTTY: false, isStderrTTY: false };
@@ -362,5 +362,112 @@ describe("contextPorcelain", () => {
         "sha256:def456",
       ].join("\t"),
     );
+  });
+});
+
+const touchValue: TouchContext = {
+  mode: "touch",
+  workspace: { name: "ai", path: "/w/ai" },
+  session: "s1",
+  entries: [
+    {
+      contextKey: "ai/grove/main",
+      scopePath: "trees/grove/main",
+      sourcePath: "trees/grove/main/AGENTS.md",
+      contentHash: "aaaa1111aaaa",
+      status: "current",
+    },
+    {
+      contextKey: "ai/grove/main/src",
+      scopePath: "trees/grove/main/src",
+      sourcePath: "trees/grove/main/src/AGENTS.md",
+      contentHash: "bbbb2222bbbb",
+      status: "served",
+      content: "body",
+    },
+    {
+      contextKey: "ai/grove/main/src/lib",
+      scopePath: "trees/grove/main/src/lib",
+      sourcePath: "trees/grove/main/src/lib/AGENTS.md",
+      contentHash: "cccc3333cccc",
+      status: "updated",
+      content: "updated body",
+    },
+  ],
+  skipped: [],
+};
+
+describe("contextText: touch mode", () => {
+  it("renders content-first with marker lines for current/updated entries", () => {
+    const text = contextText(touchValue, baseCtx);
+
+    expect(text).toContain("# Grove Context Touch");
+    expect(text).toContain("- current ai/grove/main@aaaa1111");
+    expect(text).toContain("- updated ai/grove/main/src/lib@cccc3333");
+    expect(text).toContain("## trees/grove/main/src/AGENTS.md @bbbb2222");
+    expect(text).toContain("body");
+    expect(text).toContain("## trees/grove/main/src/lib/AGENTS.md @cccc3333");
+    expect(text).toContain("updated body");
+  });
+
+  it("does not emit a marker line for served entries", () => {
+    const text = contextText(touchValue, baseCtx);
+    expect(text).not.toContain("- served");
+  });
+
+  it("omits Kind/Layer/Ownership/Selection-reason framing", () => {
+    const text = contextText(touchValue, baseCtx);
+    expect(text).not.toContain("Ownership");
+    expect(text).not.toContain("Kind:");
+    expect(text).not.toContain("Layer:");
+    expect(text).not.toContain("Selection reason:");
+  });
+
+  it("renders a 'no scopes' message when entries is empty", () => {
+    const text = contextText({ ...touchValue, entries: [] }, baseCtx);
+    expect(text).toContain("No instruction scopes for the given paths.");
+  });
+
+  it("renders the skipped section with the markdown heading", () => {
+    const text = contextText(
+      { ...touchValue, skipped: [{ path: "trees/x/AGENTS.md", reason: "permission denied" }] },
+      baseCtx,
+    );
+    expect(text).toContain("## Skipped");
+    expect(text).toContain("- trees/x/AGENTS.md - permission denied");
+  });
+});
+
+describe("contextPorcelain: touch mode", () => {
+  it("renders one touch row per entry", () => {
+    const out = contextPorcelain(touchValue);
+    const rows = out.split("\n");
+
+    expect(rows).toEqual([
+      [
+        "touch",
+        "ai",
+        "ai/grove/main",
+        "current",
+        "aaaa1111aaaa",
+        "trees/grove/main/AGENTS.md",
+      ].join("\t"),
+      [
+        "touch",
+        "ai",
+        "ai/grove/main/src",
+        "served",
+        "bbbb2222bbbb",
+        "trees/grove/main/src/AGENTS.md",
+      ].join("\t"),
+      [
+        "touch",
+        "ai",
+        "ai/grove/main/src/lib",
+        "updated",
+        "cccc3333cccc",
+        "trees/grove/main/src/lib/AGENTS.md",
+      ].join("\t"),
+    ]);
   });
 });

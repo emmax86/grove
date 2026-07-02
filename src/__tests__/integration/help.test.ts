@@ -63,14 +63,48 @@ describe("help: subcommand", () => {
     expect(r.stdout).toContain("Examples:");
   });
 
-  it("grove ws context --help -> leaf help", async () => {
+  it("grove ws context --help -> group help with show/touch/sessions subcommands", async () => {
     const r = await runCli(["ws", "context", "--help"]);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("grove ws context");
+    expect(r.stdout).toContain("Subcommands:");
+    expect(r.stdout).toContain("show");
+    expect(r.stdout).toContain("touch");
+    expect(r.stdout).toContain("sessions");
+  });
+
+  it("grove ws context show --help -> leaf help (moved from the old context leaf)", async () => {
+    const r = await runCli(["ws", "context", "show", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("grove ws context show");
     expect(r.stdout).toContain("[workspace]");
     expect(r.stdout).toContain("[target]");
     expect(r.stdout).toContain("--workspace");
     expect(r.stdout).toContain("Examples:");
+  });
+
+  it("grove ws context touch --help -> leaf help with variadic paths arg", async () => {
+    const r = await runCli(["ws", "context", "touch", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("grove ws context touch");
+    expect(r.stdout).toContain("paths");
+    expect(r.stdout).toContain("--session");
+    expect(r.stdout).toContain("--refresh");
+  });
+
+  it("grove ws context sessions --help -> leaf help", async () => {
+    const r = await runCli(["ws", "context", "sessions", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("grove ws context sessions");
+  });
+
+  it("grove mcp --help -> mcp group help with serve/connect subcommands", async () => {
+    const r = await runCli(["mcp", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("grove mcp");
+    expect(r.stdout).toContain("Subcommands:");
+    expect(r.stdout).toContain("serve");
+    expect(r.stdout).toContain("connect");
   });
 
   it("position invariance: --help anywhere yields the same path", async () => {

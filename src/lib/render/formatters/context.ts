@@ -3,8 +3,10 @@ import type {
   ContextInstructionSource,
   GroveContext,
   TargetContext,
+  TouchEntry,
   WorkspaceContext,
 } from "../../../commands/context";
+import type { ContextSessionsValue } from "../../../commands/context-client";
 import type { FormatCtx } from "./workspace";
 
 export type GroveContextValue = GroveContext;
@@ -163,9 +165,39 @@ function targetText(value: TargetContext): string {
   return lines.join("\n");
 }
 
-// TODO(task-6): replace with the real touch renderer.
+function touchMarkerLine(entry: TouchEntry): string {
+  const base = `- ${entry.status} ${entry.contextKey}@${shortHash(entry.contentHash)}`;
+  return entry.status === "updated" ? `${base} (superseded earlier version)` : base;
+}
+
 function touchText(value: Extract<GroveContextValue, { mode: "touch" }>): string {
-  return `# Grove Context (touch)\n\nsession ${value.session}\nentries: ${value.entries.length}`;
+  const markers = value.entries.filter((e) => e.status === "current" || e.status === "updated");
+  const withContent = value.entries.filter((e) => e.content !== undefined);
+  const lines = ["# Grove Context Touch"];
+
+  if (markers.length > 0) {
+    lines.push("", ...markers.map(touchMarkerLine));
+  }
+
+  for (const entry of withContent) {
+    lines.push(
+      "",
+      `## ${entry.sourcePath} @${shortHash(entry.contentHash)}`,
+      "",
+      entry.content ?? "",
+    );
+  }
+
+  if (value.entries.length === 0) {
+    lines.push("", "No instruction scopes for the given paths.");
+  }
+
+  const skipped = markdownSkippedSection(value.skipped);
+  if (skipped.length > 0) {
+    lines.push("", ...skipped);
+  }
+
+  return lines.join("\n");
 }
 
 export function contextText(value: GroveContextValue, _ctx: FormatCtx): string {
@@ -201,10 +233,18 @@ function instructionRow(
   ].join("\t");
 }
 
-// TODO(task-6): replace with the real touch porcelain output.
 function touchPorcelain(value: Extract<GroveContextValue, { mode: "touch" }>): string {
   return value.entries
-    .map((entry) => ["touch", value.workspace.name, entry.contextKey, entry.status].join("\t"))
+    .map((entry) =>
+      [
+        "touch",
+        value.workspace.name,
+        entry.contextKey,
+        entry.status,
+        entry.contentHash,
+        entry.sourcePath,
+      ].join("\t"),
+    )
     .join("\n");
 }
 
@@ -238,4 +278,36 @@ export function contextPorcelain(value: GroveContextValue): string {
   );
 
   return [targetRow, ...sourceRows].join("\n");
+}
+
+export function contextSessionsText(value: ContextSessionsValue): string {
+  const lines = ["# Grove Context Sessions"];
+
+  if (value.sessions.length === 0) {
+    lines.push("", "none");
+    return lines.join("\n");
+  }
+
+  for (const entry of value.sessions) {
+    lines.push("", `## ${entry.session}`);
+    if (entry.scopes.length === 0) {
+      lines.push("none");
+    } else {
+      lines.push(
+        ...entry.scopes.map((scope) => `- ${scope.contextKey}@${shortHash(scope.contentHash)}`),
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+export function contextSessionsPorcelain(value: ContextSessionsValue): string {
+  return value.sessions
+    .flatMap((entry) =>
+      entry.scopes.map((scope) =>
+        ["session", value.workspace, entry.session, scope.contextKey, scope.contentHash].join("\t"),
+      ),
+    )
+    .join("\n");
 }
