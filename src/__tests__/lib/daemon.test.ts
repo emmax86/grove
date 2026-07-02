@@ -90,7 +90,7 @@ describe("startDaemon", () => {
     const info = await startDaemon({
       workspace: "ws",
       paths,
-      gracePeriodMs: 500,
+      gracePeriodMs: 5000,
     });
     stopFn = info.stop;
 
@@ -106,7 +106,7 @@ describe("startDaemon", () => {
     const info = await startDaemon({
       workspace: "ws",
       paths,
-      gracePeriodMs: 500,
+      gracePeriodMs: 5000,
     });
     stopFn = info.stop;
     expect(info.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/mcp$/);
@@ -117,7 +117,7 @@ describe("startDaemon", () => {
     const info = await startDaemon({
       workspace: "ws",
       paths,
-      gracePeriodMs: 500,
+      gracePeriodMs: 5000,
     });
     stopFn = info.stop;
     const healthUrl = info.url.replace("/mcp", "/health");
@@ -141,7 +141,7 @@ describe("startDaemon", () => {
     const info = await startDaemon({
       workspace: "ws",
       paths,
-      gracePeriodMs: 500,
+      gracePeriodMs: 5000,
     });
     stopFn = info.stop;
 
@@ -232,7 +232,7 @@ describe("MCP over HTTP", () => {
     const info = await startDaemon({
       workspace: "ws",
       paths,
-      gracePeriodMs: 500,
+      gracePeriodMs: 5000,
     });
     stopFn = info.stop;
 
@@ -260,7 +260,7 @@ describe("MCP over HTTP", () => {
     const info = await startDaemon({
       workspace: "ws",
       paths,
-      gracePeriodMs: 500,
+      gracePeriodMs: 5000,
     });
     stopFn = info.stop;
 
@@ -306,7 +306,7 @@ describe("daemon context disclosure endpoints", () => {
   });
 
   async function startTestDaemon() {
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 5000 });
     stopFn = info.stop;
     return info;
   }

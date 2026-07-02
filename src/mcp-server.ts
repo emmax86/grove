@@ -37,9 +37,9 @@ idempotent and cheap to over-call: already-served scopes return one-line
 interface McpServerOptions {
   writeLock?: AsyncMutex;
   onStateChange?: () => void | Promise<void>;
-  /** Per-session served-state for context disclosure. Consumed by Task 8's tool. */
+  /** Per-session served-state for context disclosure. Consumed by the context_touch tool registered below. */
   contextLedger?: ContextLedger;
-  /** Shared observability sink for context disclosure. Consumed by Task 8's tool. */
+  /** Shared observability sink for context disclosure. Consumed by the context_touch tool registered below. */
   recorder?: DisclosureRecorder;
 }
 

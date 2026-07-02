@@ -53,7 +53,7 @@ describe("runContextTouch / listContextSessions: daemon routing", () => {
   });
 
   it("routes to a running daemon and reuses its session ledger across calls", async () => {
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 5000 });
     stopFn = info.stop;
     const cwd = paths.workspace("ws");
 
@@ -83,7 +83,7 @@ describe("runContextTouch / listContextSessions: daemon routing", () => {
   });
 
   it("listContextSessions returns the daemon's session ledgers", async () => {
-    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 500 });
+    const info = await startDaemon({ workspace: "ws", paths, gracePeriodMs: 5000 });
     stopFn = info.stop;
     const cwd = paths.workspace("ws");
 

@@ -182,7 +182,11 @@ disk:
   id the MCP SDK assigns on connect.
 - CLI callers get one ledger per `--session <key>` string, held in a
   daemon-side map keyed by that literal string. Reusing the same `--session`
-  key across CLI invocations reuses the same served-state.
+  key across CLI invocations reuses the same served-state. Note that a daemon
+  with no active MCP session shuts down after its grace period, after which a
+  CLI `--session` key's served-state resets and its content re-serves (the safe
+  direction) — so CLI `--session` dedup only persists while the daemon is kept
+  alive.
 
 A fresh ledger always starts empty, so every scope it is asked about starts at
 `served`. This happens on MCP session reconnect, on daemon restart, and the
