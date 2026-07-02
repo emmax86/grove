@@ -163,8 +163,19 @@ function targetText(value: TargetContext): string {
   return lines.join("\n");
 }
 
+// TODO(task-6): replace with the real touch renderer.
+function touchText(value: Extract<GroveContextValue, { mode: "touch" }>): string {
+  return `# Grove Context (touch)\n\nsession ${value.session}\nentries: ${value.entries.length}`;
+}
+
 export function contextText(value: GroveContextValue, _ctx: FormatCtx): string {
-  return value.mode === "workspace" ? workspaceText(value) : targetText(value);
+  if (value.mode === "workspace") {
+    return workspaceText(value);
+  }
+  if (value.mode === "touch") {
+    return touchText(value);
+  }
+  return targetText(value);
 }
 
 function instructionRow(
@@ -190,6 +201,13 @@ function instructionRow(
   ].join("\t");
 }
 
+// TODO(task-6): replace with the real touch porcelain output.
+function touchPorcelain(value: Extract<GroveContextValue, { mode: "touch" }>): string {
+  return value.entries
+    .map((entry) => ["touch", value.workspace.name, entry.contextKey, entry.status].join("\t"))
+    .join("\n");
+}
+
 export function contextPorcelain(value: GroveContextValue): string {
   if (value.mode === "workspace") {
     const rows = [
@@ -199,6 +217,10 @@ export function contextPorcelain(value: GroveContextValue): string {
       ...value.index.map((entry) => instructionRow("index", value.workspace.name, entry)),
     ];
     return rows.join("\n");
+  }
+
+  if (value.mode === "touch") {
+    return touchPorcelain(value);
   }
 
   const targetRow = [

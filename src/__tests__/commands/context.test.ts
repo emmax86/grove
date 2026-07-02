@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { getTargetContext, getWorkspaceContext } from "../../commands/context";
+import { getTargetContext, getWorkspaceContext, touchContext } from "../../commands/context";
 import { addRepo } from "../../commands/repo";
 import { addWorkspace } from "../../commands/workspace";
 import { addWorktree } from "../../commands/worktree";
 import { createPaths } from "../../constants";
+import { ContextLedger } from "../../lib/context-ledger";
+import { DisclosureRecorder } from "../../lib/context-state";
 import { cleanup, createTestDir, createTestGitRepo, GIT_ENV } from "../helpers";
 
 describe("context command", () => {
@@ -740,5 +742,214 @@ describe("context command", () => {
     expect(result.value.loadedScope).toBe("trees/api/feature-auth");
     expect(result.value.contextKey).toBe("myws/api/feature-auth");
     expect(result.value.sources).toEqual([]);
+  });
+
+  describe("touchContext", () => {
+    it("serves the full chain on first touch: workspace + worktree root + ancestors", async () => {
+      await mkdir(paths.workspaceGroveDir("myws"), { recursive: true });
+      await writeFile(paths.workspaceInstructions("myws"), "# workspace\n");
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+      await mkdir(join(root, "src", "lib"), { recursive: true });
+      await writeFile(join(root, "src", "lib", "AGENTS.md"), "# lib\n");
+      await writeFile(join(root, "src", "lib", "file.ts"), "export const x = 1;\n");
+
+      const ledger = new ContextLedger("session-1");
+      const result = await touchContext(
+        "myws",
+        ["trees/api/feature-auth/src/lib/file.ts"],
+        { cwd: paths.workspace("myws"), trigger: "cli", ledger },
+        paths,
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+      expect(result.value.mode).toBe("touch");
+      expect(result.value.entries.map((e) => e.status)).toEqual(["served", "served", "served"]);
+      expect(result.value.entries.every((e) => e.content)).toBe(true);
+    });
+
+    it("returns current markers without content on second touch", async () => {
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+      await mkdir(join(root, "src", "lib"), { recursive: true });
+      await writeFile(join(root, "src", "lib", "AGENTS.md"), "# lib\n");
+      await writeFile(join(root, "src", "lib", "file.ts"), "export const x = 1;\n");
+
+      const ledger = new ContextLedger("session-1");
+      const options = { cwd: paths.workspace("myws"), trigger: "cli" as const, ledger };
+      await touchContext("myws", ["trees/api/feature-auth/src/lib/file.ts"], options, paths);
+      const second = await touchContext(
+        "myws",
+        ["trees/api/feature-auth/src/lib/file.ts"],
+        options,
+        paths,
+      );
+
+      expect(second.ok).toBe(true);
+      if (!second.ok) {
+        return;
+      }
+      expect(second.value.entries.every((e) => e.status === "current")).toBe(true);
+      expect(second.value.entries.every((e) => e.content === undefined)).toBe(true);
+    });
+
+    it("re-serves only the changed scope as updated after a file edit", async () => {
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+      await mkdir(join(root, "src", "lib"), { recursive: true });
+      await writeFile(join(root, "src", "lib", "AGENTS.md"), "# lib\n");
+      await writeFile(join(root, "src", "lib", "file.ts"), "export const x = 1;\n");
+
+      const ledger = new ContextLedger("session-1");
+      const options = { cwd: paths.workspace("myws"), trigger: "cli" as const, ledger };
+      await touchContext("myws", ["trees/api/feature-auth/src/lib/file.ts"], options, paths);
+      await writeFile(join(root, "src", "lib", "AGENTS.md"), "# lib v2\n");
+      const third = await touchContext(
+        "myws",
+        ["trees/api/feature-auth/src/lib/file.ts"],
+        options,
+        paths,
+      );
+
+      expect(third.ok).toBe(true);
+      if (!third.ok) {
+        return;
+      }
+      const statuses = Object.fromEntries(third.value.entries.map((e) => [e.sourcePath, e.status]));
+      expect(statuses["trees/api/feature-auth/src/lib/AGENTS.md"]).toBe("updated");
+      expect(statuses["trees/api/feature-auth/AGENTS.md"]).toBe("current");
+    });
+
+    it("dedups shared scopes across a multi-path batch", async () => {
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+      await mkdir(join(root, "src", "a"), { recursive: true });
+      await mkdir(join(root, "src", "b"), { recursive: true });
+      await writeFile(join(root, "src", "a", "file.ts"), "export const a = 1;\n");
+      await writeFile(join(root, "src", "b", "file.ts"), "export const b = 1;\n");
+
+      const ledger = new ContextLedger("session-1");
+      const result = await touchContext(
+        "myws",
+        ["trees/api/feature-auth/src/a/file.ts", "trees/api/feature-auth/src/b/file.ts"],
+        { cwd: paths.workspace("myws"), trigger: "cli", ledger },
+        paths,
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+      const rootKeys = result.value.entries.filter((e) => e.contextKey === "myws/api/feature-auth");
+      expect(rootKeys).toHaveLength(1);
+    });
+
+    it("without a ledger (stateless) everything serves every time", async () => {
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+
+      const options = { cwd: paths.workspace("myws"), trigger: "cli" as const };
+      const first = await touchContext("myws", ["trees/api/feature-auth"], options, paths);
+      const second = await touchContext("myws", ["trees/api/feature-auth"], options, paths);
+
+      expect(first.ok).toBe(true);
+      expect(second.ok).toBe(true);
+      if (!first.ok || !second.ok) {
+        return;
+      }
+      expect(first.value.entries.every((e) => e.status === "served")).toBe(true);
+      expect(second.value.entries.every((e) => e.status === "served")).toBe(true);
+    });
+
+    it("refresh=true re-serves already-current scopes as refreshed", async () => {
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+
+      const ledger = new ContextLedger("session-1");
+      await touchContext(
+        "myws",
+        ["trees/api/feature-auth"],
+        { cwd: paths.workspace("myws"), trigger: "cli", ledger },
+        paths,
+      );
+      const result = await touchContext(
+        "myws",
+        ["trees/api/feature-auth"],
+        { cwd: paths.workspace("myws"), trigger: "cli", ledger, refresh: true },
+        paths,
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+      expect(result.value.entries.every((e) => e.status === "refreshed")).toBe(true);
+      expect(result.value.entries.every((e) => e.content !== undefined)).toBe(true);
+    });
+
+    it("truncates the chain at the deepest non-ignored ancestor for a gitignored path", async () => {
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+      await writeFile(join(root, ".gitignore"), "node_modules/\n");
+      await mkdir(join(root, "node_modules", "pkg"), { recursive: true });
+      await writeFile(join(root, "node_modules", "pkg", "AGENTS.md"), "# vendored\n");
+      await writeFile(join(root, "node_modules", "pkg", "index.js"), "module.exports = {};\n");
+
+      const ledger = new ContextLedger("session-1");
+      const result = await touchContext(
+        "myws",
+        ["trees/api/feature-auth/node_modules/pkg/index.js"],
+        { cwd: paths.workspace("myws"), trigger: "cli", ledger },
+        paths,
+      );
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+      const sourcePaths = result.value.entries.map((e) => e.sourcePath);
+      expect(sourcePaths).not.toContain("trees/api/feature-auth/node_modules/pkg/AGENTS.md");
+      expect(sourcePaths).toContain("trees/api/feature-auth/AGENTS.md");
+    });
+
+    it("errors with CONTEXT_TARGET_NOT_FOUND for a path outside any worktree", async () => {
+      const outside = join(tempDir, "outside-workspace");
+      await mkdir(outside, { recursive: true });
+
+      const result = await touchContext(
+        "myws",
+        [outside],
+        { cwd: paths.workspace("myws"), trigger: "cli" },
+        paths,
+      );
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("CONTEXT_TARGET_NOT_FOUND");
+      }
+    });
+
+    it("writes journal events for every decision including current", async () => {
+      const root = paths.worktreeDir("myws", "api", "feature-auth");
+      await writeFile(join(root, "AGENTS.md"), "# root\n");
+      const journalDir = await createTestDir();
+
+      const ledger = new ContextLedger("session-1");
+      const recorder = new DisclosureRecorder(journalDir);
+      const options = { cwd: paths.workspace("myws"), trigger: "cli" as const, ledger, recorder };
+      await touchContext("myws", ["trees/api/feature-auth"], options, paths);
+      await touchContext("myws", ["trees/api/feature-auth"], options, paths);
+
+      const journalText = await readFile(join(journalDir, "journal.jsonl"), "utf-8");
+      const lines = journalText.trim().split("\n").filter(Boolean);
+      expect(lines).toHaveLength(2);
+      const actions = lines.map((line) => JSON.parse(line).action);
+      expect(actions).toEqual(["served", "current"]);
+
+      await cleanup(journalDir);
+    });
   });
 });

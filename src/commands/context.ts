@@ -4,7 +4,9 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import type { Paths } from "../constants";
 import { readWorkspaceConfig } from "../lib/config";
-import { listInstructionFiles } from "../lib/git";
+import type { ContextLedger } from "../lib/context-ledger";
+import type { DisclosureRecorder, TouchStatus } from "../lib/context-state";
+import { isPathIgnored, listInstructionFiles } from "../lib/git";
 import { err, ok, type Result, type WorktreeEntry } from "../types";
 import { getStatus } from "./status";
 
@@ -79,7 +81,34 @@ export interface TargetContext {
   skipped: ContextSkippedEntry[];
 }
 
-export type GroveContext = WorkspaceContext | TargetContext;
+export interface TouchEntry {
+  contextKey: string;
+  scopePath: string;
+  sourcePath: string;
+  contentHash: string;
+  status: TouchStatus;
+  /** Present for served/updated/refreshed; absent for current. */
+  content?: string;
+}
+
+export interface TouchContext {
+  mode: "touch";
+  workspace: ContextWorkspaceInfo;
+  session: string;
+  entries: TouchEntry[];
+  skipped: ContextSkippedEntry[];
+}
+
+export interface TouchOptions {
+  cwd: string;
+  refresh?: boolean;
+  /** Absent = stateless (everything serves). */
+  ledger?: ContextLedger;
+  recorder?: DisclosureRecorder;
+  trigger: "mcp" | "cli";
+}
+
+export type GroveContext = WorkspaceContext | TargetContext | TouchContext;
 
 export interface ContextGraphNode {
   id: string;
@@ -865,6 +894,114 @@ export async function getTargetContext(
     contextHash: graph.root,
     sources,
     graph,
+    skipped,
+  });
+}
+
+export async function touchContext(
+  workspace: string,
+  targetPaths: string[],
+  options: TouchOptions,
+  paths: Paths,
+): Promise<Result<TouchContext>> {
+  const statusResult = await getStatus(workspace, paths);
+  if (!statusResult.ok) {
+    return statusResult;
+  }
+  const workspaceRoot = paths.workspace(workspace);
+  const skipped: ContextSkippedEntry[] = [];
+  const entries: TouchEntry[] = [];
+  const seenKeys = new Set<string>();
+  const session = options.ledger?.sessionKey ?? "stateless";
+
+  const classifyAndPush = async (source: ContextInstructionSource) => {
+    if (seenKeys.has(source.contextKey)) {
+      return; // batch dedup: one decision per scope per call
+    }
+    seenKeys.add(source.contextKey);
+    const status: TouchStatus = options.ledger
+      ? options.ledger.classify(source.contextKey, source.contentHash, options.refresh ?? false)
+      : "served";
+    const withContent = status !== "current";
+    entries.push({
+      contextKey: source.contextKey,
+      scopePath: source.scopePath,
+      sourcePath: source.sourcePath,
+      contentHash: source.contentHash,
+      status,
+      ...(withContent ? { content: source.content } : {}),
+    });
+    if (withContent) {
+      options.ledger?.record(source.contextKey, source.contentHash);
+    }
+    await options.recorder?.record(
+      {
+        ts: new Date().toISOString(),
+        session,
+        trigger: options.trigger,
+        contextKey: source.contextKey,
+        contentHash: source.contentHash,
+        action: status,
+      },
+      withContent ? source.content : undefined,
+    );
+  };
+
+  const workspaceSource = await readWorkspaceInstructionSource(workspace, paths, skipped);
+  if (workspaceSource) {
+    await classifyAndPush(workspaceSource);
+  }
+
+  for (const target of targetPaths) {
+    const resolvedTargetPath = resolveTargetPath(target, options.cwd);
+    const targetResult = await resolveLogicalTarget(
+      resolvedTargetPath,
+      workspace,
+      paths,
+      statusResult.value.repos,
+    );
+    if (!targetResult.ok) {
+      return targetResult;
+    }
+    const resolved = targetResult.value;
+
+    let targetStats: Awaited<ReturnType<typeof stat>>;
+    try {
+      targetStats = await stat(resolved.targetPath);
+    } catch {
+      return err(`Context target not found: ${target}`, "CONTEXT_TARGET_NOT_FOUND");
+    }
+    let targetDir = targetStats.isDirectory() ? resolved.targetPath : dirname(resolved.targetPath);
+
+    // Gitignored touch path (e.g. inside node_modules): truncate the chain to
+    // the deepest non-ignored ancestor so vendored instruction files never serve.
+    while (
+      targetDir !== resolved.worktreeRoot &&
+      (await isPathIgnored(targetDir, resolved.worktreeRoot))
+    ) {
+      targetDir = dirname(targetDir);
+    }
+
+    for (const dir of ancestorDirs(resolved.worktreeRoot, targetDir)) {
+      const source = await readInstructionSource(
+        workspace,
+        workspaceRoot,
+        resolved.repo,
+        resolved.slug,
+        dir,
+        skipped,
+      );
+      if (source) {
+        await classifyAndPush(source);
+      }
+    }
+  }
+
+  return ok({
+    mode: "touch",
+    workspace: { name: statusResult.value.name, path: statusResult.value.path },
+    session,
+    entries,
     skipped,
   });
 }
