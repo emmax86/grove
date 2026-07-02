@@ -175,7 +175,7 @@ describe("render — context kind", () => {
 
     expect(out.stdout).toContain("# Grove Context");
     expect(out.stdout).toContain("Resolved worktree: api/main");
-    expect(out.stdout).toContain("Reload with `grove ws context myws trees/api/main`");
+    expect(out.stdout).toContain("grove ws context touch");
     expect(out.stderr).toBe("");
     expect(out.exitCode).toBe(0);
   });

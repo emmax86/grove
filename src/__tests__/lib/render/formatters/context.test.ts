@@ -179,31 +179,26 @@ describe("contextText", () => {
     expect(out).not.toContain("grove ws context myws trees/api/other/packages/auth");
   });
 
-  it("renders target resolved worktree, context hash, source heading, source hash, and content", () => {
+  it("renders target resolved worktree, short context hash, source heading with short hash, and content", () => {
     const out = contextText(targetValue, baseCtx);
 
     expect(out).toContain("Resolved worktree: api/feature-auth");
     expect(out).toContain("Loaded scope: trees/api/feature-auth/packages/auth");
-    expect(out).toContain("Context hash: sha256:def456");
-    expect(out).toContain("### .grove/instructions.md");
-    expect(out).toContain("Kind: workspace");
-    expect(out).toContain("### trees/api/feature-auth/packages/auth/AGENTS.md");
-    expect(out).toContain("Kind: AGENTS.md");
-    expect(out).toContain("Layer: target");
-    expect(out).toContain("Ownership: user");
-    expect(out).toContain("Selection reason: selected by worktree instruction priority");
-    expect(out).toContain("Source/content hash: abc123");
+    expect(out).toContain("Context hash: def456");
+    expect(out).not.toContain("Context hash: sha256:def456");
+    expect(out).toContain("### .grove/instructions.md @workspac");
+    expect(out).toContain("### trees/api/feature-auth/packages/auth/AGENTS.md @abc123");
     expect(out).not.toContain("Provenance hash:");
     expect(out).toContain("# Instructions\n\nUse the auth package conventions.");
   });
 
-  it("renders target reload command with the stable loaded scope", () => {
-    const out = contextText({ ...targetValue, target: "." }, baseCtx);
-
-    expect(out).toContain(
-      "Reload with `grove ws context myws trees/api/feature-auth/packages/auth`",
-    );
-    expect(out).not.toContain("Reload with `grove ws context .`");
+  it("target text renders content-first without provenance framing", () => {
+    const text = contextText(targetValue, baseCtx);
+    expect(text).not.toContain("Ownership:");
+    expect(text).not.toContain("Selection reason:");
+    expect(text).not.toContain("Layer:");
+    expect(text).toContain("@"); // short hash on the section heading
+    expect(text).toContain("grove ws context touch"); // protocol line points at touch
   });
 
   it("renders target no-instructions message when sources is empty", () => {

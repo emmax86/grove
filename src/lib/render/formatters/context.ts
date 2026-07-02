@@ -122,16 +122,7 @@ function workspaceText(value: WorkspaceContext): string {
 }
 
 function sourceSection(source: ContextInstructionSource): string {
-  return [
-    `### ${source.path}`,
-    `Kind: ${source.kind}`,
-    `Layer: ${source.layer}`,
-    `Ownership: ${source.ownership}`,
-    `Selection reason: ${source.selectionReason}`,
-    `Source/content hash: ${source.contentHash}`,
-    "",
-    source.content,
-  ].join("\n");
+  return [`### ${source.path} @${shortHash(source.contentHash)}`, "", source.content].join("\n");
 }
 
 function targetText(value: TargetContext): string {
@@ -143,10 +134,10 @@ function targetText(value: TargetContext): string {
     `Resolved worktree: ${value.repo}/${value.slug}`,
     `Loaded scope: ${value.loadedScope}`,
     `Context key: ${value.contextKey}`,
-    `Context hash: ${value.contextHash}`,
+    `Context hash: ${shortHash(value.contextHash)}`,
     "",
     "## Agent Protocol",
-    `Reload with \`grove ws context ${value.workspace.name} ${value.loadedScope}\` when instructions may have changed.`,
+    "Prefer the context_touch MCP tool (or `grove ws context touch <paths>`) for incremental loading; it only re-sends what changed.",
     "",
     "## Loaded Instructions",
   ];
