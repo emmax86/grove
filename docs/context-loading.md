@@ -242,8 +242,7 @@ directory.
 ## Registration
 
 Grove registers itself as an MCP server for a workspace by writing a workspace
-root `.mcp.json` (generated alongside the root `AGENTS.md`/`CLAUDE.md`
-bootstrap shims, and equally not overwritten if it already exists):
+root `.mcp.json` (generated alongside the root `AGENTS.md` bootstrap shim, and equally not overwritten if it already exists):
 
 ```json
 {
@@ -319,14 +318,16 @@ output.
 
 ## Workspace Root Bootstrap Files
 
-Grove creates root `AGENTS.md` and `CLAUDE.md` files when a workspace is created
-or agent files are regenerated and those files do not already exist. The
-generated files are bootstrap shims: they tell agents to run
+Grove creates a root `AGENTS.md` when a workspace is created or agent files are
+regenerated and the file does not already exist. Grove does not create a root
+`CLAUDE.md`: Claude Code loads `AGENTS.md` only where no `CLAUDE.md` exists, so a
+generated `CLAUDE.md` would hide the `AGENTS.md` from Claude sessions. The
+generated file is a bootstrap shim: it tells agents to run
 `grove ws context`, then `grove ws context <target>`, and to treat that output
 as canonical.
 
 Existing root `AGENTS.md` and `CLAUDE.md` files are user-owned and are not
-overwritten. These root files are not the canonical workspace instruction
+overwritten or removed. These root files are not the canonical workspace instruction
 source; use `.grove/instructions.md` for workspace-wide instructions that should
 participate in context loading, provenance, and graph hashing.
 

@@ -5,7 +5,7 @@ with auto-generated Claude Code and VS Code configuration.
 
 - Named workspaces under `~/grove-workspaces/` (configurable via `GROVE_ROOT`)
 - Register git repos, manage git worktrees in a shared pool across workspaces
-- Auto-generates `CLAUDE.md`, `.claude/trees.md`, and `{workspace}.code-workspace` VS Code workspace files
+- Auto-generates `AGENTS.md`, `.claude/trees.md`, and `{workspace}.code-workspace` VS Code workspace files
 - Context inference — most commands detect workspace/repo from CWD
 
 ## Directory layout
@@ -19,7 +19,7 @@ with auto-generated Claude Code and VS Code configuration.
       feat-auth/                            # shared git worktree
   myproject/
     workspace.json
-    CLAUDE.md                               # auto-generated
+    AGENTS.md                               # auto-generated
     .claude/trees.md                        # auto-generated @-references
     myproject.code-workspace                # auto-generated
     trees/
@@ -156,7 +156,7 @@ Output captured to a file or piped to another command is byte-identical to termi
 - **Claude Code plugin** — `.claude-plugin/marketplace.json` is the Claude marketplace file, and `plugins/grove/commands/` contains the `/workspace`, `/workspace-status`, `/worktree`, `/repo`, `/exec` slash command implementations
 - **Codex plugin** — `.agents/plugins/marketplace.json` exposes `plugins/grove/` as a Codex plugin; `plugins/grove/.codex-plugin/plugin.json` is the manifest, `plugins/grove/skills/` contains Codex skills, and `plugins/grove/hooks/hooks.json` is the default bundled hook config
 - **MCP server** — `grove mcp-server` exposes workspace operations over MCP for AI tool integration
-- **Auto-generated files** — adding/removing repos creates `CLAUDE.md` once (if absent), then regenerates `.claude/trees.md` and `{workspace}.code-workspace` to keep editor and agent configs in sync
+- **Auto-generated files** — adding/removing repos creates `AGENTS.md` once (if absent), then regenerates `.claude/trees.md` and `{workspace}.code-workspace` to keep editor and agent configs in sync
 
 ### Codex
 

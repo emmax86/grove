@@ -17,7 +17,6 @@ export interface Paths {
   worktreePoolEntry: (repo: string, slug: string) => string;
   worktreePoolConfig: string;
   claudeTreesMd: (name: string) => string;
-  claudeMd: (name: string) => string;
   agentsMd: (name: string) => string;
   daemonConfig: (name: string) => string;
   contextStateDir: (name: string) => string;
@@ -42,7 +41,6 @@ export function createPaths(root: string): Paths {
     worktreePoolEntry: (repo, slug) => join(root, "worktrees", repo, slug),
     worktreePoolConfig: join(root, "worktrees.json"),
     claudeTreesMd: (name) => join(root, name, ".claude", "trees.md"),
-    claudeMd: (name) => join(root, name, "CLAUDE.md"),
     agentsMd: (name) => join(root, name, "AGENTS.md"),
     daemonConfig: (name) => join(root, name, ".claude", "server.json"),
     contextStateDir: (name) => join(root, name, ".grove", "state", "context"),

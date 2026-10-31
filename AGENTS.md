@@ -22,8 +22,7 @@ bun run format:check              # check formatting and lint with biome
 
 - **Workspace** — a named directory under `GROVE_ROOT` (default:
   `~/grove-workspaces`). Contains a `workspace.json` config, a `.claude/`
-  directory, and generated workspace entry files such as `CLAUDE.md` and
-  `AGENTS.md`.
+  directory, and a generated `AGENTS.md` workspace entry file.
 - **Repo** — a git repository registered in a workspace. Stored as a symlink at
   `repos/{name} -> <absolute-path>`. A workspace-local tree entry is also
   created at `{workspace}/trees/{name} -> ../../repos/{name}`.

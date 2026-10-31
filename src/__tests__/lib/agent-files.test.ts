@@ -244,22 +244,27 @@ describe("generateAgentFiles", () => {
     });
   });
 
-  // ── CLAUDE.md creation ──────────────────────────────────────────
+  // ── workspace entry files ───────────────────────────────────────
 
-  describe("CLAUDE.md creation", () => {
-    it("creates CLAUDE.md when it does not exist", async () => {
+  describe("workspace entry files", () => {
+    it("does not create CLAUDE.md, which would shadow AGENTS.md in Claude Code", async () => {
       await setupWorkspace("ws");
 
       const result = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
-      }
 
-      expect(result.value.claudeMd).toBe("created");
+      expect(await exists(join(paths.workspace("ws"), "CLAUDE.md"))).toBe(false);
+    });
 
-      const content = await readFile(paths.claudeMd("ws"), "utf-8");
-      expectWorkspaceBootstrapShim(content);
+    it("leaves an existing CLAUDE.md untouched", async () => {
+      await setupWorkspace("ws");
+      const claudeMd = join(paths.workspace("ws"), "CLAUDE.md");
+      await writeFile(claudeMd, "# My custom workspace notes\n");
+
+      const result = await generateAgentFiles("ws", paths, GIT_ENV);
+      expect(result.ok).toBe(true);
+
+      expect(await readFile(claudeMd, "utf-8")).toBe("# My custom workspace notes\n");
     });
 
     it("new-workspace shim is the two-line touch pointer", async () => {
@@ -271,45 +276,26 @@ describe("generateAgentFiles", () => {
         return;
       }
 
-      const shim = await readFile(paths.claudeMd("ws"), "utf-8");
+      const shim = await readFile(paths.agentsMd("ws"), "utf-8");
       expect(shim).toContain("context_touch");
       expect(shim).toContain("grove ws context touch");
       expect(shim.split("\n").filter((l) => l.trim()).length).toBeLessThanOrEqual(4);
     });
 
-    it("does not overwrite existing CLAUDE.md", async () => {
-      await setupWorkspace("ws");
-      await writeFile(paths.claudeMd("ws"), "# My custom workspace notes\n@.claude/trees.md\n");
-
-      const result = await generateAgentFiles("ws", paths, GIT_ENV);
-      expect(result.ok).toBe(true);
-      if (!result.ok) {
-        return;
-      }
-
-      expect(result.value.claudeMd).toBe("exists");
-
-      const content = await readFile(paths.claudeMd("ws"), "utf-8");
-      expect(content).toBe("# My custom workspace notes\n@.claude/trees.md\n");
-    });
-
-    it("is idempotent across all three files", async () => {
+    it("is idempotent across AGENTS.md and trees.md", async () => {
       const pathA = await setupRepo("ws", "alpha");
       await setupWorkspace("ws", [{ name: "alpha", path: pathA }]);
 
       const result1 = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result1.ok).toBe(true);
-      const claudeMd1 = await readFile(paths.claudeMd("ws"), "utf-8");
       const agentsMd1 = await readFile(paths.agentsMd("ws"), "utf-8");
       const treesMd1 = await readFile(paths.claudeTreesMd("ws"), "utf-8");
 
       const result2 = await generateAgentFiles("ws", paths, GIT_ENV);
       expect(result2.ok).toBe(true);
-      const claudeMd2 = await readFile(paths.claudeMd("ws"), "utf-8");
       const agentsMd2 = await readFile(paths.agentsMd("ws"), "utf-8");
       const treesMd2 = await readFile(paths.claudeTreesMd("ws"), "utf-8");
 
-      expect(claudeMd1).toBe(claudeMd2);
       expect(agentsMd1).toBe(agentsMd2);
       expect(treesMd1).toBe(treesMd2);
     });

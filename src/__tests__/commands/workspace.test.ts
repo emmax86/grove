@@ -253,10 +253,9 @@ describe("workspace commands", () => {
     expect(await exists(paths.claudeTreesMd("myws"))).toBe(true);
   });
 
-  it("add creates CLAUDE.md bootstrap shim in workspace root", async () => {
+  it("add does not create CLAUDE.md, which would shadow AGENTS.md in Claude Code", async () => {
     await addWorkspace("myws", paths);
-    expect(await exists(paths.claudeMd("myws"))).toBe(true);
-    expect(await readFile(paths.claudeMd("myws"), "utf-8")).toBe(WORKSPACE_AGENT_BOOTSTRAP_SHIM);
+    expect(await exists(join(paths.workspace("myws"), "CLAUDE.md"))).toBe(false);
   });
 
   it("add creates AGENTS.md bootstrap shim", async () => {
