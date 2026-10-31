@@ -28,7 +28,6 @@ export interface WorkspaceAgentTreeEntry {
 
 export interface GenerateAgentFilesResult {
   treesMd: WorkspaceAgentTreeEntry[];
-  claudeMd: "created" | "exists";
   agentsMd: "created" | "exists";
   mcpJson: "created" | "exists";
 }
@@ -143,10 +142,6 @@ export async function generateAgentFiles(
 
   await writeFile(paths.claudeTreesMd(workspace), treesMdContent);
 
-  const claudeMdStatus = await ensureWorkspaceEntryFile(
-    paths.claudeMd(workspace),
-    WORKSPACE_AGENT_BOOTSTRAP_SHIM,
-  );
   const agentsMdStatus = await ensureWorkspaceEntryFile(
     paths.agentsMd(workspace),
     WORKSPACE_AGENT_BOOTSTRAP_SHIM,
@@ -158,7 +153,6 @@ export async function generateAgentFiles(
 
   return ok({
     treesMd: included,
-    claudeMd: claudeMdStatus,
     agentsMd: agentsMdStatus,
     mcpJson: mcpJsonStatus,
   });
