@@ -322,7 +322,7 @@ Grove creates a root `AGENTS.md` when a workspace is created or agent files are
 regenerated and the file does not already exist. Grove does not create a root
 `CLAUDE.md`: Claude Code loads `AGENTS.md` only where no `CLAUDE.md` exists, so a
 generated `CLAUDE.md` would hide the `AGENTS.md` from Claude sessions. The
-generated file is a bootstrap shim: they tell agents to run
+generated file is a bootstrap shim: it tells agents to run
 `grove ws context`, then `grove ws context <target>`, and to treat that output
 as canonical.
 
