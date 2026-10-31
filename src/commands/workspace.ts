@@ -316,7 +316,7 @@ export async function syncWorkspace(
     return vscodeResult;
   }
 
-  const agentFilesResult = await generateAgentFiles(name, paths, env);
+  const agentFilesResult = await generateAgentFiles(name, paths);
   if (!agentFilesResult.ok) {
     return agentFilesResult;
   }

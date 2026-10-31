@@ -246,11 +246,10 @@ describe("workspace commands", () => {
     expect(await exists(paths.workspace("myws"))).toBe(false);
   });
 
-  it("add creates workspace.json, .code-workspace, and trees.md", async () => {
+  it("add creates workspace.json and .code-workspace", async () => {
     await addWorkspace("myws", paths);
     expect(await exists(paths.workspaceConfig("myws"))).toBe(true);
     expect(await exists(paths.vscodeWorkspace("myws"))).toBe(true);
-    expect(await exists(paths.claudeTreesMd("myws"))).toBe(true);
   });
 
   it("add does not create CLAUDE.md, which would shadow AGENTS.md in Claude Code", async () => {
