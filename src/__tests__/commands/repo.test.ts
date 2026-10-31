@@ -358,32 +358,6 @@ describe("repo commands", () => {
     expect(after.myrepo).toBeUndefined();
   });
 
-  it("addRepo generates trees.md", async () => {
-    await writeFile(join(repoPath, "CLAUDE.md"), "# myrepo\n");
-    const result = await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
-    expect(result.ok).toBe(true);
-    expect(await exists(paths.claudeTreesMd("myws"))).toBe(true);
-    const content = await readFile(paths.claudeTreesMd("myws"), "utf-8");
-    expect(content).toContain("@../trees/myrepo/main/CLAUDE.md");
-  });
-
-  it("removeRepo updates trees.md", async () => {
-    const repoPath2 = await createTestGitRepo(tempDir, "other");
-    await writeFile(join(repoPath, "CLAUDE.md"), "# myrepo\n");
-    await writeFile(join(repoPath2, "CLAUDE.md"), "# other\n");
-    await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
-    await addRepo("myws", repoPath2, undefined, paths, GIT_ENV);
-
-    const before = await readFile(paths.claudeTreesMd("myws"), "utf-8");
-    expect(before).toContain("myrepo");
-    expect(before).toContain("other");
-
-    await removeRepo("myws", "myrepo", {}, paths, GIT_ENV);
-    const after = await readFile(paths.claudeTreesMd("myws"), "utf-8");
-    expect(after).not.toContain("myrepo");
-    expect(after).toContain("other");
-  });
-
   it("does remove repoDir and deregister repo when gitWarning occurs during removeRepo --force", async () => {
     await addRepo("myws", repoPath, undefined, paths, GIT_ENV);
     await addWorktree("myws", "myrepo", "feature/pool", { newBranch: true }, paths, GIT_ENV);

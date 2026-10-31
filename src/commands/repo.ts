@@ -125,7 +125,7 @@ export async function addRepo(
     return vscodeResult;
   }
 
-  const agentFilesResult = await generateAgentFiles(workspace, paths, env);
+  const agentFilesResult = await generateAgentFiles(workspace, paths);
   if (!agentFilesResult.ok) {
     return agentFilesResult;
   }
@@ -259,7 +259,7 @@ export async function removeRepo(
     return vscodeResult;
   }
 
-  const agentFilesResult = await generateAgentFiles(workspace, paths, env);
+  const agentFilesResult = await generateAgentFiles(workspace, paths);
   if (!agentFilesResult.ok) {
     return agentFilesResult;
   }
