@@ -5,7 +5,7 @@ with auto-generated Claude Code and VS Code configuration.
 
 - Named workspaces under `~/grove-workspaces/` (configurable via `GROVE_ROOT`)
 - Register git repos, manage git worktrees in a shared pool across workspaces
-- Auto-generates `AGENTS.md`, `.mcp.json`, and `{workspace}.code-workspace` VS Code workspace files
+- Auto-generates `AGENTS.md`, `.mcp.json`, `opencode.json`, and `{workspace}.code-workspace` VS Code workspace files
 - Context inference — most commands detect workspace/repo from CWD
 
 ## Directory layout
@@ -164,7 +164,7 @@ Each harness has its own self-contained plugin directory under `plugins/`, shari
 - **Codex plugin** (`plugins/codex/`) — exposed via `.agents/plugins/marketplace.json` with `.codex-plugin/plugin.json`, `skills/`, and `hooks/hooks.json`
 - **Antigravity plugin** (`plugins/antigravity/`) — native Antigravity plugin with root `plugin.json`, `skills/`, and plugin-root `hooks.json` (`run_command` matcher)
 - **MCP server** — `grove mcp-server` / `grove mcp connect` exposes workspace operations over MCP for AI tool integration
-- **Auto-generated files** — adding/removing repos creates `AGENTS.md`, `.mcp.json`, and `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}` once (if absent), then regenerates `{workspace}.code-workspace` to keep editor and agent configs in sync
+- **Auto-generated files** — adding/removing repos creates `AGENTS.md`, `.mcp.json`, `opencode.json`, and `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}` once (if absent), then regenerates `{workspace}.code-workspace` to keep editor and agent configs in sync
 
 ### Codex
 

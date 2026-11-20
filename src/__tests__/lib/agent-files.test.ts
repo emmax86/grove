@@ -237,6 +237,48 @@ describe("generateAgentFiles", () => {
     });
   });
 
+  // ── opencode.json generation ────────────────────────────────────
+
+  describe("opencode.json generation", () => {
+    it("generates opencode.json pointing at the grove MCP bridge", async () => {
+      await setupWorkspace("ws");
+
+      const result = await generateAgentFiles("ws", paths);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.opencodeJson).toBe("created");
+      const config = JSON.parse(await readFile(paths.opencodeJson("ws"), "utf-8"));
+      expect(config).toEqual({
+        $schema: "https://opencode.ai/config.json",
+        mcp: {
+          servers: {
+            grove: {
+              type: "local",
+              command: ["grove", "mcp", "connect", "--workspace", "ws"],
+            },
+          },
+        },
+      });
+    });
+
+    it("does not overwrite a user-modified opencode.json", async () => {
+      await setupWorkspace("ws");
+      await writeFile(paths.opencodeJson("ws"), `{"mcp":{"servers":{}}}`);
+
+      const result = await generateAgentFiles("ws", paths);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.opencodeJson).toBe("exists");
+      expect(await readFile(paths.opencodeJson("ws"), "utf-8")).toBe(`{"mcp":{"servers":{}}}`);
+    });
+  });
+
   // ── error handling ──────────────────────────────────────────────
 
   describe("error handling", () => {

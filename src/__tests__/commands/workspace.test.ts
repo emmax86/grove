@@ -316,6 +316,39 @@ describe("workspace commands", () => {
     });
   });
 
+  it("add creates opencode.json pointing at the grove bridge", async () => {
+    await addWorkspace("myws", paths);
+    expect(await exists(paths.opencodeJson("myws"))).toBe(true);
+    const config = JSON.parse(await readFile(paths.opencodeJson("myws"), "utf-8"));
+    expect(config).toEqual({
+      $schema: "https://opencode.ai/config.json",
+      mcp: {
+        servers: {
+          grove: {
+            type: "local",
+            command: ["grove", "mcp", "connect", "--workspace", "myws"],
+          },
+        },
+      },
+    });
+  });
+
+  it("sync backfills opencode.json for an existing workspace", async () => {
+    await addWorkspace("myws", paths);
+    await rm(paths.opencodeJson("myws"), { force: true });
+    expect(await exists(paths.opencodeJson("myws"))).toBe(false);
+
+    const result = await syncWorkspace("myws", paths, GIT_ENV);
+    expect(result.ok).toBe(true);
+
+    expect(await exists(paths.opencodeJson("myws"))).toBe(true);
+    const config = JSON.parse(await readFile(paths.opencodeJson("myws"), "utf-8"));
+    expect(config.mcp.servers.grove).toEqual({
+      type: "local",
+      command: ["grove", "mcp", "connect", "--workspace", "myws"],
+    });
+  });
+
   describe("syncWorkspace", () => {
     it("returns WORKSPACE_NOT_FOUND for non-existent workspace", async () => {
       const result = await syncWorkspace("ghost", paths);

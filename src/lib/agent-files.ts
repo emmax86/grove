@@ -7,6 +7,7 @@ import { readWorkspaceConfig } from "./config";
 export interface GenerateAgentFilesResult {
   agentsMd: "created" | "exists";
   mcpJson: "created" | "exists";
+  opencodeJson: "created" | "exists";
   antigravityMcpPlugin: "created" | "exists";
   antigravityMcpConfig: "created" | "exists";
 }
@@ -29,6 +30,24 @@ function buildAntigravityMcpConfig(workspace: string): string {
     {
       mcpServers: {
         grove: { command: "grove", args: ["mcp", "connect", "--workspace", workspace] },
+      },
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+function buildOpenCodeConfig(workspace: string): string {
+  return `${JSON.stringify(
+    {
+      $schema: "https://opencode.ai/config.json",
+      mcp: {
+        servers: {
+          grove: {
+            type: "local",
+            command: ["grove", "mcp", "connect", "--workspace", workspace],
+          },
+        },
       },
     },
     null,
@@ -66,6 +85,10 @@ export async function generateAgentFiles(
       paths.mcpJson(workspace),
       WORKSPACE_MCP_JSON,
     );
+    const opencodeJsonStatus = await ensureWorkspaceEntryFile(
+      paths.opencodeJson(workspace),
+      buildOpenCodeConfig(workspace),
+    );
 
     await mkdir(paths.antigravityMcpPluginDir(workspace), { recursive: true });
     const antigravityMcpPluginStatus = await ensureWorkspaceEntryFile(
@@ -80,6 +103,7 @@ export async function generateAgentFiles(
     return ok({
       agentsMd: agentsMdStatus,
       mcpJson: mcpJsonStatus,
+      opencodeJson: opencodeJsonStatus,
       antigravityMcpPlugin: antigravityMcpPluginStatus,
       antigravityMcpConfig: antigravityMcpConfigStatus,
     });

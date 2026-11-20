@@ -241,8 +241,9 @@ directory.
 
 ## Registration
 
-Grove registers itself as an MCP server for a workspace by writing both a
-workspace root `.mcp.json` and an Antigravity workspace plugin at
+Grove registers itself as an MCP server for a workspace by writing a workspace
+root `.mcp.json`, a workspace root `opencode.json` (for OpenCode), and an
+Antigravity workspace plugin at
 `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}` (generated alongside
 the root `AGENTS.md` bootstrap shim, and equally not overwritten if they already
 exist):
