@@ -63,6 +63,7 @@ async function invokeHookCli(
   input: unknown,
   args: string[],
   envOverrides: Record<string, string | undefined> = {},
+  cwd?: string,
 ): Promise<HookInvocationResult> {
   const env: Record<string, string | undefined> = {
     ...process.env,
@@ -70,6 +71,7 @@ async function invokeHookCli(
     ...envOverrides,
   };
   const proc = Bun.spawn(["bun", "run", CLI_ENTRY, "hook", "reject-git-worktree", ...args], {
+    cwd,
     env,
     stdin: new Blob([JSON.stringify(input)]),
     stdout: "pipe",
@@ -108,6 +110,23 @@ function invokeClaude(input: unknown) {
 
 function invokeAntigravity(input: unknown) {
   return invokeHookDirect("antigravity", input);
+}
+
+function invokeOpenCode(input: unknown) {
+  return invokeHookDirect("opencode", input);
+}
+
+function opencodeExecuteBeforeCmd(
+  command: string,
+  directory: string,
+  tool = "bash",
+  extraInput: Record<string, unknown> = {},
+) {
+  return {
+    tool,
+    directory,
+    input: { command, ...extraInput },
+  };
 }
 
 function antigravityPreToolUseCmdInCwd(
@@ -484,6 +503,139 @@ describe("Antigravity reject-git-worktree hook adapter", () => {
   });
 });
 
+describe("OpenCode execute.before hook protocol", () => {
+  beforeEach(setupAdapterDirs);
+  afterEach(() => cleanup(tempDir));
+
+  it("denies git worktree inside GROVE_ROOT with decision JSON on stdout for bash tool", async () => {
+    const result = await invokeOpenCode(opencodeExecuteBeforeCmd("git worktree list", groveCwd));
+
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(result.decision).toBe("deny");
+    expect(result.reason).toContain(DENY_REASON);
+    expect(result.reason).toContain("/worktree add");
+    expect(result.reason).toContain("create-grove-worktree");
+    expect(result.stderr).toBe("");
+  });
+
+  it("denies git worktree inside GROVE_ROOT for shell tool", async () => {
+    const result = await invokeOpenCode(
+      opencodeExecuteBeforeCmd("git worktree add ../foo", groveCwd, "shell"),
+    );
+
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(result.decision).toBe("deny");
+    expect(result.reason).toContain(DENY_REASON);
+  });
+
+  it("allows git worktree outside GROVE_ROOT", async () => {
+    const result = await invokeOpenCode(opencodeExecuteBeforeCmd("git worktree list", nonGroveCwd));
+
+    expect(result.denied).toBe(false);
+    expect(result.stdout).toBe("");
+  });
+
+  it("prefers input.workdir over top-level directory when both are provided", async () => {
+    const denied = await invokeOpenCode(
+      opencodeExecuteBeforeCmd("git worktree list", nonGroveCwd, "bash", { workdir: groveCwd }),
+    );
+    expect(denied.denied).toBe(true);
+    expect(denied.decision).toBe("deny");
+
+    const allowed = await invokeOpenCode(
+      opencodeExecuteBeforeCmd("git worktree list", groveCwd, "bash", { workdir: nonGroveCwd }),
+    );
+    expect(allowed.denied).toBe(false);
+    expect(allowed.stdout).toBe("");
+  });
+
+  it("reads input.workdir when top-level directory is absent", async () => {
+    const result = await invokeOpenCode({
+      tool: "bash",
+      input: { command: "git worktree list", workdir: groveCwd },
+    });
+
+    expect(result.denied).toBe(true);
+    expect(result.decision).toBe("deny");
+  });
+
+  it("resolves relative input.workdir against top-level directory", async () => {
+    const subDir = path.join(groveCwd, "packages", "api");
+    await mkdir(subDir, { recursive: true });
+
+    const dotDenied = await invokeOpenCode(
+      opencodeExecuteBeforeCmd("git worktree list", groveCwd, "shell", { workdir: "." }),
+    );
+    expect(dotDenied.denied).toBe(true);
+    expect(dotDenied.decision).toBe("deny");
+
+    const nestedDenied = await invokeOpenCode(
+      opencodeExecuteBeforeCmd("git worktree list", groveCwd, "shell", {
+        workdir: "packages/api",
+      }),
+    );
+    expect(nestedDenied.denied).toBe(true);
+    expect(nestedDenied.decision).toBe("deny");
+
+    const escapedAllowed = await invokeOpenCode(
+      opencodeExecuteBeforeCmd("git worktree list", groveCwd, "shell", {
+        workdir: path.relative(groveCwd, nonGroveCwd),
+      }),
+    );
+    expect(escapedAllowed.denied).toBe(false);
+    expect(escapedAllowed.stdout).toBe("");
+  });
+
+  it("fails open when input.workdir is relative and top-level directory is absent", async () => {
+    const result = await invokeOpenCode({
+      tool: "shell",
+      input: { command: "git worktree list", workdir: "." },
+    });
+
+    expect(result.denied).toBe(false);
+    expect(result.stdout).toBe("");
+  });
+
+  it("accepts args.command when event carries args instead of input", async () => {
+    const result = await invokeOpenCode({
+      tool: "bash",
+      directory: groveCwd,
+      args: { command: "git worktree list" },
+    });
+
+    expect(result.denied).toBe(true);
+    expect(result.decision).toBe("deny");
+  });
+
+  it("fails open for non-shell tools, missing fields, and wrong payload shapes", async () => {
+    const nonShell = await invokeOpenCode(
+      opencodeExecuteBeforeCmd("git worktree list", groveCwd, "read"),
+    );
+    expect(nonShell.denied).toBe(false);
+    expect(nonShell.stdout).toBe("");
+
+    const missingTool = await invokeOpenCode({
+      directory: groveCwd,
+      input: { command: "git worktree list" },
+    });
+    expect(missingTool.denied).toBe(false);
+    expect(missingTool.stdout).toBe("");
+
+    const missingDir = await invokeOpenCode({
+      tool: "bash",
+      input: { command: "git worktree list" },
+    });
+    expect(missingDir.denied).toBe(false);
+    expect(missingDir.stdout).toBe("");
+
+    const wrongShape = await invokeOpenCode(preToolUseBashCmdInCwd("git worktree list", groveCwd));
+    expect(wrongShape.denied).toBe(false);
+    expect(wrongShape.stdout).toBe("");
+  });
+});
+
 describe("grove hook reject-git-worktree CLI subprocess", () => {
   beforeEach(setupAdapterDirs);
   afterEach(() => cleanup(tempDir));
@@ -543,6 +695,53 @@ describe("grove hook reject-git-worktree CLI subprocess", () => {
     expect(allow.exitCode).toBe(0);
     expect(allow.stdout).toBe("");
     expect(allow.stderr).toBe("");
+  });
+
+  it("runs opencode protocol over CLI (--host opencode)", async () => {
+    const deny = await invokeHookCli(opencodeExecuteBeforeCmd("git worktree list", groveCwd), [
+      "--host",
+      "opencode",
+    ]);
+
+    expect(deny.denied).toBe(true);
+    expect(deny.exitCode).toBe(0);
+    expect(deny.decision).toBe("deny");
+    expect(deny.reason).toContain(DENY_REASON);
+    expect(deny.stderr).toBe("");
+
+    const allow = await invokeHookCli(opencodeExecuteBeforeCmd("git status", groveCwd), [
+      "--host",
+      "opencode",
+    ]);
+    expect(allow.denied).toBe(false);
+    expect(allow.exitCode).toBe(0);
+    expect(allow.stdout).toBe("");
+    expect(allow.stderr).toBe("");
+  });
+
+  it("resolves relative OpenCode workdir against payload directory even when spawned outside GROVE_ROOT", async () => {
+    const subDir = path.join(groveCwd, "packages", "api");
+    await mkdir(subDir, { recursive: true });
+
+    const denyDot = await invokeHookCli(
+      opencodeExecuteBeforeCmd("git worktree list", groveCwd, "shell", { workdir: "." }),
+      ["--host", "opencode"],
+      {},
+      nonGroveCwd,
+    );
+    expect(denyDot.denied).toBe(true);
+    expect(denyDot.decision).toBe("deny");
+
+    const denySubdir = await invokeHookCli(
+      opencodeExecuteBeforeCmd("git worktree list", groveCwd, "shell", {
+        workdir: "packages/api",
+      }),
+      ["--host", "opencode"],
+      {},
+      nonGroveCwd,
+    );
+    expect(denySubdir.denied).toBe(true);
+    expect(denySubdir.decision).toBe("deny");
   });
 
   it("fails open and warns on an unrecognized or missing --host", async () => {

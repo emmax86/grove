@@ -415,7 +415,7 @@ const HOOK_GROUP = {
       flags: [
         {
           name: "host",
-          valueLabel: "<claude|codex|antigravity>",
+          valueLabel: "<claude|codex|antigravity|opencode>",
           summary: "agent harness hook protocol",
         },
       ],
