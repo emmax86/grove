@@ -71,9 +71,9 @@ adapters around the CLI rather than alternative implementations.
 - Shared canonical skills live in `skills/` and are synced into each
   self-contained harness plugin directory via `bun run sync:plugins` (enforced
   by tests in `src/__tests__/integration/hooks.test.ts`).
-- Shared hook logic lives in `src/hooks/` and runs through the compiled CLI
-  (`grove hook reject-git-worktree --host <claude|codex>`), so plugins do not
-  ship TypeScript files or rely on env-var host detection.
+- Shared hook logic lives in `src/hooks/` and is invoked through the compiled
+  CLI (`grove hook reject-git-worktree --host <claude|codex|antigravity>`), so
+  plugins do not ship TypeScript files or depend on `${PLUGIN_ROOT}` env vars.
 - Each harness has its own plugin directory under `plugins/`:
   - `plugins/claude/` — `.claude-plugin/plugin.json`, `commands/*.md`,
     `hooks/hooks.json`, and synced `skills/` (referenced by
@@ -81,8 +81,10 @@ adapters around the CLI rather than alternative implementations.
   - `plugins/codex/` — `.codex-plugin/plugin.json` (no `hooks` field; Codex
     auto-discovers `hooks/hooks.json` and rejects unsupported manifest fields),
     `hooks/hooks.json`, and synced `skills/` (referenced by
-    `.agents/plugins/marketplace.json`). After installing or reinstalling, use
+    `.agents/plugins/marketplace.json`). After installing or reinstalling, run
     `/hooks` in a new Codex thread to review and trust command hooks.
+  - `plugins/antigravity/` — root `plugin.json`, plugin-root `hooks.json`
+    (`run_command` matcher), and synced `skills/`.
 
 ### Output rendering
 

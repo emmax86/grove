@@ -66,10 +66,11 @@ Output invariants enforced by tests in `src/__tests__/lib/render/invariants.test
 
 ### Plugin
 
-Each agent harness has its own self-contained plugin directory under `plugins/` (`plugins/claude/`, `plugins/codex/`). Canonical skills live in `skills/` and are synced into each plugin with `bun run sync:plugins`. Hook execution lives in `src/hooks/` and runs via `grove hook reject-git-worktree --host <claude|codex>`.
+Each agent harness has its own self-contained plugin directory under `plugins/` (`plugins/claude/`, `plugins/codex/`, `plugins/antigravity/`). Canonical skills live in `skills/` and are synced into each plugin with `bun run sync:plugins`. Hook execution lives in `src/hooks/` and runs via `grove hook reject-git-worktree --host <claude|codex|antigravity>`.
 
 - **Claude Code** (`plugins/claude/`) uses `.claude-plugin/plugin.json`, `commands/*.md`, and `hooks/hooks.json`, installable via `.claude-plugin/marketplace.json`.
 - **Codex** (`plugins/codex/`) uses `.codex-plugin/plugin.json` (no `hooks` field — Codex discovers `hooks/hooks.json` automatically and rejects unsupported manifest fields), installable via `.agents/plugins/marketplace.json`.
+- **Antigravity** (`plugins/antigravity/`) uses root `plugin.json` and plugin-root `hooks.json` (`run_command` matcher).
 
 ## Tests
 
