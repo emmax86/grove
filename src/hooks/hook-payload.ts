@@ -92,3 +92,38 @@ export function extractAntigravityPreToolUseCommand(input: unknown): HookCommand
     cwd,
   };
 }
+
+const OPENCODE_SHELL_TOOLS = new Set(["bash", "shell"]);
+
+// OpenCode v2 `execute.before` payloads provide `{ tool, input, directory }`
+// (or `{ tool, args, directory }`), where shell tools are named `bash` or
+// `shell`. Prefer an explicit per-command `workdir`/`cwd` over top-level
+// `directory`/`cwd`.
+export function extractOpenCodePreToolUseCommand(input: unknown): HookCommandPayload | null {
+  if (!isRecord(input)) {
+    return null;
+  }
+
+  if (typeof input.tool !== "string" || !OPENCODE_SHELL_TOOLS.has(input.tool)) {
+    return null;
+  }
+
+  const toolInput = isRecord(input.input) ? input.input : isRecord(input.args) ? input.args : null;
+  if (toolInput === null || typeof toolInput.command !== "string") {
+    return null;
+  }
+
+  const cwdCandidates = [toolInput.workdir, toolInput.cwd, input.directory, input.cwd];
+  const cwd =
+    cwdCandidates.find(
+      (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
+    ) ?? null;
+  if (cwd === null) {
+    return null;
+  }
+
+  return {
+    command: toolInput.command,
+    cwd,
+  };
+}

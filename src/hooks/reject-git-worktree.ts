@@ -3,11 +3,12 @@ import {
   extractAntigravityPreToolUseCommand,
   extractClaudePreToolUseBashCommand,
   extractCodexPreToolUseBashCommand,
+  extractOpenCodePreToolUseCommand,
   type HookCommandPayload,
   parseHookInput,
 } from "./hook-payload";
 
-export type HookHost = "claude" | "codex" | "antigravity";
+export type HookHost = "claude" | "codex" | "antigravity" | "opencode";
 
 export interface HookRunResult {
   exitCode: 0 | 2;
@@ -16,7 +17,7 @@ export interface HookRunResult {
 }
 
 type PayloadExtractor = (input: unknown) => HookCommandPayload | null;
-type DenyOutputTarget = "codex-json" | "antigravity-json" | "stderr";
+type DenyOutputTarget = "codex-json" | "decision-json" | "stderr";
 
 function buildDenyOutput(target: DenyOutputTarget): { stdout: string; stderr: string } {
   if (target === "codex-json") {
@@ -26,7 +27,7 @@ function buildDenyOutput(target: DenyOutputTarget): { stdout: string; stderr: st
   const { additionalContext, permissionDecisionReason } = DENY_OUTPUT.hookSpecificOutput;
   const reason = `${permissionDecisionReason}\n\n${additionalContext}`;
 
-  if (target === "antigravity-json") {
+  if (target === "decision-json") {
     return { stdout: `${JSON.stringify({ decision: "deny", reason })}\n`, stderr: "" };
   }
 
@@ -58,6 +59,9 @@ async function evaluateHost(
 //                 and surfaces stderr to the model. stdout is ignored on exit 2.
 //   antigravity — exit 0 with `{ decision: "deny", reason }` on stdout (empty
 //                 stdout on pass-through; never `{}` which fails closed).
+//   opencode    — exit 0 with `{ decision: "deny", reason }` on stdout (empty
+//                 stdout on pass-through); the OpenCode v2 plugin parses stdout
+//                 and throws `new Error(reason)` from `execute.before`.
 export async function runRejectGitWorktreeHook(
   host: string | undefined,
   rawInput: string,
@@ -75,16 +79,18 @@ export async function runRejectGitWorktreeHook(
         input,
         extractAntigravityPreToolUseCommand,
         0,
-        "antigravity-json",
+        "decision-json",
         groveRoot,
       );
+    case "opencode":
+      return evaluateHost(input, extractOpenCodePreToolUseCommand, 0, "decision-json", groveRoot);
     default:
       // The hook matches every shell command, so a missing or unrecognized host
       // (a misconfigured install) must fail open rather than block everything.
       return {
         exitCode: 0,
         stdout: "",
-        stderr: `reject-git-worktree: unknown hook host ${JSON.stringify(host ?? "")}; expected "codex", "claude", or "antigravity". Allowing command.\n`,
+        stderr: `reject-git-worktree: unknown hook host ${JSON.stringify(host ?? "")}; expected "codex", "claude", "antigravity", or "opencode". Allowing command.\n`,
       };
   }
 }

@@ -134,7 +134,7 @@ Options: `--repo <name>` (required when no file is given, otherwise inferred fro
 
 | Command                                                        | Description                                                          |
 | -------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `reject-git-worktree --host <claude\|codex\|antigravity>`      | `PreToolUse` hook handler that blocks raw `git worktree` commands    |
+| `reject-git-worktree --host <claude\|codex\|antigravity\|opencode>` | `PreToolUse` hook handler that blocks raw `git worktree` commands    |
 
 ### Other
 
