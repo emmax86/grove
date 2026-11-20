@@ -4,6 +4,10 @@
 
 Every error returned by grove carries a SCREAMING_SNAKE_CASE code. The codes below are the canonical set; see `src/lib/errors.ts` for the source.
 
+## AGENT_FILES_WRITE_FAILED
+
+Writing generated workspace agent configuration files failed.
+
 ## CANNOT_REMOVE_DEFAULT_BRANCH
 
 The default-branch worktree is a managed symlink and cannot be removed directly; remove the repo instead.

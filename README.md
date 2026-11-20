@@ -164,7 +164,7 @@ Each harness has its own self-contained plugin directory under `plugins/`, shari
 - **Codex plugin** (`plugins/codex/`) — exposed via `.agents/plugins/marketplace.json` with `.codex-plugin/plugin.json`, `skills/`, and `hooks/hooks.json`
 - **Antigravity plugin** (`plugins/antigravity/`) — native Antigravity plugin with root `plugin.json`, `skills/`, and plugin-root `hooks.json` (`run_command` matcher)
 - **MCP server** — `grove mcp-server` / `grove mcp connect` exposes workspace operations over MCP for AI tool integration
-- **Auto-generated files** — adding/removing repos creates `AGENTS.md` and `.mcp.json` once (if absent), then regenerates `{workspace}.code-workspace` to keep the editor config in sync
+- **Auto-generated files** — adding/removing repos creates `AGENTS.md`, `.mcp.json`, and `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}` once (if absent), then regenerates `{workspace}.code-workspace` to keep editor and agent configs in sync
 
 ### Codex
 
@@ -189,7 +189,9 @@ workspace and run `/hooks` to review and trust the Grove `PreToolUse` hook from
 
 Install the native plugin from `plugins/antigravity/` (e.g. `agy plugin install
 <path-to-grove-repo>/plugins/antigravity`) for Grove skills and the
-`run_command` `PreToolUse` hook.
+`run_command` `PreToolUse` hook. Workspace MCP registration is handled
+automatically per workspace via `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}`
+(created by `grove ws add` and backfilled by `grove ws sync`).
 
 ## Development
 
