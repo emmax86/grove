@@ -284,6 +284,38 @@ describe("workspace commands", () => {
     expect(config.mcpServers.grove).toEqual({ command: "grove", args: ["mcp", "connect"] });
   });
 
+  it("add creates Antigravity workspace MCP plugin pointing at the grove bridge", async () => {
+    await addWorkspace("myws", paths);
+    expect(await exists(paths.antigravityMcpPluginManifest("myws"))).toBe(true);
+    expect(await exists(paths.antigravityMcpConfig("myws"))).toBe(true);
+    const manifest = JSON.parse(
+      await readFile(paths.antigravityMcpPluginManifest("myws"), "utf-8"),
+    );
+    expect(manifest).toEqual({ name: "grove-mcp" });
+    const config = JSON.parse(await readFile(paths.antigravityMcpConfig("myws"), "utf-8"));
+    expect(config.mcpServers.grove).toEqual({
+      command: "grove",
+      args: ["mcp", "connect", "--workspace", "myws"],
+    });
+  });
+
+  it("sync backfills Antigravity workspace MCP plugin for an existing workspace", async () => {
+    await addWorkspace("myws", paths);
+    await rm(paths.antigravityMcpPluginDir("myws"), { recursive: true, force: true });
+    expect(await exists(paths.antigravityMcpConfig("myws"))).toBe(false);
+
+    const result = await syncWorkspace("myws", paths, GIT_ENV);
+    expect(result.ok).toBe(true);
+
+    expect(await exists(paths.antigravityMcpPluginManifest("myws"))).toBe(true);
+    expect(await exists(paths.antigravityMcpConfig("myws"))).toBe(true);
+    const config = JSON.parse(await readFile(paths.antigravityMcpConfig("myws"), "utf-8"));
+    expect(config.mcpServers.grove).toEqual({
+      command: "grove",
+      args: ["mcp", "connect", "--workspace", "myws"],
+    });
+  });
+
   describe("syncWorkspace", () => {
     it("returns WORKSPACE_NOT_FOUND for non-existent workspace", async () => {
       const result = await syncWorkspace("ghost", paths);

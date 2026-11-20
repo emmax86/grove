@@ -93,6 +93,9 @@ export const ERROR_CATALOG = {
   VSCODE_WORKSPACE_WRITE_FAILED: {
     description: "Writing the generated VS Code workspace file failed.",
   },
+  AGENT_FILES_WRITE_FAILED: {
+    description: "Writing generated workspace agent configuration files failed.",
+  },
 
   // Naming and validation
   INVALID_NAME: {

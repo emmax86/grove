@@ -189,6 +189,54 @@ describe("generateAgentFiles", () => {
     });
   });
 
+  // ── Antigravity workspace MCP plugin generation ─────────────────
+
+  describe("Antigravity workspace MCP plugin generation", () => {
+    it("generates .agents/plugins/grove-mcp/plugin.json and mcp_config.json", async () => {
+      await setupWorkspace("ws");
+
+      const result = await generateAgentFiles("ws", paths);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.antigravityMcpPlugin).toBe("created");
+      expect(result.value.antigravityMcpConfig).toBe("created");
+
+      const manifest = JSON.parse(
+        await readFile(paths.antigravityMcpPluginManifest("ws"), "utf-8"),
+      );
+      expect(manifest).toEqual({ name: "grove-mcp" });
+
+      const config = JSON.parse(await readFile(paths.antigravityMcpConfig("ws"), "utf-8"));
+      expect(config.mcpServers.grove).toEqual({
+        command: "grove",
+        args: ["mcp", "connect", "--workspace", "ws"],
+      });
+    });
+
+    it("does not overwrite user-modified Antigravity plugin or mcp_config files", async () => {
+      await setupWorkspace("ws");
+      await mkdir(paths.antigravityMcpPluginDir("ws"), { recursive: true });
+      await writeFile(paths.antigravityMcpPluginManifest("ws"), `{"name":"custom-grove"}`);
+      await writeFile(paths.antigravityMcpConfig("ws"), `{"mcpServers":{}}`);
+
+      const result = await generateAgentFiles("ws", paths);
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+
+      expect(result.value.antigravityMcpPlugin).toBe("exists");
+      expect(result.value.antigravityMcpConfig).toBe("exists");
+      expect(await readFile(paths.antigravityMcpPluginManifest("ws"), "utf-8")).toBe(
+        `{"name":"custom-grove"}`,
+      );
+      expect(await readFile(paths.antigravityMcpConfig("ws"), "utf-8")).toBe(`{"mcpServers":{}}`);
+    });
+  });
+
   // ── error handling ──────────────────────────────────────────────
 
   describe("error handling", () => {
@@ -197,6 +245,17 @@ describe("generateAgentFiles", () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.code).toBe("WORKSPACE_NOT_FOUND");
+      }
+    });
+
+    it("returns AGENT_FILES_WRITE_FAILED when .agents cannot be created as a directory", async () => {
+      await setupWorkspace("ws");
+      await writeFile(join(paths.workspace("ws"), ".agents"), "not a directory\n");
+
+      const result = await generateAgentFiles("ws", paths);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("AGENT_FILES_WRITE_FAILED");
       }
     });
   });
