@@ -1,0 +1,11 @@
+{
+  "name": "grove-opencode-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "peerDependencies": {
+    "@opencode/plugin": "*"
+  }
+}

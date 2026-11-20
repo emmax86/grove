@@ -2,3 +2,4 @@ node_modules/
 bin/
 .codex
 *.js
+!plugins/opencode/*.js
