@@ -43,9 +43,6 @@ session. Already-served, unchanged scopes come back as a one-line marker
 instead of full content — the call is cheap, so touch every path you're about
 to work on rather than trying to guess whether it's already covered.
 
-When connected to grove over MCP, prefer the `context_touch` tool over
-shelling out to the CLI — same behavior, no subprocess.
-
 **Touch is idempotent and safe to over-call.** If a file's instructions change
 mid-session (edited on disk), the next touch of that path re-serves the
 updated content automatically — you don't need to detect the change yourself

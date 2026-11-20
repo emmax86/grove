@@ -19,11 +19,6 @@ export interface Paths {
   agentsMd: (name: string) => string;
   daemonConfig: (name: string) => string;
   contextStateDir: (name: string) => string;
-  mcpJson: (name: string) => string;
-  opencodeJson: (name: string) => string;
-  antigravityMcpPluginDir: (name: string) => string;
-  antigravityMcpPluginManifest: (name: string) => string;
-  antigravityMcpConfig: (name: string) => string;
 }
 
 export function createPaths(root: string): Paths {
@@ -46,13 +41,6 @@ export function createPaths(root: string): Paths {
     agentsMd: (name) => join(root, name, "AGENTS.md"),
     daemonConfig: (name) => join(root, name, ".claude", "server.json"),
     contextStateDir: (name) => join(root, name, ".grove", "state", "context"),
-    mcpJson: (name) => join(root, name, ".mcp.json"),
-    opencodeJson: (name) => join(root, name, "opencode.json"),
-    antigravityMcpPluginDir: (name) => join(root, name, ".agents", "plugins", "grove-mcp"),
-    antigravityMcpPluginManifest: (name) =>
-      join(root, name, ".agents", "plugins", "grove-mcp", "plugin.json"),
-    antigravityMcpConfig: (name) =>
-      join(root, name, ".agents", "plugins", "grove-mcp", "mcp_config.json"),
   };
 }
 
