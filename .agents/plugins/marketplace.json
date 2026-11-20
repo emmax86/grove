@@ -8,7 +8,7 @@
       "name": "grove",
       "source": {
         "source": "local",
-        "path": "./plugins/grove"
+        "path": "./plugins/codex"
       },
       "policy": {
         "installation": "AVAILABLE",

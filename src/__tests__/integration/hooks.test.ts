@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { access, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { isGitWorktreeCommand } from "../../hooks/git-worktree-policy";
+import { runRejectGitWorktreeHook } from "../../hooks/reject-git-worktree";
 import { cleanup, createTestDir } from "../helpers";
 
-const PLUGIN_ROOT = path.resolve(import.meta.dir, "../../../plugins/grove");
-const CODEX_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".codex-plugin/plugin.json");
-const CLAUDE_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".claude-plugin/plugin.json");
-const ANTIGRAVITY_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".antigravity-plugin/plugin.json");
-const CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks/hooks.json");
-const ANTIGRAVITY_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks.json");
-const HOOK_SCRIPT = path.join(PLUGIN_ROOT, "hooks/reject-git-worktree.ts");
-const SHARED_POLICY = path.join(PLUGIN_ROOT, "hooks/lib/git-worktree-policy.ts");
+const REPO_ROOT = path.resolve(import.meta.dir, "../../..");
+const CLI_ENTRY = path.join(REPO_ROOT, "src/cli.ts");
+const CANONICAL_SKILLS_DIR = path.join(REPO_ROOT, "skills");
+const PLUGINS_DIR = path.join(REPO_ROOT, "plugins");
+const CLAUDE_PLUGIN_DIR = path.join(PLUGINS_DIR, "claude");
+const CODEX_PLUGIN_DIR = path.join(PLUGINS_DIR, "codex");
+const ANTIGRAVITY_PLUGIN_DIR = path.join(PLUGINS_DIR, "antigravity");
+const LEGACY_SHARED_PLUGIN_DIR = path.join(PLUGINS_DIR, "grove");
 const DENY_REASON = "Direct git worktree commands are not allowed in grove workspaces.";
 
 type HookSpecificOutput = {
@@ -21,17 +23,7 @@ type HookSpecificOutput = {
   additionalContext: string;
 };
 
-let tempDir: string;
-let groveRoot: string;
-let groveCwd: string;
-let nonGroveCwd: string;
-
-async function invokeScript(
-  script: string,
-  input: unknown,
-  args: string[] = [],
-  envOverrides: Record<string, string> = {},
-): Promise<{
+type HookInvocationResult = {
   denied: boolean;
   exitCode: number;
   stdout: string;
@@ -39,25 +31,14 @@ async function invokeScript(
   hookSpecificOutput?: HookSpecificOutput;
   decision?: string;
   reason?: string;
-}> {
-  // Strip the host plugin-root vars from the inherited env so environment-based
-  // host detection is hermetic: a test only sees the vars it sets explicitly,
-  // regardless of whether the surrounding session was itself launched by a host
-  // that exported CLAUDE_PLUGIN_ROOT / PLUGIN_ROOT.
-  const baseEnv = { ...process.env };
-  baseEnv.CLAUDE_PLUGIN_ROOT = undefined;
-  baseEnv.PLUGIN_ROOT = undefined;
-  const proc = Bun.spawn(["bun", "run", script, ...args], {
-    env: { ...baseEnv, GROVE_ROOT: groveRoot, ...envOverrides },
-    stdin: new Blob([JSON.stringify(input)]),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
+};
+
+let tempDir: string;
+let groveRoot: string;
+let groveCwd: string;
+let nonGroveCwd: string;
+
+function parseResult(stdout: string, stderr: string, exitCode: number): HookInvocationResult {
   const trimmedStdout = stdout.trim();
   const output = trimmedStdout.length > 0 ? JSON.parse(trimmedStdout) : {};
   const codexDecision =
@@ -84,33 +65,46 @@ async function invokeScript(
   return { denied: decision === "deny", exitCode, stdout, stderr, ...output };
 }
 
+async function invokeHookCli(input: unknown, args: string[]): Promise<HookInvocationResult> {
+  const proc = Bun.spawn(["bun", "run", CLI_ENTRY, "hook", "reject-git-worktree", ...args], {
+    env: { ...process.env, GROVE_ROOT: groveRoot },
+    stdin: new Blob([JSON.stringify(input)]),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return parseResult(stdout, stderr, exitCode);
+}
+
+async function invokeHookDirect(host: string, input: unknown): Promise<HookInvocationResult> {
+  const prevRoot = process.env.GROVE_ROOT;
+  process.env.GROVE_ROOT = groveRoot;
+  try {
+    const result = await runRejectGitWorktreeHook(host, JSON.stringify(input));
+    return parseResult(result.stdout, result.stderr, result.exitCode);
+  } finally {
+    if (prevRoot === undefined) {
+      delete process.env.GROVE_ROOT;
+    } else {
+      process.env.GROVE_ROOT = prevRoot;
+    }
+  }
+}
+
 function invokeCodex(input: unknown) {
-  return invokeScript(HOOK_SCRIPT, input, ["codex"]);
+  return invokeHookDirect("codex", input);
 }
 
 function invokeClaude(input: unknown) {
-  return invokeScript(HOOK_SCRIPT, input, ["claude"]);
+  return invokeHookDirect("claude", input);
 }
 
 function invokeAntigravity(input: unknown) {
-  return invokeScript(HOOK_SCRIPT, input, ["antigravity"]);
-}
-
-function antigravityPreToolUseCmdInCwd(
-  command: string,
-  cwd: string,
-  toolName = "run_command",
-  hookEventName = "PreToolUse",
-) {
-  return {
-    cwd,
-    hookEventName,
-    toolCall: {
-      id: "toolu_01",
-      name: toolName,
-      args: { CommandLine: command },
-    },
-  };
+  return invokeHookDirect("antigravity", input);
 }
 
 function requireHookOutput(result: {
@@ -144,6 +138,23 @@ function preToolUseBashCmdInCwd(command: string, cwd: string) {
   return preToolUseCmdInCwd(command, cwd, "Bash");
 }
 
+function antigravityPreToolUseCmdInCwd(
+  command: string,
+  cwd: string,
+  toolName = "run_command",
+  hookEventName = "PreToolUse",
+) {
+  return {
+    cwd,
+    hookEventName,
+    toolCall: {
+      id: "toolu_01",
+      name: toolName,
+      args: { CommandLine: command },
+    },
+  };
+}
+
 function withCwd(input: unknown, cwd: string): unknown {
   return input !== null && typeof input === "object" ? { ...input, cwd } : input;
 }
@@ -157,285 +168,214 @@ async function exists(filePath: string): Promise<boolean> {
   }
 }
 
-const DENY_CASES: [string, unknown][] = [
-  ["git worktree list", cmd("git worktree list")],
-  ["git worktree add", cmd("git worktree add ../foo feature")],
-  ["git worktree remove", cmd("git worktree remove tmp-branch")],
-  ["git worktree (bare)", cmd("git worktree")],
-  ["git -C <path> worktree list", cmd("git -C /some/path worktree list")],
-  ["env var prefix: GIT_DIR=.git git worktree list", cmd("GIT_DIR=.git git worktree list")],
-  ["shell separator: echo ok; git worktree list", cmd("echo ok; git worktree list")],
-  ["shell &&: echo ok && git worktree list", cmd("echo ok && git worktree list")],
-  ['quoted subcommand: git "worktree" list', cmd('git "worktree" list')],
-  ["single-quoted subcommand: git 'worktree' list", cmd("git 'worktree' list")],
-  ['quoted env var with spaces: VAR="a b" git worktree list', cmd('VAR="a b" git worktree list')],
-  // VALUE_FLAGS consume next token even when it starts with "-"
+async function collectFiles(dir: string, prefix = ""): Promise<Map<string, string>> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = new Map<string, string>();
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      for (const [k, v] of await collectFiles(full, rel)) {
+        files.set(k, v);
+      }
+    } else {
+      files.set(rel, await readFile(full, "utf8"));
+    }
+  }
+  return files;
+}
+
+const DENY_COMMANDS: [string, string][] = [
+  ["git worktree list", "git worktree list"],
+  ["git worktree add", "git worktree add ../foo feature"],
+  ["git worktree remove", "git worktree remove tmp-branch"],
+  ["git worktree (bare)", "git worktree"],
+  ["git -C <path> worktree list", "git -C /some/path worktree list"],
+  ["env var prefix: GIT_DIR=.git git worktree list", "GIT_DIR=.git git worktree list"],
+  ["shell separator: echo ok; git worktree list", "echo ok; git worktree list"],
+  ["shell &&: echo ok && git worktree list", "echo ok && git worktree list"],
+  ['quoted subcommand: git "worktree" list', 'git "worktree" list'],
+  ["single-quoted subcommand: git 'worktree' list", "git 'worktree' list"],
+  ['quoted env var with spaces: VAR="a b" git worktree list', 'VAR="a b" git worktree list'],
   [
     "git -C -weird-dir worktree list (-C consumes -weird-dir, worktree is subcommand)",
-    cmd("git -C -weird-dir worktree list"),
+    "git -C -weird-dir worktree list",
   ],
-  [
-    "git --no-pager worktree list (--no-pager is a no-value flag)",
-    cmd("git --no-pager worktree list"),
-  ],
-  // -c consumes key=value pair, worktree is still the subcommand
+  ["git --no-pager worktree list (--no-pager is a no-value flag)", "git --no-pager worktree list"],
   [
     "git -c user.name=test worktree list (-c consumes key=val)",
-    cmd("git -c user.name=test worktree list"),
+    "git -c user.name=test worktree list",
   ],
-  // stacked VALUE_FLAGS — -C consumes path, -c consumes key=val, worktree is subcommand
   [
     "git -C /path -c user.name=test worktree list (multiple VALUE_FLAGS)",
-    cmd("git -C /path -c user.name=test worktree list"),
+    "git -C /path -c user.name=test worktree list",
   ],
-  // subshell and brace grouping — ( and { are segment boundaries
-  ["(git worktree list) — subshell grouping", cmd("(git worktree list)")],
-  ["{ git worktree list; } — brace grouping", cmd("{ git worktree list; }")],
-  // command substitution — ( is a boundary so the inner segment is detected
-  ["$(git worktree list) — command substitution", cmd("$(git worktree list)")],
-  // multiple env var assignments before git
+  ["(git worktree list) — subshell grouping", "(git worktree list)"],
+  ["{ git worktree list; } — brace grouping", "{ git worktree list; }"],
+  ["$(git worktree list) — command substitution", "$(git worktree list)"],
   [
     "GIT_DIR=.git GIT_WORK_TREE=. git worktree list (multiple env vars)",
-    cmd("GIT_DIR=.git GIT_WORK_TREE=. git worktree list"),
+    "GIT_DIR=.git GIT_WORK_TREE=. git worktree list",
   ],
-  // pipe creates a new segment containing git worktree
-  ["git log | git worktree list (pipe segment)", cmd("git log | git worktree list")],
-  // && creates a new segment
-  ["git fetch && git worktree list", cmd("git fetch && git worktree list")],
-  // newline-separated commands
-  ["newline-separated: git status\\ngit worktree list", cmd("git status\ngit worktree list")],
+  ["git log | git worktree list (pipe segment)", "git log | git worktree list"],
+  ["git fetch && git worktree list", "git fetch && git worktree list"],
+  ["newline-separated: git status\\ngit worktree list", "git status\ngit worktree list"],
 ];
 
-const ALLOW_CASES: [string, unknown][] = [
-  ["git status", cmd("git status")],
-  ["git --version", cmd("git --version")],
+const ALLOW_COMMANDS: [string, string][] = [
+  ["git status", "git status"],
+  ["git --version", "git --version"],
   [
     'git commit --allow-empty -m "fix worktree sync bug"',
-    cmd('git commit --allow-empty -m "fix worktree sync bug"'),
+    'git commit --allow-empty -m "fix worktree sync bug"',
   ],
-  ["echo git worktree (git is not the command)", cmd("echo git worktree")],
-  // KEY: -C consumes "worktree" as a directory arg; "list" is the subcommand
-  ["git -C worktree list (worktree is dir arg to -C)", cmd("git -C worktree list")],
+  ["echo git worktree (git is not the command)", "echo git worktree"],
+  ["git -C worktree list (worktree is dir arg to -C)", "git -C worktree list"],
   [
     "git checkout feature/worktree-cleanup (worktree in branch name)",
-    cmd("git checkout feature/worktree-cleanup"),
+    "git checkout feature/worktree-cleanup",
   ],
-  ["git status && echo worktree (worktree as echo arg)", cmd("git status && echo worktree")],
-  // operator inside quoted string must not create a false segment boundary
+  ["git status && echo worktree (worktree as echo arg)", "git status && echo worktree"],
   [
     'git commit -m "save;git worktree list" (semicolon inside double quotes)',
-    cmd('git commit -m "save;git worktree list"'),
+    'git commit -m "save;git worktree list"',
   ],
   [
     "git commit -m 'save;git worktree list' (semicolon inside single quotes)",
-    cmd("git commit -m 'save;git worktree list'"),
+    "git commit -m 'save;git worktree list'",
   ],
-  ['git commit -m "a|b" (pipe inside double quotes)', cmd('git commit -m "a|b"')],
-  // VALUE_FLAGS consume next token even when it starts with "-"
-  [
-    "git -C -weird-dir list (dir named -weird-dir, list is subcommand)",
-    cmd("git -C -weird-dir list"),
-  ],
-  ["empty command (fail open)", cmd("")],
-  ["missing tool_input (fail open)", {}],
-  // "worktree" appears only as a filename argument — not a git subcommand
-  ["cat git-worktree-docs.txt (worktree in filename)", cmd("cat git-worktree-docs.txt")],
-  ["grep worktree .git/config (worktree as grep pattern)", cmd("grep worktree .git/config")],
-  // worktree appears after a pipe but in a non-git command
+  ['git commit -m "a|b" (pipe inside double quotes)', 'git commit -m "a|b"'],
+  ["git -C -weird-dir list (dir named -weird-dir, list is subcommand)", "git -C -weird-dir list"],
+  ["empty command (fail open)", ""],
+  ["cat git-worktree-docs.txt (worktree in filename)", "cat git-worktree-docs.txt"],
+  ["grep worktree .git/config (worktree as grep pattern)", "grep worktree .git/config"],
   [
     "git log --all | grep worktree (worktree as grep arg, not git subcommand)",
-    cmd("git log --all | grep worktree"),
+    "git log --all | grep worktree",
   ],
-  // config key contains worktree but git subcommand is config, not worktree
   [
     "git config worktree.guessRemote true (worktree in config key)",
-    cmd("git config worktree.guessRemote true"),
+    "git config worktree.guessRemote true",
   ],
-  // -c value contains the word worktree — must not misidentify as subcommand
   [
     "git -c alias.wt=worktree status (-c value contains worktree, status is subcommand)",
-    cmd("git -c alias.wt=worktree status"),
+    "git -c alias.wt=worktree status",
   ],
-  // git dir flag with worktree in the path — not a subcommand
   [
     "git --git-dir=.git/worktree log (worktree in --git-dir value)",
-    cmd("git --git-dir=.git/worktree log"),
+    "git --git-dir=.git/worktree log",
   ],
-  // --exec-path consumes next token as value; subcommand is list, not worktree
   [
     "git --exec-path worktree list (worktree is exec-path value, list is subcommand)",
-    cmd("git --exec-path worktree list"),
+    "git --exec-path worktree list",
   ],
 ];
 
-describe("plugin hook layout", () => {
-  // Both Claude Code and Codex auto-discover hooks/hooks.json from the plugin
-  // root. An inline `hooks` field in either host manifest would therefore
-  // double-register the guard under Claude (manifest hook + auto-discovered
-  // hooks.json). So neither manifest declares hooks inline; the single bundled
-  // hooks/hooks.json is the only source, and the script detects the host at
-  // runtime from the plugin-root env var each runner sets.
-  it("declares no inline hooks field in either host manifest", async () => {
-    const codexManifest = JSON.parse(await readFile(CODEX_PLUGIN_MANIFEST, "utf8")) as {
-      hooks?: unknown;
-    };
-    const claudeManifest = JSON.parse(await readFile(CLAUDE_PLUGIN_MANIFEST, "utf8")) as {
-      hooks?: unknown;
-    };
-    expect(codexManifest.hooks).toBeUndefined();
-    expect(claudeManifest.hooks).toBeUndefined();
+const DENY_CASES: [string, unknown][] = DENY_COMMANDS.map(([label, command]) => [
+  label,
+  cmd(command),
+]);
+
+const ALLOW_CASES: [string, unknown][] = [
+  ...ALLOW_COMMANDS.map(([label, command]): [string, unknown] => [label, cmd(command)]),
+  ["missing tool_input (fail open)", {}],
+];
+
+describe("per-harness plugin layout", () => {
+  it("replaces the overloaded plugins/grove directory with separate per-harness plugins", async () => {
+    expect(await exists(LEGACY_SHARED_PLUGIN_DIR)).toBe(false);
+    expect(await exists(CLAUDE_PLUGIN_DIR)).toBe(true);
+    expect(await exists(CODEX_PLUGIN_DIR)).toBe(true);
+    expect(await exists(ANTIGRAVITY_PLUGIN_DIR)).toBe(true);
   });
 
-  it("resolves the script via CLAUDE_PLUGIN_ROOT or PLUGIN_ROOT with no host mode arg", async () => {
-    expect(await exists(CODEX_HOOKS_JSON)).toBe(true);
+  it("wires marketplace manifests to their dedicated harness plugin directories", async () => {
+    const claudeMarketplace = JSON.parse(
+      await readFile(path.join(REPO_ROOT, ".claude-plugin/marketplace.json"), "utf8"),
+    ) as { plugins: [{ source: string }] };
+    expect(claudeMarketplace.plugins[0].source).toBe("./plugins/claude");
 
-    const hookConfig = JSON.parse(await readFile(CODEX_HOOKS_JSON, "utf8")) as {
-      hooks: {
-        PreToolUse: [
-          {
-            hooks: [
-              {
-                command: string;
-              },
-            ];
-          },
-        ];
-      };
-    };
-    expect(hookConfig.hooks.PreToolUse).toHaveLength(1);
-    expect(hookConfig.hooks.PreToolUse[0].hooks).toHaveLength(1);
-    const command = hookConfig.hooks.PreToolUse[0].hooks[0].command;
-    // Single command for both hosts: Claude sets CLAUDE_PLUGIN_ROOT, Codex sets
-    // PLUGIN_ROOT; the unset one falls back to the other. No static host arg —
-    // the script detects the host from the environment at runtime.
-    // Built via concatenation so the literal ${...} does not read as an unfilled
-    // template placeholder to the linter.
-    const dollar = "$";
-    const expectedCommand =
-      `bun run "${dollar}{CLAUDE_PLUGIN_ROOT:-${dollar}{PLUGIN_ROOT}}` +
-      `/hooks/reject-git-worktree.ts"`;
-    expect(command).toBe(expectedCommand);
-    expect(command).not.toContain(" codex");
-    expect(command).not.toContain(" claude");
-    expect(JSON.stringify(hookConfig)).not.toContain("CODEX_PLUGIN_ROOT");
+    const codexMarketplace = JSON.parse(
+      await readFile(path.join(REPO_ROOT, ".agents/plugins/marketplace.json"), "utf8"),
+    ) as { plugins: [{ source: { path: string } }] };
+    expect(codexMarketplace.plugins[0].source.path).toBe("./plugins/codex");
   });
 
-  it("packages a native Antigravity plugin manifest and plugin-root hooks.json", async () => {
-    expect(await exists(ANTIGRAVITY_PLUGIN_MANIFEST)).toBe(true);
-    expect(await exists(ANTIGRAVITY_HOOKS_JSON)).toBe(true);
-
-    const manifest = JSON.parse(await readFile(ANTIGRAVITY_PLUGIN_MANIFEST, "utf8")) as {
-      name: string;
-      hooks?: unknown;
-    };
+  it("packages plugins/claude with .claude-plugin manifest and grove hook CLI command", async () => {
+    const manifest = JSON.parse(
+      await readFile(path.join(CLAUDE_PLUGIN_DIR, ".claude-plugin/plugin.json"), "utf8"),
+    ) as { name: string; hooks?: unknown };
     expect(manifest.name).toBe("grove");
     expect(manifest.hooks).toBeUndefined();
 
-    // Antigravity native plugins load hooks.json from the plugin root using
-    // named top-level hook entries (never the legacy Codex `hooks` wrapper).
-    const hookConfig = JSON.parse(await readFile(ANTIGRAVITY_HOOKS_JSON, "utf8")) as {
+    const hookConfig = JSON.parse(
+      await readFile(path.join(CLAUDE_PLUGIN_DIR, "hooks/hooks.json"), "utf8"),
+    ) as { hooks: { PreToolUse: [{ matcher: string; hooks: [{ command: string }] }] } };
+    expect(hookConfig.hooks.PreToolUse).toHaveLength(1);
+    expect(hookConfig.hooks.PreToolUse[0].matcher).toBe("Bash");
+    expect(hookConfig.hooks.PreToolUse[0].hooks[0].command).toBe(
+      "grove hook reject-git-worktree --host claude",
+    );
+  });
+
+  it("packages plugins/codex with .codex-plugin manifest (no hooks field) and grove hook CLI command", async () => {
+    const manifest = JSON.parse(
+      await readFile(path.join(CODEX_PLUGIN_DIR, ".codex-plugin/plugin.json"), "utf8"),
+    ) as { name: string; hooks?: unknown };
+    expect(manifest.name).toBe("grove");
+    expect(manifest.hooks).toBeUndefined();
+    expect(await exists(path.join(CODEX_PLUGIN_DIR, "hooks.json"))).toBe(false);
+
+    const hookConfig = JSON.parse(
+      await readFile(path.join(CODEX_PLUGIN_DIR, "hooks/hooks.json"), "utf8"),
+    ) as { hooks: { PreToolUse: [{ matcher: string; hooks: [{ command: string }] }] } };
+    expect(hookConfig.hooks.PreToolUse).toHaveLength(1);
+    expect(hookConfig.hooks.PreToolUse[0].matcher).toBe("Bash");
+    expect(hookConfig.hooks.PreToolUse[0].hooks[0].command).toBe(
+      "grove hook reject-git-worktree --host codex",
+    );
+  });
+
+  it("packages plugins/antigravity with root plugin.json and root hooks.json", async () => {
+    const manifest = JSON.parse(
+      await readFile(path.join(ANTIGRAVITY_PLUGIN_DIR, "plugin.json"), "utf8"),
+    ) as { name: string; hooks?: unknown };
+    expect(manifest.name).toBe("grove");
+    expect(manifest.hooks).toBeUndefined();
+
+    const hookConfig = JSON.parse(
+      await readFile(path.join(ANTIGRAVITY_PLUGIN_DIR, "hooks.json"), "utf8"),
+    ) as {
       hooks?: unknown;
       "reject-git-worktree": {
-        PreToolUse: [
-          {
-            matcher: string;
-            hooks: [{ type: string; command: string; timeout?: number }];
-          },
-        ];
+        PreToolUse: [{ matcher: string; hooks: [{ type: string; command: string }] }];
       };
     };
     expect(hookConfig.hooks).toBeUndefined();
     expect(hookConfig["reject-git-worktree"].PreToolUse).toHaveLength(1);
     expect(hookConfig["reject-git-worktree"].PreToolUse[0].matcher).toBe("run_command");
-    expect(hookConfig["reject-git-worktree"].PreToolUse[0].hooks).toHaveLength(1);
     expect(hookConfig["reject-git-worktree"].PreToolUse[0].hooks[0].command).toBe(
-      "bun run ./hooks/reject-git-worktree.ts antigravity",
+      "grove hook reject-git-worktree --host antigravity",
     );
   });
-});
 
-describe("reject-git-worktree host detection from environment", () => {
-  beforeEach(setupAdapterDirs);
-  afterEach(() => cleanup(tempDir));
+  it("keeps skills/ synced identically across all harness plugin directories (run `bun run sync:plugins` on drift)", async () => {
+    const canonical = await collectFiles(CANONICAL_SKILLS_DIR);
+    expect(canonical.size).toBeGreaterThan(0);
 
-  it("uses the Claude protocol when only CLAUDE_PLUGIN_ROOT is set and no mode arg is given", async () => {
-    const result = await invokeScript(
-      HOOK_SCRIPT,
-      preToolUseBashCmdInCwd("git worktree list", groveCwd),
-      [],
-      { CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT },
-    );
-
-    expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(2);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain(DENY_REASON);
-  });
-
-  it("uses the Codex protocol when only PLUGIN_ROOT is set and no mode arg is given", async () => {
-    const result = await invokeScript(
-      HOOK_SCRIPT,
-      preToolUseBashCmdInCwd("git worktree list", groveCwd),
-      [],
-      { PLUGIN_ROOT },
-    );
-
-    expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(0);
-    expect(requireHookOutput(result).permissionDecision).toBe("deny");
-    expect(result.stderr).toBe("");
-  });
-
-  it("prefers the Claude protocol when both plugin-root vars are set", async () => {
-    const result = await invokeScript(
-      HOOK_SCRIPT,
-      preToolUseBashCmdInCwd("git worktree list", groveCwd),
-      [],
-      { CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT, PLUGIN_ROOT },
-    );
-
-    expect(result.exitCode).toBe(2);
-    expect(result.stdout).toBe("");
-  });
-
-  it("lets an explicit mode arg override environment detection", async () => {
-    const result = await invokeScript(
-      HOOK_SCRIPT,
-      preToolUseBashCmdInCwd("git worktree list", groveCwd),
-      ["codex"],
-      { CLAUDE_PLUGIN_ROOT: PLUGIN_ROOT },
-    );
-
-    expect(result.exitCode).toBe(0);
-    expect(requireHookOutput(result).permissionDecision).toBe("deny");
-  });
-
-  it("falls back to the Claude protocol when no mode arg and neither plugin-root var is set", async () => {
-    // A real hook invocation always has one plugin-root var set, so this is the
-    // anomalous/manual path. It must still deny — via the strongest signal.
-    const result = await invokeScript(
-      HOOK_SCRIPT,
-      preToolUseBashCmdInCwd("git worktree list", groveCwd),
-      [],
-    );
-
-    expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(2);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain(DENY_REASON);
+    for (const pluginDir of [CLAUDE_PLUGIN_DIR, CODEX_PLUGIN_DIR, ANTIGRAVITY_PLUGIN_DIR]) {
+      const synced = await collectFiles(path.join(pluginDir, "skills"));
+      expect(synced).toEqual(canonical);
+    }
   });
 });
 
 describe("shared git worktree policy", () => {
-  it("detects git worktree shell segments without hook payload parsing", async () => {
-    const policy = (await import(SHARED_POLICY)) as {
-      isGitWorktreeCommand(command: string): boolean;
-    };
-
-    expect(policy.isGitWorktreeCommand("git worktree list")).toBe(true);
-    expect(policy.isGitWorktreeCommand("echo ok && git worktree list")).toBe(true);
-    expect(policy.isGitWorktreeCommand("git status")).toBe(false);
-    expect(policy.isGitWorktreeCommand("git -C worktree list")).toBe(false);
+  it("detects git worktree shell segments without hook payload parsing", () => {
+    expect(isGitWorktreeCommand("git worktree list")).toBe(true);
+    expect(isGitWorktreeCommand("echo ok && git worktree list")).toBe(true);
+    expect(isGitWorktreeCommand("git status")).toBe(false);
+    expect(isGitWorktreeCommand("git -C worktree list")).toBe(false);
   });
 });
 
@@ -449,12 +389,6 @@ async function setupAdapterDirs() {
   await mkdir(nonGroveCwd, { recursive: true });
 }
 
-// The deny/allow matrix, cwd resolution, and payload parsing all live in the
-// shared git-worktree-policy and hook-payload modules, so every adapter must
-// behave identically here. Run the full shared-policy suite through each
-// adapter so a future adapter that stops routing through the shared modules is
-// caught. Adapter-specific behavior (exit code, output channel) is asserted in
-// the per-adapter describe blocks below.
 function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
   describe(`shared git worktree policy via the ${label} adapter`, () => {
     beforeEach(setupAdapterDirs);
@@ -472,7 +406,6 @@ function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
 
     it("allows direct git worktree outside a grove workspace", async () => {
       const result = await invoke(cmdInCwd("git worktree list", nonGroveCwd));
-
       expect(result.denied).toBe(false);
     });
 
@@ -482,7 +415,6 @@ function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
       await writeFile(path.join(foreignCwd, "workspace.json"), JSON.stringify({ name: "foreign" }));
 
       const result = await invoke(cmdInCwd("git worktree list", foreignCwd));
-
       expect(result.denied).toBe(false);
     });
 
@@ -491,7 +423,6 @@ function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
       await mkdir(nestedCwd, { recursive: true });
 
       const result = await invoke(cmdInCwd("git worktree list", nestedCwd));
-
       expect(result.denied).toBe(true);
     });
 
@@ -504,21 +435,17 @@ function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
       groveRoot = linkedRoot;
 
       const result = await invoke(cmdInCwd("git worktree list", canonicalCwd));
-
       expect(result.denied).toBe(true);
     });
 
     it("allows direct git worktree when cwd is missing", async () => {
       const result = await invoke(cmd("git worktree list"));
-
       expect(result.denied).toBe(false);
     });
 
     it("allows direct git worktree when GROVE_ROOT does not exist", async () => {
       groveRoot = path.join(tempDir, "missing-grove-root");
-
       const result = await invoke(cmdInCwd("git worktree list", nonGroveCwd));
-
       expect(result.denied).toBe(false);
     });
 
@@ -526,7 +453,6 @@ function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
       const result = await invoke(
         cmdInCwd("git worktree list", path.join(groveRoot, "nonexistent-dir")),
       );
-
       expect(result.denied).toBe(false);
     });
 
@@ -534,21 +460,13 @@ function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
       const result = await invoke({
         tool_input: { command: "git worktree list", cwd: groveCwd },
       });
-
       expect(result.denied).toBe(false);
-    });
-
-    it("withCwd overrides an existing top-level cwd", async () => {
-      const result = await invoke(withCwd(cmdInCwd("git worktree list", nonGroveCwd), groveCwd));
-
-      expect(result.denied).toBe(true);
     });
 
     it("allows PreToolUse payloads for non-Bash tools", async () => {
       const result = await invoke(
         preToolUseCmdInCwd("git worktree list", groveCwd, "mcp__fs__read"),
       );
-
       expect(result.denied).toBe(false);
     });
   });
@@ -557,60 +475,25 @@ function describeSharedPolicy(label: string, invoke: typeof invokeCodex) {
 describeSharedPolicy("Codex", invokeCodex);
 describeSharedPolicy("Claude", invokeClaude);
 
-describe("Codex reject-git-worktree hook adapter", () => {
-  beforeEach(setupAdapterDirs);
-  afterEach(() => cleanup(tempDir));
-
-  it("denies with exit 0 and a permissionDecision deny payload on stdout", async () => {
-    const result = await invokeCodex(preToolUseBashCmdInCwd("git worktree list", groveCwd));
-
-    expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(0);
-    expect(requireHookOutput(result).permissionDecision).toBe("deny");
-    expect(result.stderr).toBe("");
-  });
-
-  it("deny output has correct JSON structure", async () => {
-    const result = await invokeCodex(cmdInCwd("git worktree list", groveCwd));
-    const output = requireHookOutput(result);
-
-    expect(output.permissionDecision).toBe("deny");
-    expect(output.additionalContext).toContain("/worktree");
-    expect(output.additionalContext).toContain("\u2014 create a worktree");
-    expect(output.additionalContext).toContain("create-grove-worktree");
-  });
-});
-
-describe("Claude reject-git-worktree hook adapter", () => {
-  beforeEach(setupAdapterDirs);
-  afterEach(() => cleanup(tempDir));
-
-  // The full deny/allow matrix, cwd edge cases, and payload parsing are exercised
-  // via describeSharedPolicy("Claude", invokeClaude) above. This block asserts
-  // only Claude-specific protocol behavior: exit codes and output channels.
-  it("denies with exit 2 and the reason on stderr, leaving stdout empty", async () => {
-    const result = await invokeClaude(preToolUseBashCmdInCwd("git worktree list", groveCwd));
-
-    expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(2);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain(DENY_REASON);
-    expect(result.stderr).toContain("/worktree add");
-  });
-
-  it("allows with exit 0 and empty output", async () => {
-    const result = await invokeClaude(preToolUseBashCmdInCwd("git status", groveCwd));
-
-    expect(result.denied).toBe(false);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout.trim()).toBe("");
-    expect(result.stderr).toBe("");
-  });
-});
-
 describe("Antigravity reject-git-worktree hook adapter", () => {
   beforeEach(setupAdapterDirs);
   afterEach(() => cleanup(tempDir));
+
+  it.each(DENY_COMMANDS)("denies: %s", async (_, command) => {
+    const result = await invokeAntigravity(antigravityPreToolUseCmdInCwd(command, groveCwd));
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(result.decision).toBe("deny");
+    expect(result.stderr).toBe("");
+  });
+
+  it.each(ALLOW_COMMANDS)("allows: %s", async (_, command) => {
+    const result = await invokeAntigravity(antigravityPreToolUseCmdInCwd(command, groveCwd));
+    expect(result.denied).toBe(false);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+  });
 
   it("denies with exit 0 and { decision: 'deny', reason } on stdout, leaving stderr empty", async () => {
     const result = await invokeAntigravity(
@@ -626,15 +509,6 @@ describe("Antigravity reject-git-worktree hook adapter", () => {
     expect(result.stderr).toBe("");
   });
 
-  it("allows with exit 0 and empty stdout/stderr (never {}, which fails closed)", async () => {
-    const result = await invokeAntigravity(antigravityPreToolUseCmdInCwd("git status", groveCwd));
-
-    expect(result.denied).toBe(false);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toBe("");
-  });
-
   it("allows git worktree outside GROVE_ROOT", async () => {
     const result = await invokeAntigravity(
       antigravityPreToolUseCmdInCwd("git worktree list", nonGroveCwd),
@@ -642,15 +516,6 @@ describe("Antigravity reject-git-worktree hook adapter", () => {
 
     expect(result.denied).toBe(false);
     expect(result.stdout).toBe("");
-  });
-
-  it("denies chained shell segments containing git worktree", async () => {
-    const result = await invokeAntigravity(
-      antigravityPreToolUseCmdInCwd("git fetch && git -C /repo worktree add ../foo bar", groveCwd),
-    );
-
-    expect(result.denied).toBe(true);
-    expect(result.decision).toBe("deny");
   });
 
   it("fails open for non-run_command tools, non-PreToolUse events, and missing fields", async () => {
@@ -679,43 +544,81 @@ describe("Antigravity reject-git-worktree hook adapter", () => {
     expect(wrongShape.denied).toBe(false);
     expect(wrongShape.stdout).toBe("");
   });
-
-  it("overrides PLUGIN_ROOT env var detection when explicit antigravity mode is passed", async () => {
-    const result = await invokeScript(
-      HOOK_SCRIPT,
-      antigravityPreToolUseCmdInCwd("git worktree list", groveCwd),
-      ["antigravity"],
-      { PLUGIN_ROOT },
-    );
-
-    expect(result.denied).toBe(true);
-    expect(result.exitCode).toBe(0);
-    expect(result.decision).toBe("deny");
-    expect(result.hookSpecificOutput).toBeUndefined();
-  });
 });
 
-describe("unknown reject-git-worktree hook mode", () => {
+describe("grove hook reject-git-worktree CLI subprocess", () => {
   beforeEach(setupAdapterDirs);
   afterEach(() => cleanup(tempDir));
 
-  it("fails open and warns on an unrecognized mode argument", async () => {
-    const result = await invokeScript(HOOK_SCRIPT, cmdInCwd("git worktree list", groveCwd), [
-      "bogus",
+  it("runs codex protocol over CLI (--host codex)", async () => {
+    const result = await invokeHookCli(preToolUseBashCmdInCwd("git worktree list", groveCwd), [
+      "--host",
+      "codex",
     ]);
 
-    expect(result.denied).toBe(false);
+    expect(result.denied).toBe(true);
     expect(result.exitCode).toBe(0);
-    expect(result.stderr).toContain("unknown hook mode");
+    expect(requireHookOutput(result).permissionDecision).toBe("deny");
+    expect(requireHookOutput(result).additionalContext).toContain("/worktree");
+    expect(result.stderr).toBe("");
   });
 
-  it("treats the removed legacy mode as an unrecognized argument", async () => {
-    const result = await invokeScript(HOOK_SCRIPT, cmdInCwd("git worktree list", groveCwd), [
-      "legacy",
+  it("runs claude protocol over CLI (--host claude)", async () => {
+    const deny = await invokeHookCli(preToolUseBashCmdInCwd("git worktree list", groveCwd), [
+      "--host",
+      "claude",
     ]);
 
-    expect(result.denied).toBe(false);
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr).toContain("unknown hook mode");
+    expect(deny.denied).toBe(true);
+    expect(deny.exitCode).toBe(2);
+    expect(deny.stdout).toBe("");
+    expect(deny.stderr).toContain(DENY_REASON);
+    expect(deny.stderr).toContain("/worktree add");
+
+    const allow = await invokeHookCli(preToolUseBashCmdInCwd("git status", groveCwd), [
+      "--host",
+      "claude",
+    ]);
+    expect(allow.denied).toBe(false);
+    expect(allow.exitCode).toBe(0);
+    expect(allow.stdout).toBe("");
+    expect(allow.stderr).toBe("");
+  });
+
+  it("runs antigravity protocol over CLI (--host antigravity)", async () => {
+    const deny = await invokeHookCli(antigravityPreToolUseCmdInCwd("git worktree list", groveCwd), [
+      "--host",
+      "antigravity",
+    ]);
+
+    expect(deny.denied).toBe(true);
+    expect(deny.exitCode).toBe(0);
+    expect(deny.decision).toBe("deny");
+    expect(deny.reason).toContain(DENY_REASON);
+    expect(deny.stderr).toBe("");
+
+    const allow = await invokeHookCli(antigravityPreToolUseCmdInCwd("git status", groveCwd), [
+      "--host",
+      "antigravity",
+    ]);
+    expect(allow.denied).toBe(false);
+    expect(allow.exitCode).toBe(0);
+    expect(allow.stdout).toBe("");
+    expect(allow.stderr).toBe("");
+  });
+
+  it("fails open and warns on an unrecognized or missing host", async () => {
+    const unknown = await invokeHookCli(cmdInCwd("git worktree list", groveCwd), [
+      "--host",
+      "bogus",
+    ]);
+    expect(unknown.denied).toBe(false);
+    expect(unknown.exitCode).toBe(0);
+    expect(unknown.stderr).toContain("unknown hook host");
+
+    const missing = await invokeHookCli(cmdInCwd("git worktree list", groveCwd), []);
+    expect(missing.denied).toBe(false);
+    expect(missing.exitCode).toBe(0);
+    expect(missing.stderr).toContain("unknown hook host");
   });
 });

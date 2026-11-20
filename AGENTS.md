@@ -68,23 +68,23 @@ adapters around the CLI rather than alternative implementations.
 
 ### Plugin packaging
 
-- Claude Code support uses `plugins/grove/.claude-plugin/plugin.json`,
-  `plugins/grove/commands/*.md`, and `${CLAUDE_PLUGIN_ROOT}` in Claude hook
-  commands.
-- Codex support uses `plugins/grove/.codex-plugin/plugin.json`,
-  `plugins/grove/skills/`, and the default plugin-bundled hook file at
-  `plugins/grove/hooks/hooks.json`.
-- Do not add a `hooks` field to the Codex manifest. Codex discovers
-  `hooks/hooks.json` by default, and the local plugin validator rejects
-  unsupported manifest fields.
-- Codex hook commands should resolve from `${PLUGIN_ROOT}`. After installing or
-  reinstalling the plugin, use `/hooks` in a new Codex thread to review and
-  trust non-managed command hooks before relying on them.
-- Antigravity support uses `plugins/grove/.antigravity-plugin/plugin.json`,
-  `plugins/grove/skills/`, and the plugin-root hook file at
-  `plugins/grove/hooks.json` (which runs `reject-git-worktree.ts antigravity`
-  against Antigravity's `run_command` `PreToolUse` payload). Native Antigravity
-  plugins load `hooks.json` from the plugin root rather than `hooks/hooks.json`.
+- Shared canonical skills live in `skills/` and are synced into each
+  self-contained harness plugin directory via `bun run sync:plugins` (enforced
+  by tests in `src/__tests__/integration/hooks.test.ts`).
+- Shared hook logic lives in `src/hooks/` and is invoked through the compiled
+  CLI (`grove hook reject-git-worktree --host <claude|codex|antigravity>`), so
+  plugins do not ship TypeScript files or depend on `${PLUGIN_ROOT}` env vars.
+- Each harness has its own plugin directory under `plugins/`:
+  - `plugins/claude/` — `.claude-plugin/plugin.json`, `commands/*.md`,
+    `hooks/hooks.json`, and synced `skills/` (referenced by
+    `.claude-plugin/marketplace.json`).
+  - `plugins/codex/` — `.codex-plugin/plugin.json` (no `hooks` field; Codex
+    auto-discovers `hooks/hooks.json` and rejects unsupported manifest fields),
+    `hooks/hooks.json`, and synced `skills/` (referenced by
+    `.agents/plugins/marketplace.json`). After installing or reinstalling, run
+    `/hooks` in a new Codex thread to review and trust command hooks.
+  - `plugins/antigravity/` — root `plugin.json`, plugin-root `hooks.json`
+    (`run_command` matcher), and synced `skills/`.
 
 ### Output rendering
 

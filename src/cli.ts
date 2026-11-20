@@ -13,6 +13,7 @@ import { addWorkspace, listWorkspaces, removeWorkspace, syncWorkspace } from "./
 import { addWorktree, listWorktrees, pruneWorktrees, removeWorktree } from "./commands/worktree";
 import { createPaths, DEFAULT_WORKSPACES_ROOT, type Paths } from "./constants";
 import { inferContext } from "./context";
+import { runRejectGitWorktreeHook } from "./hooks/reject-git-worktree";
 import { type ParsedArgs, parseArgs } from "./lib/args";
 import { readWorkspaceConfig } from "./lib/config";
 import { discoverDaemon, startDaemon } from "./lib/daemon";
@@ -176,6 +177,31 @@ async function main() {
   // ── --version / -V ───────────────────────────────────────────────
   if (argv.includes("--version") || argv.includes("-V")) {
     emit(ok({ version: packageJson.version }), "version", renderCtx);
+  }
+
+  // ── hook subcommand (agent lifecycle hooks) ──────────────────────
+  if (cmd === "hook" && argv[1] === "reject-git-worktree") {
+    const parsed = parseArgs(argv.slice(2));
+    const host = flagValue(parsed, "host") ?? parsed.positional[0];
+    const result = await runRejectGitWorktreeHook(host, await Bun.stdin.text());
+    if (result.stdout) {
+      process.stdout.write(result.stdout);
+    }
+    if (result.stderr) {
+      process.stderr.write(result.stderr);
+    }
+    process.exit(result.exitCode);
+  }
+  if (cmd === "hook") {
+    const hookName = argv[1];
+    if (!hookName) {
+      emitMissingArg("subcommand", ["hook"], renderCtx);
+    }
+    emit(
+      err(`unknown subcommand '${hookName}'`, "UNKNOWN_SUBCOMMAND"),
+      "workspace-list",
+      renderCtx,
+    );
   }
 
   // ── mcp connect subcommand (stdio bridge) ────────────────────────

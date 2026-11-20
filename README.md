@@ -130,6 +130,12 @@ Options: `--repo <name>` (required when no file is given, otherwise inferred fro
 | `serve [--workspace W] [--port P]` | Run the MCP daemon for a workspace (alias: `grove mcp-server`)   |
 | `connect [--workspace W]`      | stdio bridge to the workspace daemon (auto-starts it); for `.mcp.json` |
 
+### Hooks — `grove hook <command>`
+
+| Command                                                        | Description                                                          |
+| -------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `reject-git-worktree --host <claude\|codex\|antigravity>`      | `PreToolUse` hook handler that blocks raw `git worktree` commands    |
+
 ### Other
 
 | Command                                 | Description                                  |
@@ -152,32 +158,19 @@ Output captured to a file or piped to another command is byte-identical to termi
 
 ## Integrations
 
-- **Claude Code plugin** — `.claude-plugin/marketplace.json` is the Claude marketplace file, and `plugins/grove/commands/` contains the `/workspace`, `/workspace-status`, `/worktree`, `/repo`, `/exec` slash command implementations
-- **Codex plugin** — `.agents/plugins/marketplace.json` exposes `plugins/grove/` as a Codex plugin; `plugins/grove/.codex-plugin/plugin.json` is the manifest, `plugins/grove/skills/` contains Codex skills, and `plugins/grove/hooks/hooks.json` is the default bundled hook config
-- **Antigravity plugin** — `plugins/grove/.antigravity-plugin/plugin.json` exposes `plugins/grove/` as a native Antigravity plugin with `plugins/grove/skills/` and the plugin-root `PreToolUse` hook at `plugins/grove/hooks.json` (`run_command` matcher)
-- **MCP server** — `grove mcp-server` exposes workspace operations over MCP for AI tool integration
+Each harness has its own self-contained plugin directory under `plugins/`, sharing canonical skills from `skills/` (synced with `bun run sync:plugins`) and hook enforcement via `grove hook reject-git-worktree --host <claude|codex|antigravity>`:
+
+- **Claude Code plugin** (`plugins/claude/`) — exposed via `.claude-plugin/marketplace.json` with `commands/*.md`, `skills/`, and `hooks/hooks.json`
+- **Codex plugin** (`plugins/codex/`) — exposed via `.agents/plugins/marketplace.json` with `.codex-plugin/plugin.json`, `skills/`, and `hooks/hooks.json`
+- **Antigravity plugin** (`plugins/antigravity/`) — native Antigravity plugin with root `plugin.json`, `skills/`, and plugin-root `hooks.json` (`run_command` matcher)
+- **MCP server** — `grove mcp-server` / `grove mcp connect` exposes workspace operations over MCP for AI tool integration
 - **Auto-generated files** — adding/removing repos creates `AGENTS.md`, `.mcp.json`, and `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}` once (if absent), then regenerates `{workspace}.code-workspace` to keep editor and agent configs in sync
 
 ### Codex
 
-The Codex integration is intentionally CLI-first. The plugin in `plugins/grove/`
-packages Grove's existing skills and a bundled lifecycle hook so Codex uses:
-
-- `grove ws status` to discover workspace context
-- `grove ws worktree ...` to create and manage worktrees
-- the `PreToolUse` hook declared at `plugins/grove/hooks/hooks.json` to steer the agent away from raw `git worktree`
-
-This keeps the `grove` CLI as the source of truth. MCP support remains available,
-but Codex does not depend on it for the primary workflow.
-
-Codex discovers plugin-bundled hooks at `hooks/hooks.json` by default, so
-`plugins/grove/.codex-plugin/plugin.json` intentionally does not include a
-`hooks` field. The hook command resolves through
-`${PLUGIN_ROOT}/hooks/reject-git-worktree.ts codex`; Claude Code support
-remains separate in `plugins/grove/.claude-plugin/plugin.json` and resolves
-through `${CLAUDE_PLUGIN_ROOT}/hooks/reject-git-worktree.ts claude`. The shared
-entrypoint dispatches to runner-specific payload handlers and all handlers use
-the same git worktree policy.
+The Codex integration is intentionally CLI-first. `plugins/codex/` packages
+Grove's skills and `hooks/hooks.json` (`grove hook reject-git-worktree --host codex`)
+without a `hooks` field in `.codex-plugin/plugin.json`.
 
 To use the local plugin in Codex from this Grove workspace, add the repository
 root as a local marketplace source and install the `grove` entry:
@@ -188,12 +181,17 @@ codex plugin marketplace add <path-to-grove-repo-main-tree>
 codex plugin add grove@grove
 ```
 
-Codex resolves `.agents/plugins/marketplace.json` from that marketplace root and
-then resolves the plugin `source.path` relative to the root. After installing or
-reinstalling, start a new Codex thread in your Grove workspace and run `/hooks`
-to review and trust the Grove `PreToolUse` hook from
-`plugins/grove/hooks/hooks.json`. Codex skips non-managed command hooks until
-they are trusted and requires review again when a hook definition changes.
+After installing or reinstalling, start a new Codex thread in your Grove
+workspace and run `/hooks` to review and trust the Grove `PreToolUse` hook from
+`plugins/codex/hooks/hooks.json`.
+
+### Antigravity
+
+Install the native plugin from `plugins/antigravity/` (e.g. `agy plugin install
+<path-to-grove-repo>/plugins/antigravity`) for Grove skills and the
+`run_command` `PreToolUse` hook. Workspace MCP registration is handled
+automatically per workspace via `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}`
+(created by `grove ws add` and backfilled by `grove ws sync`).
 
 ## Development
 

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ./hooks/reject-git-worktree.ts antigravity",
+            "command": "grove hook reject-git-worktree --host antigravity",
             "timeout": 5
           }
         ]

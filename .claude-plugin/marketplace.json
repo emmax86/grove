@@ -14,7 +14,7 @@
         "name": "emmax86",
         "url": "https://github.com/emmax86/grove"
       },
-      "source": "./plugins/grove",
+      "source": "./plugins/claude",
       "category": "productivity",
       "homepage": "https://github.com/emmax86/grove"
     }

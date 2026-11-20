@@ -66,9 +66,11 @@ Output invariants enforced by tests in `src/__tests__/lib/render/invariants.test
 
 ### Plugin
 
-`plugins/grove/` contains both Claude Code and Codex plugin assets. Claude Code support uses `plugins/grove/.claude-plugin/plugin.json` plus `plugins/grove/commands/*.md` slash-command definitions, and remains installable with `claude plugin marketplace add emmax86/grove --sparse .claude-plugin plugins`.
+Each agent harness has its own self-contained plugin directory under `plugins/` (`plugins/claude/`, `plugins/codex/`, `plugins/antigravity/`). Canonical skills live in `skills/` and are synced into each plugin with `bun run sync:plugins`. Hook execution lives in `src/hooks/` and runs via `grove hook reject-git-worktree --host <claude|codex|antigravity>`.
 
-Codex support uses `plugins/grove/.codex-plugin/plugin.json`, `plugins/grove/skills/`, and the default plugin-bundled hook file at `plugins/grove/hooks/hooks.json`. Do not add a `hooks` field to the Codex manifest; the local validator rejects it, and Codex discovers the default hook path automatically. Codex hook commands should resolve from `${PLUGIN_ROOT}`. Claude Code hook commands should keep using `${CLAUDE_PLUGIN_ROOT}`.
+- **Claude Code** (`plugins/claude/`) uses `.claude-plugin/plugin.json`, `commands/*.md`, and `hooks/hooks.json`, installable via `.claude-plugin/marketplace.json`.
+- **Codex** (`plugins/codex/`) uses `.codex-plugin/plugin.json` (no `hooks` field — Codex discovers `hooks/hooks.json` automatically and rejects unsupported manifest fields), installable via `.agents/plugins/marketplace.json`.
+- **Antigravity** (`plugins/antigravity/`) uses root `plugin.json` and plugin-root `hooks.json` (`run_command` matcher).
 
 ## Tests
 
