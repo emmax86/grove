@@ -107,6 +107,13 @@ describe("help: subcommand", () => {
     expect(r.stdout).toContain("connect");
   });
 
+  it("grove hook --help -> hook group help with reject-git-worktree", async () => {
+    const r = await runCli(["hook", "--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("grove hook");
+    expect(r.stdout).toContain("reject-git-worktree");
+  });
+
   it("position invariance: --help anywhere yields the same path", async () => {
     const a = await runCli(["ws", "repo", "add", "--help"]);
     const b = await runCli(["--help", "ws", "repo", "add"]);

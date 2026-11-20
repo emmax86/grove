@@ -130,6 +130,12 @@ Options: `--repo <name>` (required when no file is given, otherwise inferred fro
 | `serve [--workspace W] [--port P]` | Run the MCP daemon for a workspace (alias: `grove mcp-server`)   |
 | `connect [--workspace W]`      | stdio bridge to the workspace daemon (auto-starts it); for `.mcp.json` |
 
+### Hooks — `grove hook <command>`
+
+| Command                                      | Description                                                          |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| `reject-git-worktree --host <claude\|codex>` | `PreToolUse` hook handler that blocks raw `git worktree` commands    |
+
 ### Other
 
 | Command                                 | Description                                  |
