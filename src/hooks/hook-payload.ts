@@ -1,3 +1,5 @@
+import { isAbsolute, resolve } from "node:path";
+
 export type HookCommandPayload = {
   command: string;
   cwd: string;
@@ -95,10 +97,19 @@ export function extractAntigravityPreToolUseCommand(input: unknown): HookCommand
 
 const OPENCODE_SHELL_TOOLS = new Set(["bash", "shell"]);
 
+function firstNonEmptyString(values: unknown[]): string | null {
+  return (
+    values.find(
+      (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
+    ) ?? null
+  );
+}
+
 // OpenCode v2 `execute.before` payloads provide `{ tool, input, directory }`
 // (or `{ tool, args, directory }`), where shell tools are named `bash` or
 // `shell`. Prefer an explicit per-command `workdir`/`cwd` over top-level
-// `directory`/`cwd`.
+// `directory`/`cwd`, resolving relative per-command paths against the payload's
+// top-level directory rather than the hook subprocess's working directory.
 export function extractOpenCodePreToolUseCommand(input: unknown): HookCommandPayload | null {
   if (!isRecord(input)) {
     return null;
@@ -113,11 +124,22 @@ export function extractOpenCodePreToolUseCommand(input: unknown): HookCommandPay
     return null;
   }
 
-  const cwdCandidates = [toolInput.workdir, toolInput.cwd, input.directory, input.cwd];
-  const cwd =
-    cwdCandidates.find(
-      (candidate): candidate is string => typeof candidate === "string" && candidate.length > 0,
-    ) ?? null;
+  const baseDir = firstNonEmptyString([input.directory, input.cwd]);
+  const commandDir = firstNonEmptyString([toolInput.workdir, toolInput.cwd]);
+
+  let cwd: string | null;
+  if (commandDir !== null) {
+    if (isAbsolute(commandDir)) {
+      cwd = commandDir;
+    } else if (baseDir !== null) {
+      cwd = resolve(baseDir, commandDir);
+    } else {
+      cwd = null;
+    }
+  } else {
+    cwd = baseDir;
+  }
+
   if (cwd === null) {
     return null;
   }
