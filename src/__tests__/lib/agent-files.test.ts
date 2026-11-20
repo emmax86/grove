@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { chmod, exists, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { exists, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { createPaths } from "../../constants";
@@ -172,18 +172,17 @@ describe("generateAgentFiles", () => {
       }
     });
 
-    it("returns AGENT_FILES_WRITE_FAILED when workspace directory is not writable", async () => {
+    it("returns AGENT_FILES_WRITE_FAILED when AGENTS.md cannot be written", async () => {
       await setupWorkspace("ws");
-      const wsDir = paths.workspace("ws");
-      await chmod(wsDir, 0o555);
-      try {
-        const result = await generateAgentFiles("ws", paths);
-        expect(result.ok).toBe(false);
-        if (!result.ok) {
-          expect(result.code).toBe("AGENT_FILES_WRITE_FAILED");
-        }
-      } finally {
-        await chmod(wsDir, 0o755);
+      const brokenPaths = {
+        ...paths,
+        agentsMd: (name: string) => join(paths.workspace(name), "missing-parent", "AGENTS.md"),
+      };
+
+      const result = await generateAgentFiles("ws", brokenPaths);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe("AGENT_FILES_WRITE_FAILED");
       }
     });
   });
