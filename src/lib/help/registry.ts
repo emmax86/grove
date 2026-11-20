@@ -403,9 +403,29 @@ const MCP_GROUP = {
   ],
 } as const satisfies HelpGroup;
 
+const HOOK_GROUP = {
+  kind: "group",
+  name: "hook",
+  summary: "run agent lifecycle hook handlers",
+  children: [
+    {
+      kind: "leaf",
+      name: "reject-git-worktree",
+      summary: "reject direct git worktree commands inside Grove workspaces",
+      flags: [
+        {
+          name: "host",
+          valueLabel: "<claude|codex>",
+          summary: "agent harness hook protocol",
+        },
+      ],
+    },
+  ],
+} as const satisfies HelpGroup;
+
 export const REGISTRY = {
   kind: "group",
   name: "grove",
   summary: "manage named workspaces of git repos and worktrees",
-  children: [WS_GROUP, MCP_GROUP, MCP_SERVER_LEAF],
+  children: [WS_GROUP, MCP_GROUP, MCP_SERVER_LEAF, HOOK_GROUP],
 } as const satisfies HelpGroup;
