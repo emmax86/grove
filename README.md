@@ -132,9 +132,9 @@ Options: `--repo <name>` (required when no file is given, otherwise inferred fro
 
 ### Hooks — `grove hook <command>`
 
-| Command                                     | Description                                                          |
-| ------------------------------------------- | -------------------------------------------------------------------- |
-| `reject-git-worktree --host <claude\|codex>` | `PreToolUse` hook handler that blocks raw `git worktree` commands    |
+| Command                                                        | Description                                                          |
+| -------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `reject-git-worktree --host <claude\|codex\|antigravity>`      | `PreToolUse` hook handler that blocks raw `git worktree` commands    |
 
 ### Other
 
@@ -158,10 +158,11 @@ Output captured to a file or piped to another command is byte-identical to termi
 
 ## Integrations
 
-Each harness has its own self-contained plugin directory under `plugins/`, sharing canonical skills from `skills/` (synced with `bun run sync:plugins`) and hook enforcement via `grove hook reject-git-worktree --host <claude|codex>`:
+Each harness has its own self-contained plugin directory under `plugins/`, sharing canonical skills from `skills/` (synced with `bun run sync:plugins`) and hook enforcement via `grove hook reject-git-worktree --host <claude|codex|antigravity>`:
 
 - **Claude Code plugin** (`plugins/claude/`) — exposed via `.claude-plugin/marketplace.json` with `commands/*.md`, `skills/`, and `hooks/hooks.json`
 - **Codex plugin** (`plugins/codex/`) — exposed via `.agents/plugins/marketplace.json` with `.codex-plugin/plugin.json`, `skills/`, and `hooks/hooks.json`
+- **Antigravity plugin** (`plugins/antigravity/`) — native Antigravity plugin with root `plugin.json`, `skills/`, and plugin-root `hooks.json` (`run_command` matcher)
 - **MCP server** — `grove mcp-server` / `grove mcp connect` exposes workspace operations over MCP for AI tool integration
 - **Auto-generated files** — adding/removing repos creates `AGENTS.md` and `.mcp.json` once (if absent), then regenerates `{workspace}.code-workspace` to keep the editor config in sync
 
@@ -183,6 +184,12 @@ codex plugin add grove@grove
 After installing or reinstalling, start a new Codex thread in your Grove
 workspace and run `/hooks` to review and trust the Grove `PreToolUse` hook from
 `plugins/codex/hooks/hooks.json`.
+
+### Antigravity
+
+Install the native plugin from `plugins/antigravity/` (e.g. `agy plugin install
+<path-to-grove-repo>/plugins/antigravity`) for Grove skills and the
+`run_command` `PreToolUse` hook.
 
 ## Development
 

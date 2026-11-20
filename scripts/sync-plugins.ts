@@ -1,7 +1,7 @@
 import { cp, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 
-export const SKILL_PLUGIN_TARGETS = ["claude", "codex"] as const;
+export const SKILL_PLUGIN_TARGETS = ["claude", "codex", "antigravity"] as const;
 
 const repoRoot = resolve(import.meta.dir, "..");
 const canonicalSkillsDir = resolve(repoRoot, "skills");

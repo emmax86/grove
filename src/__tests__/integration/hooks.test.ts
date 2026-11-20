@@ -7,6 +7,7 @@ const CANONICAL_SKILLS_DIR = path.join(REPO_ROOT, "skills");
 const PLUGINS_DIR = path.join(REPO_ROOT, "plugins");
 const CLAUDE_PLUGIN_DIR = path.join(PLUGINS_DIR, "claude");
 const CODEX_PLUGIN_DIR = path.join(PLUGINS_DIR, "codex");
+const ANTIGRAVITY_PLUGIN_DIR = path.join(PLUGINS_DIR, "antigravity");
 const LEGACY_SHARED_PLUGIN_DIR = path.join(PLUGINS_DIR, "grove");
 
 async function exists(filePath: string): Promise<boolean> {
@@ -40,6 +41,7 @@ describe("per-harness plugin layout", () => {
     expect(await exists(LEGACY_SHARED_PLUGIN_DIR)).toBe(false);
     expect(await exists(CLAUDE_PLUGIN_DIR)).toBe(true);
     expect(await exists(CODEX_PLUGIN_DIR)).toBe(true);
+    expect(await exists(ANTIGRAVITY_PLUGIN_DIR)).toBe(true);
   });
 
   it("wires marketplace manifests to their dedicated harness plugin directories", async () => {
@@ -89,11 +91,34 @@ describe("per-harness plugin layout", () => {
     );
   });
 
+  it("packages plugins/antigravity with root plugin.json and root hooks.json", async () => {
+    const manifest = JSON.parse(
+      await readFile(path.join(ANTIGRAVITY_PLUGIN_DIR, "plugin.json"), "utf8"),
+    ) as { name: string; hooks?: unknown };
+    expect(manifest.name).toBe("grove");
+    expect(manifest.hooks).toBeUndefined();
+
+    const hookConfig = JSON.parse(
+      await readFile(path.join(ANTIGRAVITY_PLUGIN_DIR, "hooks.json"), "utf8"),
+    ) as {
+      hooks?: unknown;
+      "reject-git-worktree": {
+        PreToolUse: [{ matcher: string; hooks: [{ type: string; command: string }] }];
+      };
+    };
+    expect(hookConfig.hooks).toBeUndefined();
+    expect(hookConfig["reject-git-worktree"].PreToolUse).toHaveLength(1);
+    expect(hookConfig["reject-git-worktree"].PreToolUse[0].matcher).toBe("run_command");
+    expect(hookConfig["reject-git-worktree"].PreToolUse[0].hooks[0].command).toBe(
+      "grove hook reject-git-worktree --host antigravity",
+    );
+  });
+
   it("keeps skills/ synced identically across all harness plugin directories (run `bun run sync:plugins` on drift)", async () => {
     const canonical = await collectFiles(CANONICAL_SKILLS_DIR);
     expect(canonical.size).toBeGreaterThan(0);
 
-    for (const pluginDir of [CLAUDE_PLUGIN_DIR, CODEX_PLUGIN_DIR]) {
+    for (const pluginDir of [CLAUDE_PLUGIN_DIR, CODEX_PLUGIN_DIR, ANTIGRAVITY_PLUGIN_DIR]) {
       const synced = await collectFiles(path.join(pluginDir, "skills"));
       expect(synced).toEqual(canonical);
     }
