@@ -63,8 +63,8 @@ command is `grove ws <subcommand>` (also aliased as `grove workspaces`). All
 output goes through `render(result, kind, ctx)` in `src/lib/render/`.
 
 The Grove CLI is the source of truth. Agent integrations should prefer calling
-`grove ws ...` directly. The Claude plugin, Codex plugin, and MCP server are
-adapters around the CLI rather than alternative implementations.
+`grove ws ...` directly. Harness plugins are thin adapters around the CLI
+rather than alternative implementations.
 
 ### Plugin packaging
 

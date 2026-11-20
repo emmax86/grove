@@ -3,10 +3,8 @@
 import { relative } from "node:path";
 
 import packageJson from "../package.json";
-import { getTargetContext, getWorkspaceContext } from "./commands/context";
-import { listContextSessions, runContextTouch } from "./commands/context-client";
+import { getTargetContext, getWorkspaceContext, touchContext } from "./commands/context";
 import { execCommand, type StandardCommand } from "./commands/exec";
-import { runMcpConnect } from "./commands/mcp-connect";
 import { addRepo, listRepos, removeRepo } from "./commands/repo";
 import { getStatus } from "./commands/status";
 import { addWorkspace, listWorkspaces, removeWorkspace, syncWorkspace } from "./commands/workspace";
@@ -16,7 +14,7 @@ import { inferContext } from "./context";
 import { runRejectGitWorktreeHook } from "./hooks/reject-git-worktree";
 import { type ParsedArgs, parseArgs } from "./lib/args";
 import { readWorkspaceConfig } from "./lib/config";
-import { discoverDaemon, startDaemon } from "./lib/daemon";
+import { DisclosureRecorder } from "./lib/context-state";
 import { buildMissingArgPayload, isHelpRequested, resolveCommandPath } from "./lib/help/dispatch";
 import { GLOBAL_FLAGS, REGISTRY } from "./lib/help/registry";
 import type { HelpView } from "./lib/render";
@@ -131,7 +129,7 @@ async function main() {
   // argv[0] = cmd
   const cmd = argv[0];
 
-  // Resolve render context once — used by all subcommands including mcp-server
+  // Resolve render context once — used by all subcommands
   const ctxResult = resolveRenderContext({
     argv,
     env: process.env,
@@ -202,50 +200,6 @@ async function main() {
       "workspace-list",
       renderCtx,
     );
-  }
-
-  // ── mcp connect subcommand (stdio bridge) ────────────────────────
-  if (cmd === "mcp" && argv[1] === "connect") {
-    const parsed = parseArgs(argv.slice(2));
-    const workspaceName = resolveWorkspace(parsed, ctx.workspace);
-    if (!workspaceName) {
-      emitMissingArg("workspace", ["mcp", "connect"], renderCtx);
-    }
-    await runMcpConnect(workspaceName, paths);
-    return;
-  }
-
-  // ── mcp serve / mcp-server subcommand ────────────────────────────
-  // `mcp serve` is the canonical name; `mcp-server` is a kept alias.
-  if (cmd === "mcp-server" || (cmd === "mcp" && argv[1] === "serve")) {
-    const parsed = parseArgs(argv.slice(cmd === "mcp" ? 2 : 1));
-    const workspaceName = resolveWorkspace(parsed, ctx.workspace);
-    const portArg = flagValue(parsed, "port");
-    const port = portArg !== undefined ? parseInt(portArg, 10) : 0;
-    if (portArg !== undefined && (Number.isNaN(port) || port < 0 || port > 65535)) {
-      console.error(`Invalid port: ${portArg}`);
-      process.exit(1);
-    }
-
-    if (!workspaceName) {
-      emitMissingArg("workspace", ["mcp-server"], renderCtx);
-    }
-
-    // Check if already running
-    const existing = await discoverDaemon(workspaceName, paths);
-    if (existing) {
-      process.stderr.write(`[mcp-server] already running at ${existing.url}\n`);
-      process.exit(0);
-    }
-
-    const info = await startDaemon({ workspace: workspaceName, paths, port });
-    process.stderr.write(`[mcp-server] listening at ${info.url}\n`);
-
-    // Block until the daemon shuts itself down (grace timer or signal), then
-    // exit so the process does not linger idle. Signals are also handled inside
-    // startDaemon, but awaiting `closed` covers the grace-timer path too.
-    await info.closed;
-    process.exit(0);
   }
 
   // ── ws exec subcommand ───────────────────────────────────────────
@@ -544,25 +498,19 @@ async function main() {
         if (touchPaths.length === 0) {
           emitMissingArg("paths", ["ws", "context", "touch"], renderCtx);
         }
-        const result = await runContextTouch(
+        const recorder = new DisclosureRecorder(paths.contextStateDir(workspace));
+        const result = await touchContext(
           workspace,
           touchPaths,
           {
             cwd: process.env.PWD ?? process.cwd(),
             refresh: flag(parsed, "refresh"),
-            session: flagValue(parsed, "session"),
+            recorder,
+            trigger: "cli",
           },
           paths,
         );
         emit(result, "context", renderCtx);
-        break;
-      }
-      if (sub === "sessions") {
-        const workspace = resolveWorkspace(parsed, ctx.workspace);
-        if (!workspace) {
-          emitMissingArg("workspace", ["ws", "context", "sessions"], renderCtx);
-        }
-        emit(await listContextSessions(workspace, paths), "context-sessions", renderCtx);
         break;
       }
       if (sub === "show") {

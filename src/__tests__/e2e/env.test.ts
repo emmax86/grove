@@ -48,17 +48,6 @@ describe("E2E: deprecation warnings", () => {
     );
   });
 
-  it("warns with value when DOTCLAUDE_WORKSPACE is set and GROVE_WORKSPACE is not (mcp-server path)", async () => {
-    // mcp-server fails fast (workspace not found), but warning fires first
-    const r = await runCLI(["mcp-server"], {
-      root,
-      env: { DOTCLAUDE_WORKSPACE: "myws" },
-    });
-    expect(r.stderr).toContain(
-      `DOTCLAUDE_WORKSPACE="myws" is deprecated. Rename it to GROVE_WORKSPACE="myws"`,
-    );
-  });
-
   it("does not warn when GROVE_WORKSPACE is set (ws exec path)", async () => {
     const r = await runCLI(["ws", "exec", "test"], {
       root,
