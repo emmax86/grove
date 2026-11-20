@@ -72,7 +72,7 @@ adapters around the CLI rather than alternative implementations.
   self-contained harness plugin directory via `bun run sync:plugins` (enforced
   by tests in `src/__tests__/integration/hooks.test.ts`).
 - Shared hook logic lives in `src/hooks/` and is invoked through the compiled
-  CLI (`grove hook reject-git-worktree --host <claude|codex|antigravity>`), so
+  CLI (`grove hook reject-git-worktree --host <claude|codex|antigravity|opencode>`), so
   plugins do not ship TypeScript files or depend on `${PLUGIN_ROOT}` env vars.
 - Each harness has its own plugin directory under `plugins/`:
   - `plugins/claude/` — `.claude-plugin/plugin.json`, `commands/*.md`,
@@ -85,6 +85,9 @@ adapters around the CLI rather than alternative implementations.
     `/hooks` in a new Codex thread to review and trust command hooks.
   - `plugins/antigravity/` — root `plugin.json`, plugin-root `hooks.json`
     (`run_command` matcher), and synced `skills/`.
+  - `plugins/opencode/` — OpenCode v2 plugin (`package.json`, `index.js` using
+    `Plugin.define` and `ctx.tool.hook("execute.before")`, thin async CLI bridge
+    in `reject-git-worktree.js`), and synced `skills/`.
 
 ### Output rendering
 

@@ -158,11 +158,12 @@ Output captured to a file or piped to another command is byte-identical to termi
 
 ## Integrations
 
-Each harness has its own self-contained plugin directory under `plugins/`, sharing canonical skills from `skills/` (synced with `bun run sync:plugins`) and hook enforcement via `grove hook reject-git-worktree --host <claude|codex|antigravity>`:
+Each harness has its own self-contained plugin directory under `plugins/`, sharing canonical skills from `skills/` (synced with `bun run sync:plugins`) and hook enforcement via `grove hook reject-git-worktree --host <claude|codex|antigravity|opencode>`:
 
 - **Claude Code plugin** (`plugins/claude/`) — exposed via `.claude-plugin/marketplace.json` with `commands/*.md`, `skills/`, and `hooks/hooks.json`
 - **Codex plugin** (`plugins/codex/`) — exposed via `.agents/plugins/marketplace.json` with `.codex-plugin/plugin.json`, `skills/`, and `hooks/hooks.json`
 - **Antigravity plugin** (`plugins/antigravity/`) — native Antigravity plugin with root `plugin.json`, `skills/`, and plugin-root `hooks.json` (`run_command` matcher)
+- **OpenCode plugin** (`plugins/opencode/`) — OpenCode v2 plugin (`Plugin.define` + `ctx.tool.hook("execute.before")`) and synced `skills/`
 - **MCP server** — `grove mcp-server` / `grove mcp connect` exposes workspace operations over MCP for AI tool integration
 - **Auto-generated files** — adding/removing repos creates `AGENTS.md`, `.mcp.json`, `opencode.json`, and `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}` once (if absent), then regenerates `{workspace}.code-workspace` to keep editor and agent configs in sync
 
@@ -192,6 +193,16 @@ Install the native plugin from `plugins/antigravity/` (e.g. `agy plugin install
 `run_command` `PreToolUse` hook. Workspace MCP registration is handled
 automatically per workspace via `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}`
 (created by `grove ws add` and backfilled by `grove ws sync`).
+
+### OpenCode
+
+Install the OpenCode v2 plugin from `plugins/opencode/` (link or copy it into
+`~/.config/opencode/plugins/grove/` or reference it in `opencode.json`) for the
+`execute.before` worktree guard hook, and copy or symlink
+`plugins/opencode/skills/*` into `~/.config/opencode/skills/` (or workspace
+`.opencode/skills/`). Workspace MCP registration is handled automatically per
+workspace via `opencode.json` (created by `grove ws add` and backfilled by
+`grove ws sync`).
 
 ## Development
 
