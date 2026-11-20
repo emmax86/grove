@@ -63,14 +63,13 @@ describe("help: subcommand", () => {
     expect(r.stdout).toContain("Examples:");
   });
 
-  it("grove ws context --help -> group help with show/touch/sessions subcommands", async () => {
+  it("grove ws context --help -> group help with show/touch subcommands", async () => {
     const r = await runCli(["ws", "context", "--help"]);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("grove ws context");
     expect(r.stdout).toContain("Subcommands:");
     expect(r.stdout).toContain("show");
     expect(r.stdout).toContain("touch");
-    expect(r.stdout).toContain("sessions");
   });
 
   it("grove ws context show --help -> leaf help (moved from the old context leaf)", async () => {
@@ -88,23 +87,7 @@ describe("help: subcommand", () => {
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("grove ws context touch");
     expect(r.stdout).toContain("paths");
-    expect(r.stdout).toContain("--session");
     expect(r.stdout).toContain("--refresh");
-  });
-
-  it("grove ws context sessions --help -> leaf help", async () => {
-    const r = await runCli(["ws", "context", "sessions", "--help"]);
-    expect(r.exitCode).toBe(0);
-    expect(r.stdout).toContain("grove ws context sessions");
-  });
-
-  it("grove mcp --help -> mcp group help with serve/connect subcommands", async () => {
-    const r = await runCli(["mcp", "--help"]);
-    expect(r.exitCode).toBe(0);
-    expect(r.stdout).toContain("grove mcp");
-    expect(r.stdout).toContain("Subcommands:");
-    expect(r.stdout).toContain("serve");
-    expect(r.stdout).toContain("connect");
   });
 
   it("grove hook --help -> hook group help with reject-git-worktree", async () => {
@@ -151,21 +134,6 @@ describe("help: subcommand", () => {
     // Whole stdout (note + body) must be ASCII-clean under --ascii
     expect(r.stdout).not.toContain("—");
     expect(r.stdout).toContain("--");
-  });
-
-  it("grove mcp-server --help -> leaf help, exit 0, daemon NOT started", async () => {
-    const r = await runCli(["mcp-server", "--help"]);
-    expect(r.exitCode).toBe(0);
-    expect(r.stdout).toContain("grove mcp-server");
-    expect(r.stdout).toContain("Flags:");
-    expect(r.stderr).not.toContain("[mcp-server] listening");
-  });
-
-  it("grove mcp-server --workspace foo --help -> help, NOT daemon start", async () => {
-    const r = await runCli(["mcp-server", "--workspace", "foo", "--help"]);
-    expect(r.exitCode).toBe(0);
-    expect(r.stdout).toContain("grove mcp-server");
-    expect(r.stderr).not.toContain("[mcp-server] listening");
   });
 });
 
@@ -270,15 +238,6 @@ describe("help: missing required argument", () => {
     expect(r.exitCode).toBe(1);
     expect(r.stderr).toContain("missing required argument: command");
     expect(r.stderr).toContain("grove ws exec");
-  });
-
-  it("grove mcp-server --json (no workspace) -> MISSING_ARG JSON envelope", async () => {
-    const r = await runCli(["mcp-server", "--json"]);
-    expect(r.exitCode).toBe(1);
-    const parsed = JSON.parse(r.stderr);
-    expect(parsed.ok).toBe(false);
-    expect(parsed.code).toBe("MISSING_ARG");
-    expect(parsed.help.path).toEqual(["grove", "mcp-server"]);
   });
 });
 

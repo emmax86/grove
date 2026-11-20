@@ -74,7 +74,7 @@ describe("E2E: context inference via cwd", () => {
   });
 });
 
-describe("E2E: ws context touch/sessions/show dispatch", () => {
+describe("E2E: ws context touch/show dispatch", () => {
   let root: string;
   let repoPath: string;
 
@@ -108,18 +108,6 @@ describe("E2E: ws context touch/sessions/show dispatch", () => {
     const json = JSON.parse(r.stderr);
     expect(json.ok).toBe(false);
     expect(json.code).toBe("MISSING_ARG");
-  });
-
-  it("ws context sessions reports no daemon running", async () => {
-    const r = await runCLI(["ws", "context", "sessions", "--json"], {
-      root,
-      cwd: join(root, "myws"),
-    });
-
-    expect(r.exitCode).toBe(1);
-    const json = JSON.parse(r.stderr);
-    expect(json.ok).toBe(false);
-    expect(json.code).toBe("DAEMON_NOT_RUNNING");
   });
 
   it("ws context show <ws> <target> strips the explicit 'show' token and loads the target", async () => {

@@ -6,7 +6,6 @@ import type {
   TouchEntry,
   WorkspaceContext,
 } from "../../../commands/context";
-import type { ContextSessionsValue } from "../../../commands/context-client";
 import type { FormatCtx } from "./workspace";
 
 export type GroveContextValue = GroveContext;
@@ -137,7 +136,7 @@ function targetText(value: TargetContext): string {
     `Context hash: ${shortHash(value.contextHash)}`,
     "",
     "## Agent Protocol",
-    "Prefer the context_touch MCP tool (or `grove ws context touch <paths>`) for incremental loading; it only re-sends what changed.",
+    "Run `grove ws context touch <paths>` to load workspace and ancestor instruction files for paths you work on.",
     "",
     "## Loaded Instructions",
   ];
@@ -269,36 +268,4 @@ export function contextPorcelain(value: GroveContextValue): string {
   );
 
   return [targetRow, ...sourceRows].join("\n");
-}
-
-export function contextSessionsText(value: ContextSessionsValue): string {
-  const lines = ["# Grove Context Sessions"];
-
-  if (value.sessions.length === 0) {
-    lines.push("", "none");
-    return lines.join("\n");
-  }
-
-  for (const entry of value.sessions) {
-    lines.push("", `## ${entry.session}`);
-    if (entry.scopes.length === 0) {
-      lines.push("none");
-    } else {
-      lines.push(
-        ...entry.scopes.map((scope) => `- ${scope.contextKey}@${shortHash(scope.contentHash)}`),
-      );
-    }
-  }
-
-  return lines.join("\n");
-}
-
-export function contextSessionsPorcelain(value: ContextSessionsValue): string {
-  return value.sessions
-    .flatMap((entry) =>
-      entry.scopes.map((scope) =>
-        ["session", value.workspace, entry.session, scope.contextKey, scope.contentHash].join("\t"),
-      ),
-    )
-    .join("\n");
 }

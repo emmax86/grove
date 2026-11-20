@@ -109,14 +109,14 @@ const WS_GROUP = {
     {
       kind: "group",
       name: "context",
-      summary: "agent instruction context: orientation, lazy loading, session touch",
+      summary: "agent instruction context: orientation, lazy loading, touch",
       children: [
         {
           kind: "leaf",
           name: "show",
           summary: "show workspace context or load a target scope (default subcommand)",
           description:
-            "Invoked implicitly: `grove ws context [workspace] [target]` routes here unless the first token is touch/sessions/show.",
+            "Invoked implicitly: `grove ws context [workspace] [target]` routes here unless the first token is touch/show.",
           args: [
             {
               name: "workspace",
@@ -150,9 +150,9 @@ const WS_GROUP = {
         {
           kind: "leaf",
           name: "touch",
-          summary: "serve not-yet-seen instruction scopes for the paths you are about to work on",
+          summary: "serve instruction scopes for the paths you are about to work on",
           description:
-            "Idempotent and cheap to over-call. Returns full content only for scopes this session has not seen (or whose content changed); already-served scopes return one-line current markers.",
+            "Resolves workspace instructions plus ancestor AGENTS.md/CLAUDE.md files down to each path.",
           args: [
             {
               name: "paths",
@@ -162,12 +162,7 @@ const WS_GROUP = {
             },
           ],
           flags: [
-            {
-              name: "session",
-              valueLabel: "<key>",
-              summary: "session key for the served-ledger (daemon mode)",
-            },
-            { name: "refresh", summary: "bypass the ledger and re-serve the full chain" },
+            { name: "refresh", summary: "re-serve the full instruction chain" },
             WORKSPACE_FLAG,
           ],
           examples: [
@@ -176,12 +171,6 @@ const WS_GROUP = {
               description: "Serve instruction scopes for a file you are about to edit",
             },
           ],
-        },
-        {
-          kind: "leaf",
-          name: "sessions",
-          summary: "list active disclosure sessions and their served scopes (daemon)",
-          flags: [WORKSPACE_FLAG],
         },
       ],
     },
@@ -362,47 +351,6 @@ const WS_GROUP = {
   ],
 } as const satisfies HelpGroup;
 
-const MCP_SERVER_LEAF = {
-  kind: "leaf",
-  name: "mcp-server",
-  summary: "run the MCP server for a workspace",
-  flags: [
-    WORKSPACE_FLAG,
-    {
-      name: "port",
-      valueLabel: "<port>",
-      summary: "port to listen on (default: random free port)",
-    },
-  ],
-} as const satisfies HelpLeaf;
-
-const MCP_GROUP = {
-  kind: "group",
-  name: "mcp",
-  summary: "MCP server and harness bridge",
-  children: [
-    {
-      kind: "leaf",
-      name: "serve",
-      summary: "run the MCP daemon for a workspace (alias: grove mcp-server)",
-      flags: [
-        WORKSPACE_FLAG,
-        {
-          name: "port",
-          valueLabel: "<port>",
-          summary: "port to listen on (default: random free port)",
-        },
-      ],
-    },
-    {
-      kind: "leaf",
-      name: "connect",
-      summary: "stdio bridge to the workspace daemon (auto-starts it); for harness .mcp.json",
-      flags: [WORKSPACE_FLAG],
-    },
-  ],
-} as const satisfies HelpGroup;
-
 const HOOK_GROUP = {
   kind: "group",
   name: "hook",
@@ -427,5 +375,5 @@ export const REGISTRY = {
   kind: "group",
   name: "grove",
   summary: "manage named workspaces of git repos and worktrees",
-  children: [WS_GROUP, MCP_GROUP, MCP_SERVER_LEAF, HOOK_GROUP],
+  children: [WS_GROUP, HOOK_GROUP],
 } as const satisfies HelpGroup;

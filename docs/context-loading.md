@@ -125,10 +125,9 @@ whole; individual sources expose `contentHash` rather than per-node hashes.
 
 ## Touch Protocol
 
-`grove ws context touch <paths>` and the `context_touch` MCP tool serve
-not-yet-seen instruction content for the paths an agent is about to work on.
-Call it before reading or editing files in a part of the tree you haven't
-touched yet this session.
+`grove ws context touch <paths>` serves instruction content for the paths an
+agent is about to work on. Call it before reading or editing files in a part of
+the tree you haven't touched yet this session.
 
 For each path, touch resolves the same scope chain as target loading:
 workspace instructions (`.grove/instructions.md`, when present) first, then
@@ -138,67 +137,14 @@ call are resolved independently and then batch-deduplicated — each unique scop
 is classified and journaled at most once per call, even when two paths share
 ancestors.
 
-Each resolved scope classifies against the caller's session state as one of
-four statuses:
-
-- `served` — first time this session has seen this scope; full content is
-  returned.
-- `current` — already served, content unchanged since; a one-line marker only,
-  no content.
-- `updated` — already served, content hash changed since (the file was
-  edited); full content is returned.
-- `refreshed` — already served, `--refresh` passed; full content is returned
-  regardless of hash.
-
-Touch is idempotent and cheap to over-call. Touching the same paths repeatedly
-returns `current` markers once content has been served, so agents should call
-it liberally on every new path rather than trying to reason about whether a
-scope "needs" touching.
+Each resolved scope classifies as one of four statuses (`served`, `current`,
+`updated`, `refreshed`); CLI invocations run statelessly so every resolved
+scope serves fresh content.
 
 If a touched path resolves inside a gitignored directory (for example
 something under `node_modules`), the scope chain is truncated at the deepest
 non-ignored ancestor directory before it is walked. Gitignored ancestors are
 never checked for instruction files, so vendored instruction files never serve.
-
-`--refresh` bypasses the "already current" short circuit for scopes already
-served this session, forcing a full re-send of their content; it does not
-clear or reset the session's served-state, and scopes never served this
-session still classify as `served` even with `--refresh` passed.
-
-Use `grove ws context sessions` to inspect active disclosure sessions and the
-scopes each has served (daemon only — see Session Ledgers below).
-
-## Session Ledgers
-
-Served-state per session is tracked by a `ContextLedger`: an in-memory
-`Map<contextKey, contentHash>` recording what content each session has already
-been sent. The ledger is the sole AUTHORITY for touch's `served`/`current`/
-`updated`/`refreshed` decisions.
-
-Ledgers are held by the workspace daemon and are deliberately not persisted to
-disk:
-
-- MCP sessions get one ledger per MCP transport session, keyed by the session
-  id the MCP SDK assigns on connect.
-- CLI callers get one ledger per `--session <key>` string, held in a
-  daemon-side map keyed by that literal string. Reusing the same `--session`
-  key across CLI invocations reuses the same served-state. Note that a daemon
-  with no active MCP session shuts down after its grace period, after which a
-  CLI `--session` key's served-state resets and its content re-serves (the safe
-  direction) — so CLI `--session` dedup only persists while the daemon is kept
-  alive.
-
-A fresh ledger always starts empty, so every scope it is asked about starts at
-`served`. This happens on MCP session reconnect, on daemon restart, and the
-first time a given `--session` key is used. Re-serving already-seen content is
-the safe failure direction — a session that thinks it has seen something it
-was never actually sent is the failure mode to avoid, not the reverse.
-
-If no daemon is running (or the daemon is unreachable), CLI touch calls fall
-back to a stateless local touch with no ledger at all: every scope always
-classifies as `served`, and any `--session` key passed is silently ignored.
-This fallback is never worse than not having disclosure at all — content
-simply isn't deduplicated across calls.
 
 ## Disclosure Journal & Blob Store
 
@@ -209,20 +155,16 @@ store rooted at `.grove/state/context/` inside the workspace:
   per classified scope:
 
   ```json
-  {"ts":"2026-07-01T12:00:00.000Z","session":"mcp-session-id","trigger":"mcp","contextKey":"myws/api/main","contentHash":"<sha256>","action":"served"}
+  {"ts":"2026-07-01T12:00:00.000Z","session":"stateless","trigger":"cli","contextKey":"myws/api/main","contentHash":"<sha256>","action":"served"}
   ```
 
-  `trigger` is `"mcp"` or `"cli"` depending on which surface issued the touch.
-  `action` is the same `served`/`current`/`updated`/`refreshed` status served
-  to the caller.
 - `.grove/state/context/objects/<hash>` — content-addressed blobs, one file per
   distinct content hash, written once (write-once: an object that already
   exists on disk is never rewritten).
 
 The journal and blob store are **observation-only**: nothing on the serving
-path ever reads them. Touch decisions are made entirely from the in-memory
-session ledger described above. Deleting the journal, corrupting a line, or
-wiping the objects directory changes no serving behavior — it only destroys the
+path ever reads them. Deleting the journal, corrupting a line, or wiping the
+objects directory changes no serving behavior — it only destroys the
 observability record. Every write goes through a try/catch that swallows I/O
 errors for the same reason: a broken state directory must never break
 disclosure.
@@ -238,33 +180,6 @@ started. Retention is a bounded N-segment ring (default 2 segments total,
 active + one archive) — rotating past the ring evicts the oldest segment, and
 any blob no longer referenced by a retained segment is pruned from the objects
 directory.
-
-## Registration
-
-Grove does not auto-generate workspace MCP config files (such as `.mcp.json`,
-`opencode.json`, or Antigravity plugin configs); configure your harness
-manually to run `grove mcp connect` if you want to connect over MCP:
-
-```json
-{
-  "mcpServers": {
-    "grove": {
-      "command": "grove",
-      "args": ["mcp", "connect"]
-    }
-  }
-}
-```
-
-`grove mcp connect` is the stdio bridge a harness actually launches per editor
-session: it pumps JSON-RPC messages between the harness's stdio transport and
-the workspace daemon's streamable-HTTP `/mcp` endpoint. Before bridging, it
-calls the same daemon-discovery logic touch uses; if no daemon is discoverable
-for the workspace it auto-starts one as a detached background process
-(`grove mcp serve` under the hood) and polls until the daemon's discovery file
-appears. Multiple `connect` invocations — e.g. several editor sessions against
-the same workspace — all bridge to the same singleton daemon, so ledgers are
-shared per session as described above, not per bridge process.
 
 ## Porcelain Schema
 

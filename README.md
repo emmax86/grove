@@ -86,8 +86,7 @@ loading contract, instruction priority, and porcelain row schemas.
 | Command                                                | Description                                                    |
 | ------------------------------------------------------ | ---------------------------------------------------------------|
 | `show [workspace] [target]`                             | Show workspace context or load a target scope (default; `grove ws context [workspace] [target]` also routes here) |
-| `touch <paths...> [--session K] [--refresh]`            | Serve not-yet-seen instruction scopes for paths you're about to work on |
-| `sessions`                                              | List active disclosure sessions and their served scopes (daemon) |
+| `touch <paths...> [--refresh]`                          | Serve instruction scopes for paths you're about to work on |
 
 ### Repos — `grove ws repo <command>`
 
@@ -123,24 +122,11 @@ Run standard commands against a repo without needing to know its toolchain:
 
 Options: `--repo <name>` (required when no file is given, otherwise inferred from file path), `--match <pattern>` (filter pattern for `test:match`), `--dry-run` (print resolved command without running).
 
-### MCP — `grove mcp <command>`
-
-| Command                        | Description                                                          |
-| ------------------------------ | -------------------------------------------------------------------- |
-| `serve [--workspace W] [--port P]` | Run the MCP daemon for a workspace (alias: `grove mcp-server`)   |
-| `connect [--workspace W]`      | stdio bridge to the workspace daemon (auto-starts it); for `.mcp.json` |
-
 ### Hooks — `grove hook <command>`
 
 | Command                                                        | Description                                                          |
 | -------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `reject-git-worktree --host <claude\|codex\|antigravity\|opencode>` | `PreToolUse` hook handler that blocks raw `git worktree` commands    |
-
-### Other
-
-| Command                                 | Description                                  |
-| --------------------------------------- | -------------------------------------------- |
-| `mcp-server [--workspace W] [--port P]` | Start MCP server (top-level, not under `ws`) |
 
 Bracketed args are inferred from CWD. Override with `--workspace` flag or `GROVE_WORKSPACE` env var.
 
@@ -164,7 +150,6 @@ Each harness has its own self-contained plugin directory under `plugins/`, shari
 - **Codex plugin** (`plugins/codex/`) — exposed via `.agents/plugins/marketplace.json` with `.codex-plugin/plugin.json`, `skills/`, and `hooks/hooks.json`
 - **Antigravity plugin** (`plugins/antigravity/`) — native Antigravity plugin with root `plugin.json`, `skills/`, and plugin-root `hooks.json` (`run_command` matcher)
 - **OpenCode plugin** (`plugins/opencode/`) — OpenCode v2 plugin (`Plugin.define` + `ctx.tool.hook("execute.before")`) and synced `skills/`
-- **MCP server** — `grove mcp-server` / `grove mcp connect` exposes workspace operations over MCP for AI tool integration
 - **Auto-generated files** — adding/removing repos creates `AGENTS.md` once (if absent), then regenerates `{workspace}.code-workspace` to keep editor configs in sync
 
 ### Codex
