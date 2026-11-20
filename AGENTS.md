@@ -68,18 +68,21 @@ adapters around the CLI rather than alternative implementations.
 
 ### Plugin packaging
 
-- Claude Code support uses `plugins/grove/.claude-plugin/plugin.json`,
-  `plugins/grove/commands/*.md`, and `${CLAUDE_PLUGIN_ROOT}` in Claude hook
-  commands.
-- Codex support uses `plugins/grove/.codex-plugin/plugin.json`,
-  `plugins/grove/skills/`, and the default plugin-bundled hook file at
-  `plugins/grove/hooks/hooks.json`.
-- Do not add a `hooks` field to the Codex manifest. Codex discovers
-  `hooks/hooks.json` by default, and the local plugin validator rejects
-  unsupported manifest fields.
-- Codex hook commands should resolve from `${PLUGIN_ROOT}`. After installing or
-  reinstalling the plugin, use `/hooks` in a new Codex thread to review and
-  trust non-managed command hooks before relying on them.
+- Shared canonical skills live in `skills/` and are synced into each
+  self-contained harness plugin directory via `bun run sync:plugins` (enforced
+  by tests in `src/__tests__/integration/hooks.test.ts`).
+- Shared hook logic lives in `src/hooks/` and runs through the compiled CLI
+  (`grove hook reject-git-worktree --host <claude|codex>`), so plugins do not
+  ship TypeScript files or rely on env-var host detection.
+- Each harness has its own plugin directory under `plugins/`:
+  - `plugins/claude/` — `.claude-plugin/plugin.json`, `commands/*.md`,
+    `hooks/hooks.json`, and synced `skills/` (referenced by
+    `.claude-plugin/marketplace.json`).
+  - `plugins/codex/` — `.codex-plugin/plugin.json` (no `hooks` field; Codex
+    auto-discovers `hooks/hooks.json` and rejects unsupported manifest fields),
+    `hooks/hooks.json`, and synced `skills/` (referenced by
+    `.agents/plugins/marketplace.json`). After installing or reinstalling, use
+    `/hooks` in a new Codex thread to review and trust command hooks.
 
 ### Output rendering
 
