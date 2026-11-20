@@ -138,6 +138,7 @@ describe("per-harness plugin layout", () => {
     expect(entrypoint).toContain("@opencode/plugin");
     expect(entrypoint).toContain("Plugin.define");
     expect(entrypoint).toContain('ctx.tool.hook("execute.before"');
+    expect(entrypoint).toContain("createRejectGitWorktreeHook({ ctx })");
   });
 
   it("keeps skills/ synced identically across all harness plugin directories (run `bun run sync:plugins` on drift)", async () => {
@@ -156,12 +157,23 @@ describe("per-harness plugin layout", () => {
   });
 });
 
+type OpenCodeHookContext = {
+  location?: { directory?: string };
+  directory?: string;
+  session?: {
+    get: (input: { sessionID: string }) => Promise<{ directory?: string } | undefined>;
+  };
+};
+
 type OpenCodeHookFactory = (options: {
-  directory: string;
+  ctx?: OpenCodeHookContext;
+  directory?: string;
   groveCommand?: string[];
   env?: Record<string, string | undefined>;
 }) => (event: {
   tool?: string;
+  sessionID?: string;
+  directory?: string;
   input?: Record<string, unknown>;
   args?: Record<string, unknown>;
 }) => Promise<void>;
@@ -224,6 +236,68 @@ describe("OpenCode v2 plugin execute.before adapter", () => {
     const outsideHook = createHook({ directory: nonGroveCwd, groveCommand, env });
     await expect(
       outsideHook({ tool: "bash", input: { command: "git worktree list" } }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("resolves the session directory per event via event.sessionID instead of capturing plugin load location", async () => {
+    const createHook = await loadHookFactory();
+    const sessions = new Map<string, { directory: string }>([
+      ["ses_grove", { directory: groveCwd }],
+      ["ses_other", { directory: nonGroveCwd }],
+    ]);
+    const sessionApi = {
+      get: async ({ sessionID }: { sessionID: string }) => sessions.get(sessionID),
+    };
+    const groveCommand = ["bun", "run", CLI_ENTRY];
+    const env = { ...process.env, GROVE_ROOT: groveRoot };
+
+    // Plugin loaded outside GROVE_ROOT must still deny a session running inside GROVE_ROOT.
+    const hookLoadedOutside = createHook({
+      ctx: { location: { directory: nonGroveCwd }, session: sessionApi },
+      groveCommand,
+      env,
+    });
+    await expect(
+      hookLoadedOutside({
+        tool: "shell",
+        sessionID: "ses_grove",
+        input: { command: "git worktree list" },
+      }),
+    ).rejects.toThrow("Direct git worktree commands are not allowed in grove workspaces.");
+
+    // Plugin loaded inside GROVE_ROOT must allow an unrelated session running outside GROVE_ROOT.
+    const hookLoadedInside = createHook({
+      ctx: { location: { directory: groveCwd }, session: sessionApi },
+      groveCommand,
+      env,
+    });
+    await expect(
+      hookLoadedInside({
+        tool: "shell",
+        sessionID: "ses_other",
+        input: { command: "git worktree list" },
+      }),
+    ).resolves.toBeUndefined();
+
+    // If session lookup fails for a session event, fail open rather than falling back to plugin load location.
+    const hookWithFailingLookup = createHook({
+      ctx: {
+        location: { directory: groveCwd },
+        session: {
+          get: async () => {
+            throw new Error("session lookup failed");
+          },
+        },
+      },
+      groveCommand,
+      env,
+    });
+    await expect(
+      hookWithFailingLookup({
+        tool: "shell",
+        sessionID: "ses_unknown",
+        input: { command: "git worktree list" },
+      }),
     ).resolves.toBeUndefined();
   });
 
