@@ -42,10 +42,11 @@ function buildOpenCodeConfig(workspace: string): string {
     {
       $schema: "https://opencode.ai/config.json",
       mcp: {
-        grove: {
-          type: "local",
-          command: ["grove", "mcp", "connect", "--workspace", workspace],
-          enabled: true,
+        servers: {
+          grove: {
+            type: "local",
+            command: ["grove", "mcp", "connect", "--workspace", workspace],
+          },
         },
       },
     },

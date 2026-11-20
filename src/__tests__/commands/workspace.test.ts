@@ -323,10 +323,11 @@ describe("workspace commands", () => {
     expect(config).toEqual({
       $schema: "https://opencode.ai/config.json",
       mcp: {
-        grove: {
-          type: "local",
-          command: ["grove", "mcp", "connect", "--workspace", "myws"],
-          enabled: true,
+        servers: {
+          grove: {
+            type: "local",
+            command: ["grove", "mcp", "connect", "--workspace", "myws"],
+          },
         },
       },
     });
@@ -342,10 +343,9 @@ describe("workspace commands", () => {
 
     expect(await exists(paths.opencodeJson("myws"))).toBe(true);
     const config = JSON.parse(await readFile(paths.opencodeJson("myws"), "utf-8"));
-    expect(config.mcp.grove).toEqual({
+    expect(config.mcp.servers.grove).toEqual({
       type: "local",
       command: ["grove", "mcp", "connect", "--workspace", "myws"],
-      enabled: true,
     });
   });
 

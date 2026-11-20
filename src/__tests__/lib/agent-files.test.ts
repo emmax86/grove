@@ -254,10 +254,11 @@ describe("generateAgentFiles", () => {
       expect(config).toEqual({
         $schema: "https://opencode.ai/config.json",
         mcp: {
-          grove: {
-            type: "local",
-            command: ["grove", "mcp", "connect", "--workspace", "ws"],
-            enabled: true,
+          servers: {
+            grove: {
+              type: "local",
+              command: ["grove", "mcp", "connect", "--workspace", "ws"],
+            },
           },
         },
       });
@@ -265,7 +266,7 @@ describe("generateAgentFiles", () => {
 
     it("does not overwrite a user-modified opencode.json", async () => {
       await setupWorkspace("ws");
-      await writeFile(paths.opencodeJson("ws"), `{"mcp":{}}`);
+      await writeFile(paths.opencodeJson("ws"), `{"mcp":{"servers":{}}}`);
 
       const result = await generateAgentFiles("ws", paths);
       expect(result.ok).toBe(true);
@@ -274,7 +275,7 @@ describe("generateAgentFiles", () => {
       }
 
       expect(result.value.opencodeJson).toBe("exists");
-      expect(await readFile(paths.opencodeJson("ws"), "utf-8")).toBe(`{"mcp":{}}`);
+      expect(await readFile(paths.opencodeJson("ws"), "utf-8")).toBe(`{"mcp":{"servers":{}}}`);
     });
   });
 
