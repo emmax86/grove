@@ -136,7 +136,7 @@ function targetText(value: TargetContext): string {
     `Context hash: ${shortHash(value.contextHash)}`,
     "",
     "## Agent Protocol",
-    "Prefer the context_touch MCP tool (or `grove ws context touch <paths>`) for incremental loading; it only re-sends what changed.",
+    "Run `grove ws context touch <paths>` to load workspace and ancestor instruction files for paths you work on.",
     "",
     "## Loaded Instructions",
   ];

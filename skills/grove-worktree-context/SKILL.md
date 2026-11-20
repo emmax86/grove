@@ -29,24 +29,19 @@ broken — run `grove ws sync` to repair it).
 
 ## Touch before working on files
 
-Before reading or editing files in a part of the tree you haven't touched yet
-this session, run:
+Before reading or editing files in a part of the tree whose instructions you
+haven't loaded yet, run:
 
 ```
 grove ws context touch <paths>
 ```
 
-passing the file or directory paths you're about to work on. This serves the
-instruction content (workspace instructions plus every ancestor
-`AGENTS.md`/`CLAUDE.md` down to each path) that you haven't already seen this
-session. Already-served, unchanged scopes come back as a one-line marker
-instead of full content — the call is cheap, so touch every path you're about
-to work on rather than trying to guess whether it's already covered.
-
-**Touch is idempotent and safe to over-call.** If a file's instructions change
-mid-session (edited on disk), the next touch of that path re-serves the
-updated content automatically — you don't need to detect the change yourself
-or ask for a reload.
+passing the file or directory paths you're about to work on. This resolves and
+serves the instruction chain (workspace instructions plus every ancestor
+`AGENTS.md`/`CLAUDE.md` down to each path), batch-deduplicating shared ancestors
+within a single call. Calls are stateless, so pass all relevant paths together
+or re-run when switching to a new part of the tree (or after editing an
+instruction file on disk).
 
 ## Finding a worktree path
 

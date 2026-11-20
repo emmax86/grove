@@ -199,6 +199,7 @@ describe("contextText", () => {
     expect(text).not.toContain("Layer:");
     expect(text).toContain("@"); // short hash on the section heading
     expect(text).toContain("grove ws context touch"); // protocol line points at touch
+    expect(text).not.toContain("MCP");
   });
 
   it("renders target no-instructions message when sources is empty", () => {
