@@ -1,0 +1,16 @@
+{
+  "reject-git-worktree": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run ./hooks/reject-git-worktree.ts antigravity",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2,6 +2,7 @@
 
 import { DENY_OUTPUT, shouldDenyGitWorktree } from "./lib/git-worktree-policy";
 import {
+  extractAntigravityPreToolUseCommand,
   extractClaudePreToolUseBashCommand,
   extractCodexPreToolUseBashCommand,
   type HookCommandPayload,
@@ -9,16 +10,23 @@ import {
 } from "./lib/hook-payload";
 
 type PayloadExtractor = (input: unknown) => HookCommandPayload | null;
-type DenyOutputTarget = "json" | "stderr";
+type DenyOutputTarget = "codex-json" | "antigravity-json" | "stderr";
 
 function writeDenyOutput(target: DenyOutputTarget) {
-  if (target === "json") {
+  if (target === "codex-json") {
     process.stdout.write(`${JSON.stringify(DENY_OUTPUT)}\n`);
     return;
   }
 
   const { additionalContext, permissionDecisionReason } = DENY_OUTPUT.hookSpecificOutput;
-  process.stderr.write(`${permissionDecisionReason}\n\n${additionalContext}\n`);
+  const reason = `${permissionDecisionReason}\n\n${additionalContext}`;
+
+  if (target === "antigravity-json") {
+    process.stdout.write(`${JSON.stringify({ decision: "deny", reason })}\n`);
+    return;
+  }
+
+  process.stderr.write(`${reason}\n`);
 }
 
 async function runHook(
@@ -64,23 +72,28 @@ const mode = resolveMode(process.argv[2]);
 
 // Each runner has its own documented way to deny a PreToolUse tool call, and
 // they differ — do not unify them:
-//   codex  — exit 0 with a `hookSpecificOutput.permissionDecision: "deny"` JSON
-//            payload on stdout (Codex parses stdout for the decision).
-//   claude — exit 2 with the reason on stderr; Claude Code blocks the tool and
-//            surfaces stderr to the model. stdout is ignored on exit 2.
+//   codex       — exit 0 with a `hookSpecificOutput.permissionDecision: "deny"`
+//                 JSON payload on stdout (Codex parses stdout for the decision).
+//   claude      — exit 2 with the reason on stderr; Claude Code blocks the tool
+//                 and surfaces stderr to the model. stdout is ignored on exit 2.
+//   antigravity — exit 0 with `{ decision: "deny", reason }` on stdout (empty
+//                 stdout on allow/pass-through; never `{}` which fails closed).
 switch (mode) {
   case "codex":
-    await runHook(input, extractCodexPreToolUseBashCommand, 0, "json");
+    await runHook(input, extractCodexPreToolUseBashCommand, 0, "codex-json");
     break;
   case "claude":
     await runHook(input, extractClaudePreToolUseBashCommand, 2, "stderr");
     break;
+  case "antigravity":
+    await runHook(input, extractAntigravityPreToolUseCommand, 0, "antigravity-json");
+    break;
   default:
-    // The hook matches every Bash command, so an unrecognized explicit mode (a
+    // The hook matches every shell command, so an unrecognized explicit mode (a
     // misconfigured install) must fail open rather than block everything.
     // Warn on stderr — only ever reached by a broken config, never normal use.
     process.stderr.write(
-      `reject-git-worktree: unknown hook mode ${JSON.stringify(mode)}; expected "codex" or "claude". Allowing command.\n`,
+      `reject-git-worktree: unknown hook mode ${JSON.stringify(mode)}; expected "codex", "claude", or "antigravity". Allowing command.\n`,
     );
     process.exit(0);
 }

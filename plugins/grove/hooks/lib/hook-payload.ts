@@ -51,3 +51,36 @@ export function extractCodexPreToolUseBashCommand(input: unknown): HookCommandPa
 export function extractClaudePreToolUseBashCommand(input: unknown): HookCommandPayload | null {
   return extractPreToolUseBashCommand(input);
 }
+
+// Antigravity PreToolUse payloads use camelCase protojson fields:
+// { hookEventName: "PreToolUse", cwd, toolCall: { name: "run_command", args: { CommandLine } } }
+export function extractAntigravityPreToolUseCommand(input: unknown): HookCommandPayload | null {
+  if (!isRecord(input)) {
+    return null;
+  }
+
+  if (typeof input.hookEventName === "string" && input.hookEventName !== "PreToolUse") {
+    return null;
+  }
+
+  if (typeof input.cwd !== "string") {
+    return null;
+  }
+
+  if (!isRecord(input.toolCall)) {
+    return null;
+  }
+
+  if (typeof input.toolCall.name === "string" && input.toolCall.name !== "run_command") {
+    return null;
+  }
+
+  if (!isRecord(input.toolCall.args) || typeof input.toolCall.args.CommandLine !== "string") {
+    return null;
+  }
+
+  return {
+    command: input.toolCall.args.CommandLine,
+    cwd: input.cwd,
+  };
+}

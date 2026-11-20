@@ -7,8 +7,9 @@ import { cleanup, createTestDir } from "../helpers";
 const PLUGIN_ROOT = path.resolve(import.meta.dir, "../../../plugins/grove");
 const CODEX_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".codex-plugin/plugin.json");
 const CLAUDE_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".claude-plugin/plugin.json");
+const ANTIGRAVITY_PLUGIN_MANIFEST = path.join(PLUGIN_ROOT, ".antigravity-plugin/plugin.json");
 const CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks/hooks.json");
-const LEGACY_CODEX_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks.json");
+const ANTIGRAVITY_HOOKS_JSON = path.join(PLUGIN_ROOT, "hooks.json");
 const HOOK_SCRIPT = path.join(PLUGIN_ROOT, "hooks/reject-git-worktree.ts");
 const SHARED_POLICY = path.join(PLUGIN_ROOT, "hooks/lib/git-worktree-policy.ts");
 const DENY_REASON = "Direct git worktree commands are not allowed in grove workspaces.";
@@ -36,6 +37,8 @@ async function invokeScript(
   stdout: string;
   stderr: string;
   hookSpecificOutput?: HookSpecificOutput;
+  decision?: string;
+  reason?: string;
 }> {
   // Strip the host plugin-root vars from the inherited env so environment-based
   // host detection is hermetic: a test only sees the vars it sets explicitly,
@@ -57,7 +60,7 @@ async function invokeScript(
   ]);
   const trimmedStdout = stdout.trim();
   const output = trimmedStdout.length > 0 ? JSON.parse(trimmedStdout) : {};
-  const decision =
+  const codexDecision =
     output !== null &&
     typeof output === "object" &&
     "hookSpecificOutput" in output &&
@@ -67,6 +70,11 @@ async function invokeScript(
       ? (output as { hookSpecificOutput: { permissionDecision: unknown } }).hookSpecificOutput
           .permissionDecision
       : null;
+  const antigravityDecision =
+    output !== null && typeof output === "object" && "decision" in output
+      ? (output as { decision: unknown }).decision
+      : null;
+  const decision = codexDecision ?? antigravityDecision;
   if (exitCode === 2) {
     return { denied: true, exitCode, stdout, stderr, ...output };
   }
@@ -82,6 +90,27 @@ function invokeCodex(input: unknown) {
 
 function invokeClaude(input: unknown) {
   return invokeScript(HOOK_SCRIPT, input, ["claude"]);
+}
+
+function invokeAntigravity(input: unknown) {
+  return invokeScript(HOOK_SCRIPT, input, ["antigravity"]);
+}
+
+function antigravityPreToolUseCmdInCwd(
+  command: string,
+  cwd: string,
+  toolName = "run_command",
+  hookEventName = "PreToolUse",
+) {
+  return {
+    cwd,
+    hookEventName,
+    toolCall: {
+      id: "toolu_01",
+      name: toolName,
+      args: { CommandLine: command },
+    },
+  };
 }
 
 function requireHookOutput(result: {
@@ -259,7 +288,6 @@ describe("plugin hook layout", () => {
 
   it("resolves the script via CLAUDE_PLUGIN_ROOT or PLUGIN_ROOT with no host mode arg", async () => {
     expect(await exists(CODEX_HOOKS_JSON)).toBe(true);
-    expect(await exists(LEGACY_CODEX_HOOKS_JSON)).toBe(false);
 
     const hookConfig = JSON.parse(await readFile(CODEX_HOOKS_JSON, "utf8")) as {
       hooks: {
@@ -290,6 +318,39 @@ describe("plugin hook layout", () => {
     expect(command).not.toContain(" codex");
     expect(command).not.toContain(" claude");
     expect(JSON.stringify(hookConfig)).not.toContain("CODEX_PLUGIN_ROOT");
+  });
+
+  it("packages a native Antigravity plugin manifest and plugin-root hooks.json", async () => {
+    expect(await exists(ANTIGRAVITY_PLUGIN_MANIFEST)).toBe(true);
+    expect(await exists(ANTIGRAVITY_HOOKS_JSON)).toBe(true);
+
+    const manifest = JSON.parse(await readFile(ANTIGRAVITY_PLUGIN_MANIFEST, "utf8")) as {
+      name: string;
+      hooks?: unknown;
+    };
+    expect(manifest.name).toBe("grove");
+    expect(manifest.hooks).toBeUndefined();
+
+    // Antigravity native plugins load hooks.json from the plugin root using
+    // named top-level hook entries (never the legacy Codex `hooks` wrapper).
+    const hookConfig = JSON.parse(await readFile(ANTIGRAVITY_HOOKS_JSON, "utf8")) as {
+      hooks?: unknown;
+      "reject-git-worktree": {
+        PreToolUse: [
+          {
+            matcher: string;
+            hooks: [{ type: string; command: string; timeout?: number }];
+          },
+        ];
+      };
+    };
+    expect(hookConfig.hooks).toBeUndefined();
+    expect(hookConfig["reject-git-worktree"].PreToolUse).toHaveLength(1);
+    expect(hookConfig["reject-git-worktree"].PreToolUse[0].matcher).toBe("run_command");
+    expect(hookConfig["reject-git-worktree"].PreToolUse[0].hooks).toHaveLength(1);
+    expect(hookConfig["reject-git-worktree"].PreToolUse[0].hooks[0].command).toBe(
+      "bun run ./hooks/reject-git-worktree.ts antigravity",
+    );
   });
 });
 
@@ -544,6 +605,93 @@ describe("Claude reject-git-worktree hook adapter", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.trim()).toBe("");
     expect(result.stderr).toBe("");
+  });
+});
+
+describe("Antigravity reject-git-worktree hook adapter", () => {
+  beforeEach(setupAdapterDirs);
+  afterEach(() => cleanup(tempDir));
+
+  it("denies with exit 0 and { decision: 'deny', reason } on stdout, leaving stderr empty", async () => {
+    const result = await invokeAntigravity(
+      antigravityPreToolUseCmdInCwd("git worktree list", groveCwd),
+    );
+
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(result.decision).toBe("deny");
+    expect(result.reason).toContain(DENY_REASON);
+    expect(result.reason).toContain("/worktree add");
+    expect(result.reason).toContain("create-grove-worktree");
+    expect(result.stderr).toBe("");
+  });
+
+  it("allows with exit 0 and empty stdout/stderr (never {}, which fails closed)", async () => {
+    const result = await invokeAntigravity(antigravityPreToolUseCmdInCwd("git status", groveCwd));
+
+    expect(result.denied).toBe(false);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("");
+  });
+
+  it("allows git worktree outside GROVE_ROOT", async () => {
+    const result = await invokeAntigravity(
+      antigravityPreToolUseCmdInCwd("git worktree list", nonGroveCwd),
+    );
+
+    expect(result.denied).toBe(false);
+    expect(result.stdout).toBe("");
+  });
+
+  it("denies chained shell segments containing git worktree", async () => {
+    const result = await invokeAntigravity(
+      antigravityPreToolUseCmdInCwd("git fetch && git -C /repo worktree add ../foo bar", groveCwd),
+    );
+
+    expect(result.denied).toBe(true);
+    expect(result.decision).toBe("deny");
+  });
+
+  it("fails open for non-run_command tools, non-PreToolUse events, and missing fields", async () => {
+    const nonShell = await invokeAntigravity(
+      antigravityPreToolUseCmdInCwd("git worktree list", groveCwd, "read_file"),
+    );
+    expect(nonShell.denied).toBe(false);
+    expect(nonShell.stdout).toBe("");
+
+    const postTool = await invokeAntigravity(
+      antigravityPreToolUseCmdInCwd("git worktree list", groveCwd, "run_command", "PostToolUse"),
+    );
+    expect(postTool.denied).toBe(false);
+    expect(postTool.stdout).toBe("");
+
+    const missingCwd = await invokeAntigravity({
+      hookEventName: "PreToolUse",
+      toolCall: { name: "run_command", args: { CommandLine: "git worktree list" } },
+    });
+    expect(missingCwd.denied).toBe(false);
+    expect(missingCwd.stdout).toBe("");
+
+    const wrongShape = await invokeAntigravity(
+      preToolUseBashCmdInCwd("git worktree list", groveCwd),
+    );
+    expect(wrongShape.denied).toBe(false);
+    expect(wrongShape.stdout).toBe("");
+  });
+
+  it("overrides PLUGIN_ROOT env var detection when explicit antigravity mode is passed", async () => {
+    const result = await invokeScript(
+      HOOK_SCRIPT,
+      antigravityPreToolUseCmdInCwd("git worktree list", groveCwd),
+      ["antigravity"],
+      { PLUGIN_ROOT },
+    );
+
+    expect(result.denied).toBe(true);
+    expect(result.exitCode).toBe(0);
+    expect(result.decision).toBe("deny");
+    expect(result.hookSpecificOutput).toBeUndefined();
   });
 });
 

@@ -80,6 +80,11 @@ adapters around the CLI rather than alternative implementations.
 - Codex hook commands should resolve from `${PLUGIN_ROOT}`. After installing or
   reinstalling the plugin, use `/hooks` in a new Codex thread to review and
   trust non-managed command hooks before relying on them.
+- Antigravity support uses `plugins/grove/.antigravity-plugin/plugin.json`,
+  `plugins/grove/skills/`, and the plugin-root hook file at
+  `plugins/grove/hooks.json` (which runs `reject-git-worktree.ts antigravity`
+  against Antigravity's `run_command` `PreToolUse` payload). Native Antigravity
+  plugins load `hooks.json` from the plugin root rather than `hooks/hooks.json`.
 
 ### Output rendering
 

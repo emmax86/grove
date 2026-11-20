@@ -154,8 +154,9 @@ Output captured to a file or piped to another command is byte-identical to termi
 
 - **Claude Code plugin** — `.claude-plugin/marketplace.json` is the Claude marketplace file, and `plugins/grove/commands/` contains the `/workspace`, `/workspace-status`, `/worktree`, `/repo`, `/exec` slash command implementations
 - **Codex plugin** — `.agents/plugins/marketplace.json` exposes `plugins/grove/` as a Codex plugin; `plugins/grove/.codex-plugin/plugin.json` is the manifest, `plugins/grove/skills/` contains Codex skills, and `plugins/grove/hooks/hooks.json` is the default bundled hook config
+- **Antigravity plugin** — `plugins/grove/.antigravity-plugin/plugin.json` exposes `plugins/grove/` as a native Antigravity plugin with `plugins/grove/skills/` and the plugin-root `PreToolUse` hook at `plugins/grove/hooks.json` (`run_command` matcher)
 - **MCP server** — `grove mcp-server` exposes workspace operations over MCP for AI tool integration
-- **Auto-generated files** — adding/removing repos creates `AGENTS.md` and `.mcp.json` once (if absent), then regenerates `{workspace}.code-workspace` to keep the editor config in sync
+- **Auto-generated files** — adding/removing repos creates `AGENTS.md`, `.mcp.json`, and `.agents/plugins/grove-mcp/{plugin.json,mcp_config.json}` once (if absent), then regenerates `{workspace}.code-workspace` to keep editor and agent configs in sync
 
 ### Codex
 
