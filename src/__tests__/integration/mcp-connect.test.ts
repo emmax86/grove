@@ -5,12 +5,50 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
+import { buildDaemonCommand } from "../../commands/mcp-connect";
 import { addRepo } from "../../commands/repo";
 import { addWorkspace } from "../../commands/workspace";
 import { createPaths } from "../../constants";
 import { cleanup, createTestDir, createTestGitRepo, GIT_ENV } from "../helpers";
 
 const CLI_PATH = join(import.meta.dir, "../../cli.ts");
+const COMPILED_BIN = join(import.meta.dir, "../../../bin/grove");
+
+describe("buildDaemonCommand", () => {
+  it("includes script argv[1] when running under bun", () => {
+    expect(buildDaemonCommand("ws", "/usr/bin/bun", "/repo/src/cli.ts")).toEqual([
+      "/usr/bin/bun",
+      "/repo/src/cli.ts",
+      "mcp-server",
+      "--workspace",
+      "ws",
+    ]);
+  });
+
+  it("omits Bun's virtual /$bunfs/ entrypoint for compiled binaries", () => {
+    expect(buildDaemonCommand("ws", "/usr/local/bin/grove", "/$bunfs/root/grove")).toEqual([
+      "/usr/local/bin/grove",
+      "mcp-server",
+      "--workspace",
+      "ws",
+    ]);
+  });
+
+  it("omits Windows virtual ~BUN entrypoint and missing argv[1]", () => {
+    expect(buildDaemonCommand("ws", "C:\\bin\\grove.exe", "B:/~BUN/root/grove.exe")).toEqual([
+      "C:\\bin\\grove.exe",
+      "mcp-server",
+      "--workspace",
+      "ws",
+    ]);
+    expect(buildDaemonCommand("ws", "/usr/local/bin/grove", null)).toEqual([
+      "/usr/local/bin/grove",
+      "mcp-server",
+      "--workspace",
+      "ws",
+    ]);
+  });
+});
 
 describe("grove mcp connect (stdio bridge)", () => {
   let tempDir: string;
@@ -61,6 +99,26 @@ describe("grove mcp connect (stdio bridge)", () => {
     }
 
     // Daemon was auto-started: discovery file exists and health-checks OK.
+    expect(await exists(paths.daemonConfig("ws"))).toBe(true);
+  }, 30_000);
+
+  it("auto-starts the daemon when invoked via the compiled bin/grove binary", async () => {
+    expect(await exists(COMPILED_BIN)).toBe(true);
+    const client = new Client({ name: "test-compiled", version: "0.0.0" });
+    const transport = new StdioClientTransport({
+      command: COMPILED_BIN,
+      args: ["mcp", "connect", "--workspace", "ws"],
+      env: { ...(process.env as Record<string, string>), GROVE_ROOT: fixtureRoot },
+    });
+
+    await client.connect(transport);
+    try {
+      const tools = await client.listTools();
+      expect(tools.tools.map((t) => t.name)).toContain("context_touch");
+    } finally {
+      await client.close();
+    }
+
     expect(await exists(paths.daemonConfig("ws"))).toBe(true);
   }, 30_000);
 

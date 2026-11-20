@@ -5,6 +5,26 @@ import type { Paths } from "../constants";
 import { discoverDaemon } from "../lib/daemon";
 
 /**
+ * Build the argv to re-invoke this CLI as the detached `mcp-server` daemon.
+ *
+ * Under `bun run src/cli.ts`, `process.execPath` is `bun` and `process.argv[1]`
+ * is the script path. Under a `bun build --compile` standalone binary,
+ * `process.execPath` is already the compiled `grove` executable and
+ * `process.argv[1]` is Bun's virtual `/$bunfs/...` (or Windows `B:/~BUN/...`)
+ * entrypoint — passing that virtual path back to the binary makes it treat the
+ * path as an unknown command and fail immediately.
+ */
+export function buildDaemonCommand(
+  workspace: string,
+  execPath = process.execPath,
+  argv1: string | null = process.argv[1] ?? null,
+): string[] {
+  const isCompiledEntry =
+    !argv1 || argv1.startsWith("/$bunfs/") || /^[A-Za-z]:[/\\]~BUN[/\\]/.test(argv1);
+  return [execPath, ...(isCompiledEntry ? [] : [argv1]), "mcp-server", "--workspace", workspace];
+}
+
+/**
  * Resolve the URL of the per-workspace MCP daemon, auto-starting it if absent.
  *
  * Discovery + health-checking is delegated to {@link discoverDaemon}. When no
@@ -19,15 +39,7 @@ async function ensureDaemon(workspace: string, paths: Paths): Promise<string> {
     return existing.url;
   }
 
-  // Auto-start: spawn ourselves detached. process.execPath is the bun binary
-  // (or the compiled grove binary); re-run the CLI entrypoint with mcp-server.
-  const command = [
-    process.execPath,
-    ...(process.argv[1] ? [process.argv[1]] : []),
-    "mcp-server",
-    "--workspace",
-    workspace,
-  ];
+  const command = buildDaemonCommand(workspace);
   const proc = Bun.spawn(command, {
     stdio: ["ignore", "ignore", "ignore"],
     env: process.env as Record<string, string>,
